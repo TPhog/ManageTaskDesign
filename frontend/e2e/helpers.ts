@@ -1,4 +1,4 @@
-import { type Page, expect } from '@playwright/test'
+import { type APIRequestContext, type Page, expect } from '@playwright/test'
 
 // Seeded by appsettings.Development.json (Seed:DesignerUsername / Seed:DesignerPassword)
 export const TEST_USERNAME = process.env.E2E_USERNAME ?? 'designer'
@@ -25,4 +25,33 @@ export async function expectToast(page: Page, text: string | RegExp) {
 export async function selectOption(page: Page, combobox: string | RegExp, option: string | RegExp) {
   await page.getByRole('combobox', { name: combobox }).click()
   await page.getByRole('option', { name: option }).click()
+}
+
+export async function csrfToken(page: Page) {
+  const cookie = (await page.context().cookies()).find(c => c.name === 'ff_csrf')
+  return cookie ? decodeURIComponent(cookie.value) : ''
+}
+
+async function apiPost(request: APIRequestContext, page: Page, url: string, data: unknown) {
+  // CsrfMiddleware requires Origin == App:PublicBaseUrl plus the double-submit token;
+  // APIRequestContext sends neither on its own. page must already be on an app URL.
+  const res = await request.post(url, {
+    data,
+    headers: { 'X-CSRF-Token': await csrfToken(page), Origin: new URL(page.url()).origin },
+  })
+  expect(res.ok(), `${url} → ${res.status()}`).toBeTruthy()
+  return res.json()
+}
+
+/** Make sure at least one active client exists; returns its id. */
+export async function ensureClient(page: Page): Promise<string> {
+  const data = await (await page.request.get('/api/admin/clients?status=ACTIVE&pageSize=1')).json()
+  if (data.total > 0) return data.items[0].id
+  return (await apiPost(page.request, page, '/api/admin/clients', { name: 'E2E Test Client' })).id
+}
+
+/** Create a fresh project through the API (keeps tests independent of each other). */
+export async function createProject(page: Page, name = `E2E Project ${Date.now()}`): Promise<string> {
+  const clientId = await ensureClient(page)
+  return (await apiPost(page.request, page, '/api/admin/projects', { clientId, name, designType: 'LOGO' })).id
 }

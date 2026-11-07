@@ -18,6 +18,10 @@ const styleMap: Record<string, [string, string]> = {
   CONFIRMED: ['bg-emerald-50 text-emerald-700 ring-emerald-200', 'bg-emerald-500'],
   ACTIVE: ['bg-emerald-50 text-emerald-700 ring-emerald-200', 'bg-emerald-500'],
   INACTIVE: ['bg-slate-100 text-slate-600 ring-slate-200', 'bg-slate-400'],
+  NOT_STARTED: ['bg-slate-100 text-slate-700 ring-slate-200', 'bg-slate-400'],
+  IN_REVIEW: ['bg-amber-50 text-amber-700 ring-amber-200', 'bg-amber-500'],
+  APPROVED: ['bg-teal-50 text-teal-700 ring-teal-200', 'bg-teal-500'],
+  DELIVERED: ['bg-emerald-50 text-emerald-700 ring-emerald-200', 'bg-emerald-500'],
 }
 
 const labelMap: Record<string, string> = {
@@ -39,6 +43,10 @@ const labelMap: Record<string, string> = {
   CONFIRMED: 'Đã xác nhận',
   ACTIVE: 'Đang hoạt động',
   INACTIVE: 'Lưu trữ',
+  NOT_STARTED: 'Chưa bắt đầu',
+  IN_REVIEW: 'Chờ khách duyệt',
+  APPROVED: 'Khách đã duyệt',
+  DELIVERED: 'Đã bàn giao',
 }
 
 export function StatusBadge({ status, label }: { status: string; label?: string }) {

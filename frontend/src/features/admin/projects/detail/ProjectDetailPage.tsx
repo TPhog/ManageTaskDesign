@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, FileText, Package, History, SearchX } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileText, History, SearchX } from 'lucide-react'
 import { toast } from 'sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -12,11 +12,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { StatusBadge } from '@/components/StatusBadge'
-import { QuotaMeter } from '@/components/QuotaMeter'
 import { EmptyState } from '@/components/EmptyState'
 import { formatDate } from '@/lib/format'
 import { api, type ApiError } from '@/lib/api'
-import type { ProjectDetail, ProjectStatus, Deliverable } from '@/lib/types'
+import { DeliverablesTab } from './DeliverablesTab'
+import type { ProjectDetail, ProjectStatus } from '@/lib/types'
 
 const designTypeLabel: Record<string, string> = {
   LOGO: 'Logo', BANNER: 'Banner', POSTER: 'Poster', BRANDING: 'Thương hiệu',
@@ -47,24 +47,6 @@ const statusTransitions: Record<ProjectStatus, { to: ProjectStatus; label: strin
 }
 
 const panelClass = 'rounded-xl border bg-card p-5 shadow-card'
-
-function DeliverableRow({ d }: { d: Deliverable }) {
-  return (
-    <div className="flex flex-col gap-3 py-3.5 sm:flex-row sm:items-center sm:gap-4">
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-foreground">{d.name}</p>
-        <p className="text-xs text-muted-foreground">Số lượng: {d.quantity}</p>
-      </div>
-      <div className="w-full sm:w-40">
-        <QuotaMeter used={d.usedRounds} total={d.includedRounds} label="vòng" />
-      </div>
-      <div className="flex items-center justify-between gap-4 sm:justify-end">
-        <StatusBadge status={d.status} />
-        <span className="w-24 text-right text-xs tabular-nums text-muted-foreground">{formatDate(d.dueDate)}</span>
-      </div>
-    </div>
-  )
-}
 
 function InfoItem({ label, value }: { label: string; value: string }) {
   return (
@@ -213,18 +195,7 @@ export default function ProjectDetailPage() {
         </TabsContent>
 
         <TabsContent value="deliverables" className="mt-4">
-          <div className={panelClass}>
-            {project.deliverables.length === 0 ? (
-              <EmptyState icon={Package} title="Chưa có deliverable" description="Các hạng mục bàn giao của dự án sẽ hiện ở đây." />
-            ) : (
-              <div className="divide-y">
-                {project.deliverables
-                  .slice()
-                  .sort((a, b) => a.sortOrder - b.sortOrder)
-                  .map(d => <DeliverableRow key={d.id} d={d} />)}
-              </div>
-            )}
-          </div>
+          <DeliverablesTab project={project} />
         </TabsContent>
 
         <TabsContent value="brief" className="mt-4">

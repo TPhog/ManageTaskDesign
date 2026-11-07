@@ -1,22 +1,5 @@
-import { test, expect, type Page } from '@playwright/test'
-import { expectToast, selectOption } from './helpers'
-
-/** Make sure at least one active client exists (a project needs one). */
-async function ensureClient(page: Page) {
-  const res = await page.request.get('/api/admin/clients?status=ACTIVE&pageSize=1')
-  const data = await res.json()
-  if (data.total > 0) return
-  const created = await page.request.post('/api/admin/clients', {
-    data: { name: 'E2E Test Client' },
-    headers: { 'X-CSRF-Token': await csrfToken(page) },
-  })
-  expect(created.ok()).toBeTruthy()
-}
-
-async function csrfToken(page: Page) {
-  const cookie = (await page.context().cookies()).find(c => c.name === 'ff_csrf')
-  return cookie ? decodeURIComponent(cookie.value) : ''
-}
+import { test, expect } from '@playwright/test'
+import { ensureClient, expectToast, selectOption } from './helpers'
 
 test.describe('Projects — List & Gantt', () => {
   test.beforeEach(async ({ page }) => {

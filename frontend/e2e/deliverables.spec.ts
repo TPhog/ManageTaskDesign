@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { expectToast } from './helpers'
+import { createProject, expectToast } from './helpers'
 
 /** Navigate to the first available project detail page */
 async function goToFirstProject(page: Page) {
@@ -15,27 +15,44 @@ async function goToFirstProject(page: Page) {
 // editing/confirming briefs has not been built yet. Tests marked fixme until that UI lands.
 
 test.describe('Deliverables', () => {
-  test('deliverables tab renders', async ({ page }) => {
-    const id = await goToFirstProject(page)
-    test.skip(!id, 'No projects available')
-
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/admin')
+    const id = await createProject(page)
+    await page.goto(`/admin/projects/${id}`)
     await page.getByRole('tab', { name: /Deliverables/ }).click()
-    await expect(page.getByRole('tabpanel')).toBeVisible()
   })
 
-  test.fixme('can add a deliverable to a project', async ({ page }) => {
-    const id = await goToFirstProject(page)
-    test.skip(!id, 'No projects available')
+  test('can add a deliverable to a project', async ({ page }) => {
+    await page.getByRole('button', { name: 'Thêm deliverable' }).first().click()
+    const dialog = page.getByRole('dialog', { name: 'Thêm deliverable' })
+    await dialog.getByLabel('Tên deliverable').fill('Logo chính E2E')
+    await dialog.getByLabel('Số vòng sửa miễn phí').fill('3')
+    await dialog.getByLabel('Giá vòng thêm (₫)').fill('200000')
+    await dialog.getByRole('button', { name: 'Thêm', exact: true }).click()
 
-    await page.getByRole('tab', { name: /Deliverables/ }).click()
-    await page.getByRole('button', { name: /thêm deliverable/i }).click()
-    await page.getByLabel(/tên/i).fill('Logo chính E2E')
-    await page.getByLabel(/số vòng/i).fill('3')
-    await page.getByLabel(/giá vòng thêm/i).fill('200000')
-    await page.getByRole('button', { name: /thêm/i }).click()
-
-    await expectToast(page, /Đã thêm/)
+    await expectToast(page, 'Đã thêm deliverable')
     await expect(page.getByText('Logo chính E2E')).toBeVisible()
+    await expect(page.getByText('0/3 vòng')).toBeVisible()
+  })
+
+  test('can edit a deliverable and move it through statuses', async ({ page }) => {
+    await page.getByRole('button', { name: 'Thêm deliverable' }).first().click()
+    let dialog = page.getByRole('dialog', { name: 'Thêm deliverable' })
+    await dialog.getByLabel('Tên deliverable').fill('Banner E2E')
+    await dialog.getByLabel('Số vòng sửa miễn phí').fill('1')
+    await dialog.getByRole('button', { name: 'Thêm', exact: true }).click()
+    await expectToast(page, 'Đã thêm deliverable')
+
+    await page.getByRole('button', { name: 'Sửa Banner E2E' }).click()
+    dialog = page.getByRole('dialog', { name: 'Sửa deliverable' })
+    await dialog.getByLabel('Tên deliverable').fill('Banner E2E v2')
+    await dialog.getByRole('button', { name: 'Lưu', exact: true }).click()
+    await expectToast(page, 'Đã cập nhật deliverable')
+
+    await page.getByRole('button', { name: 'Đổi trạng thái Banner E2E v2' }).click()
+    await page.getByRole('menuitem', { name: 'Bắt đầu làm' }).click()
+    await expectToast(page, 'Đã cập nhật trạng thái')
+    await expect(page.getByRole('tabpanel')).toContainText('Đang làm')
   })
 })
 

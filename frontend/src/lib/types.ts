@@ -1,6 +1,6 @@
 export type ProjectStatus = 'DRAFT' | 'QUOTED' | 'IN_PROGRESS' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED'
 export type DesignType = 'LOGO' | 'BANNER' | 'POSTER' | 'BRANDING' | 'UI_UX' | 'SOCIAL_MEDIA' | 'PACKAGING' | 'PRINT' | 'OTHER'
-export type DeliverableStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED'
+export type DeliverableStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'IN_REVIEW' | 'APPROVED' | 'DELIVERED' | 'CANCELLED'
 export type BriefStatus = 'DRAFT' | 'CONFIRMED'
 
 export interface ClientRef {
