@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, FileText, History, SearchX } from 'lucide-react'
+import { ChevronDown, ChevronRight, History, SearchX } from 'lucide-react'
 import { toast } from 'sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { EmptyState } from '@/components/EmptyState'
 import { formatDate } from '@/lib/format'
 import { api, type ApiError } from '@/lib/api'
+import { BriefTab } from './BriefTab'
 import { DeliverablesTab } from './DeliverablesTab'
 import type { ProjectDetail, ProjectStatus } from '@/lib/types'
 
@@ -199,26 +200,11 @@ export default function ProjectDetailPage() {
         </TabsContent>
 
         <TabsContent value="brief" className="mt-4">
-          <div className={panelClass}>
-            {!project.brief ? (
-              <EmptyState icon={FileText} title="Chưa có brief" description="Yêu cầu chi tiết của khách sẽ hiện ở đây." />
-            ) : (
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                  <span>Phiên bản {project.brief.version}</span>
-                  <StatusBadge status={project.brief.status} />
-                  {project.brief.confirmedAt && <span>Xác nhận {formatDate(project.brief.confirmedAt)}</span>}
-                </div>
-                {project.brief.content ? (
-                  <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-                    {project.brief.content}
-                  </div>
-                ) : (
-                  <p className="text-sm italic text-muted-foreground">Brief chưa có nội dung</p>
-                )}
-              </div>
-            )}
-          </div>
+          <BriefTab
+            key={`${project.brief?.id}-${project.brief?.updatedAt}`}
+            projectId={project.id}
+            brief={project.brief}
+          />
         </TabsContent>
 
         <TabsContent value="activity" className="mt-4">

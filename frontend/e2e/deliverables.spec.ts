@@ -1,18 +1,5 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 import { createProject, expectToast } from './helpers'
-
-/** Navigate to the first available project detail page */
-async function goToFirstProject(page: Page) {
-  const res = await page.request.get('/api/admin/projects?pageSize=1')
-  const data = await res.json()
-  if (!data.items?.length) return null
-  const projectId = data.items[0].id
-  await page.goto(`/admin/projects/${projectId}`)
-  return projectId
-}
-
-// The deliverable/brief APIs exist (M2) but the admin UI for adding deliverables and
-// editing/confirming briefs has not been built yet. Tests marked fixme until that UI lands.
 
 test.describe('Deliverables', () => {
   test.beforeEach(async ({ page }) => {
@@ -57,33 +44,32 @@ test.describe('Deliverables', () => {
 })
 
 test.describe('Brief', () => {
-  test('brief tab renders', async ({ page }) => {
-    const id = await goToFirstProject(page)
-    test.skip(!id, 'No projects available')
-
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/admin')
+    const id = await createProject(page)
+    await page.goto(`/admin/projects/${id}`)
     await page.getByRole('tab', { name: 'Brief' }).click()
-    await expect(page.getByRole('tabpanel')).toBeVisible()
   })
 
-  test.fixme('can edit and save brief content', async ({ page }) => {
-    const id = await goToFirstProject(page)
-    test.skip(!id, 'No projects available')
-
+  test('can edit and save brief content', async ({ page }) => {
+    await page.getByLabel('Nội dung brief').fill('Khách cần logo chuyên nghiệp, tông xanh.')
+    await page.getByRole('button', { name: 'Lưu brief' }).click()
+    await expectToast(page, 'Đã lưu brief')
+    await page.reload()
     await page.getByRole('tab', { name: 'Brief' }).click()
-    const editor = page.getByRole('textbox')
-    await editor.fill('Nội dung brief E2E test - khách cần logo chuyên nghiệp.')
-    await page.getByRole('button', { name: /lưu/i }).click()
-    await expectToast(page, 'Đã lưu')
+    await expect(page.getByLabel('Nội dung brief')).toHaveValue('Khách cần logo chuyên nghiệp, tông xanh.')
   })
 
-  test.fixme('can confirm a brief', async ({ page }) => {
-    const id = await goToFirstProject(page)
-    test.skip(!id, 'No projects available')
+  test('can confirm a brief and start a new version', async ({ page }) => {
+    await page.getByLabel('Nội dung brief').fill('Brief v1 E2E')
+    await page.getByRole('button', { name: 'Xác nhận brief' }).click()
+    await expectToast(page, 'Đã xác nhận brief')
+    await expect(page.getByLabel('Nội dung brief')).toHaveCount(0)
+    await expect(page.getByRole('tabpanel')).toContainText('Brief v1 E2E')
 
-    await page.getByRole('tab', { name: 'Brief' }).click()
-    const confirmBtn = page.getByRole('button', { name: /xác nhận brief/i })
-    await confirmBtn.click()
-    await expectToast(page, 'Đã xác nhận')
-    await expect(confirmBtn).not.toBeVisible()
+    await page.getByRole('button', { name: 'Tạo phiên bản mới' }).click()
+    await expectToast(page, 'Đã tạo phiên bản mới')
+    await expect(page.getByLabel('Nội dung brief')).toHaveValue('Brief v1 E2E')
+    await expect(page.getByRole('tabpanel')).toContainText('Phiên bản 2')
   })
 })
