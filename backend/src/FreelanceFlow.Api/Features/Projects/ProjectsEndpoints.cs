@@ -202,6 +202,12 @@ public static class ProjectsEndpoints
             .CountAsync(t => t.ProjectId == id && t.Status != "DONE" &&
                              t.DueDate != null && t.DueDate < clock.TodayVn);
 
+        var brief = await db.ProjectBriefs.AsNoTracking()
+            .Where(b => b.ProjectId == id)
+            .OrderByDescending(b => b.Version)
+            .Select(b => new { b.Id, b.Version, b.Status, b.Content, b.ConfirmedAt, b.CreatedAt, b.UpdatedAt })
+            .FirstOrDefaultAsync();
+
         var rowVersion = await db.Projects
             .Where(p => p.Id == id)
             .Select(p => EF.Property<uint>(p, "xmin"))
@@ -224,6 +230,7 @@ public static class ProjectsEndpoints
             RowVersion = rowVersion,
             Client = client,
             Deliverables = deliverableDtos,
+            Brief = brief,
             Money = new
             {
                 AcceptedTotal = moneyStats?.AcceptedTotal ?? 0,
