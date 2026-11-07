@@ -1,0 +1,26 @@
+{
+  admin off
+}
+
+:80 {
+  redir https://{host}{uri} permanent
+}
+
+https://{$DOMAIN} {
+  handle /api/* {
+    reverse_proxy api:8080
+  }
+  handle /p/* {
+    header Referrer-Policy no-referrer
+    reverse_proxy api:8080
+  }
+  handle {
+    root * /srv
+    try_files {path} /index.html
+    file_server
+  }
+  log {
+    output stdout
+    format json
+  }
+}

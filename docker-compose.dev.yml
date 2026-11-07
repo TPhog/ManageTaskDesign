@@ -1,0 +1,19 @@
+version: '3.9'
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: freelanceflow
+      POSTGRES_USER: ff
+      POSTGRES_PASSWORD: changeme
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ff -d freelanceflow"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  pgdata_dev:

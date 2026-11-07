@@ -1,0 +1,47 @@
+version: '3.9'
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: freelanceflow
+      POSTGRES_USER: ff
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ff -d freelanceflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file: .env
+    volumes:
+      - files:/data/files
+      - keys:/data/keys
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+  web:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./frontend/dist:/srv:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    restart: unless-stopped
+volumes:
+  pgdata: {}
+  files: {}
+  keys: {}
+  caddy_data: {}
+  caddy_config: {}
