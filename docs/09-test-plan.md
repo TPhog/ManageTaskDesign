@@ -1,0 +1,138 @@
+# 09 — Test Plan & Acceptance Criteria
+
+## 1. Chiến lược
+
+| Tầng | Công cụ | Phạm vi | Mục tiêu |
+|---|---|---|---|
+| Unit (BE) | xUnit + FluentAssertions | `Domain/*`, `VietQr`, tính tiền, gợi ý billing, state machine | ≥ 80% line coverage `Domain/` |
+| Integration (BE) | `WebApplicationFactory` + Testcontainers PostgreSQL 17 | Endpoint thật + DB thật + trigger + constraint + auth | Mọi endpoint có ≥ 1 happy path + lỗi chính |
+| Isolation (BE) | Như trên | **Mọi** endpoint Portal với 2 khách | 100% endpoint Portal |
+| Unit (FE) | Vitest + Testing Library | format tiền/ngày, form validation, component trạng thái | |
+| E2E | Playwright | 5 luồng chính (§3) trên docker-compose | Chạy trước mỗi release |
+| Thủ công | — | QR với app ngân hàng thật, mobile Portal (iOS Safari, Android Chrome) | Trước go-live |
+
+**TDD:** viết test trước cho Domain (quota, billing, quotation state/tiền, VietQR) — đây là chỗ sai là mất tiền.
+Integration test dùng `IClock` giả để kiểm EXPIRED/quá hạn.
+
+Fixture chuẩn (`TestData.Seed()`): designer, settings (VCB 970436 / 0123456789), services mẫu,
+khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khách **B** (dự án B1).
+
+## 2. Acceptance criteria theo nghiệp vụ
+
+### AC-QUOTA — Quota revision (BR-40..46)
+
+| ID | Given | When | Then |
+|---|---|---|---|
+| AC-Q1 | Logo `included_rounds=3`, chưa có round | Triage request: 1 round Logo với 5 item MINOR, billing null | 1 round `round_no=1`, 5 item IN_QUOTA, `usedRounds=1` |
+| AC-Q2 | Logo đã dùng 3/3 | Tạo round 4 với 1 item MAJOR | Gợi ý CHARGEABLE, lý do nêu "3/3"; `usedRounds` vẫn 3 |
+| AC-Q3 | Logo 1/3 | Round có 2 IN_QUOTA + 1 CHARGEABLE | `usedRounds = 2` (chỉ trừ 1) |
+| AC-Q4 | Logo 3/3 | Item FREE_FIX ở round 4 | `usedRounds` vẫn 3 |
+| AC-Q5 | Round cấp dự án | Thêm item billing IN_QUOTA | `422 BUSINESS_RULE` (BR-41) |
+| AC-Q6 | Round 2 có 1 IN_QUOTA | Chuyển item đó CANCELLED | `usedRounds` giảm 1, activity có before/after |
+| AC-Q7 | Item NEW_DELIVERABLE | Tạo | Gợi ý CHARGEABLE |
+| AC-Q8 | Logo 3/3, round 4 có 3 item CHARGEABLE MINOR + 1 NEW_DELIVERABLE (service Banner) | `from-revisions` | DRAFT ADDITIONAL có 2 dòng: "Vòng sửa thứ 4 — Logo" 200.000 và Banner 500.000; cả 4 item có `quotation_item_id` |
+
+### AC-QUO — Báo giá (BR-30..39, 70..75)
+
+| ID | Given | When | Then |
+|---|---|---|---|
+| AC-B1 | DRAFT: 2.000.000 + 500.000, giảm 100.000, VAT 0, cọc 50% | Lưu | subtotal 2.500.000, total 2.400.000, deposit 1.200.000 |
+| AC-B2 | VAT 8% trên taxable 1.234.567 | Lưu | vat_amount 98.765 (half-up 98.765,36), total 1.333.332 |
+| AC-B3 | DRAFT đầu tiên năm 2026, chưa có seq | Send | number `BG-2026-0001`, version 1, snapshot đủ trường, `issue_date` = hôm nay VN, `expiry_date` = +validity |
+| AC-B4 | 2 lệnh send đồng thời của 2 báo giá khác | Send song song | Số khác nhau, liên tiếp, không trùng |
+| AC-B5 | SENT | PUT sửa items | `409 QUOTATION_LOCKED`; UPDATE SQL trực tiếp cũng bị trigger chặn |
+| AC-B6 | v1 SENT | new-version → sửa → send | v2 SENT cùng number; v1 SUPERSEDED; revision items chuyển link sang dòng v2 (BR-47) |
+| AC-B7 | v1 SENT, v2 DRAFT | new-version lần nữa | `409` (1 DRAFT/chain) |
+| AC-B8 | Đổi `base_price` service Logo 2.000.000 → 3.000.000 | Xem báo giá SENT cũ (admin + portal) | Vẫn 2.000.000 |
+| AC-B9 | Đổi tài khoản ngân hàng trong settings | Xem QR báo giá SENT cũ | QR vẫn dùng tài khoản cũ (snapshot) |
+| AC-B10 | SENT, `expiry_date` = hôm qua (clock giả) | GET | `effectiveStatus = EXPIRED`; DB `status = SENT` |
+| AC-B11 | SENT | accept `{acceptedAt, note, evidenceFileId}` | ACCEPTED; activity `quotation.accepted` visible_to_client |
+| AC-B12 | SENT | reject không có reason | `400` |
+| AC-B13 | ACCEPTED, cọc 50%, UNPAID | payment-status DEPOSIT_PAID | `qrOptions` chỉ còn `remaining` = total − deposit |
+| AC-B14 | ACCEPTED, cọc 0% | payment-status DEPOSIT_PAID | `422` (BR-71) |
+| AC-B15 | SENT (chưa ACCEPTED) | payment-status PAID | `422` (BR-70) |
+| AC-B16 | PAID | hoàn tác về DEPOSIT_PAID không có reason | `400`; có reason → OK + activity |
+| AC-B17 | Settings chưa có ngân hàng | Send | `422` "Chưa cấu hình tài khoản nhận tiền" |
+| AC-B18 | DRAFT ADDITIONAL có link revision | DELETE | Xóa OK; các revision item `quotation_item_id = null` |
+| AC-B19 | SENT | DELETE | `409` |
+
+### AC-SCOPE — Scope guard (BR-60..62)
+
+| ID | Given | When | Then |
+|---|---|---|---|
+| AC-S1 | Item CHARGEABLE chưa có báo giá | work-status IN_PROGRESS không reason | `428 SCOPE_GUARD` |
+| AC-S2 | Như trên | Có `overrideReason` | OK; `scope_override_reason` lưu; activity `revision_item.scope_override` |
+| AC-S3 | Item CHARGEABLE, báo giá SENT | work-status IN_PROGRESS | `428` |
+| AC-S4 | Item CHARGEABLE, báo giá ACCEPTED | work-status IN_PROGRESS | OK, không cần reason |
+| AC-S5 | Item đã link báo giá SENT | Đổi billing → IN_QUOTA | `409 BILLING_LOCKED` |
+| AC-S6 | Item IN_QUOTA | work-status DONE | OK |
+
+### AC-PRJ — Dự án & brief
+
+| ID | Given | When | Then |
+|---|---|---|---|
+| AC-P1 | DRAFT | status → COMPLETED | `409 INVALID_TRANSITION` |
+| AC-P2 | IN_PROGRESS | ON_HOLD không reason | `400` |
+| AC-P3 | QUOTED, chưa có INITIAL ACCEPTED | → IN_PROGRESS, `confirmWarnings=false` | `422` + warnings; `true` → OK |
+| AC-P4 | Brief v1 CONFIRMED | PUT content | `409 BRIEF_LOCKED`; SQL UPDATE trực tiếp bị trigger chặn |
+| AC-P5 | Brief v1 CONFIRMED | Tạo version mới | v2 DRAFT, content = v1 |
+| AC-P6 | Brief v2 DRAFT tồn tại | Tạo version mới | `409` |
+| AC-P7 | Khách có dự án IN_PROGRESS | archive khách | `409 HAS_ACTIVE_PROJECTS` |
+
+### AC-REQ — Request
+
+| ID | Given | When | Then |
+|---|---|---|---|
+| AC-R1 | Khách A session | POST request cho A1 với 2 ảnh | 201, status NEW, `created_by=CLIENT`, `source=PORTAL`, 2 file `uploaded_by=CLIENT`; badge admin +1 |
+| AC-R2 | A1 COMPLETED | Khách gửi request | `422` (BR-21) |
+| AC-R3 | Request TRIAGED | Triage lại | `409` |
+| AC-R4 | Decline với reason | Khách xem danh sách request | Thấy DECLINED + lý do |
+| AC-R5 | Khách gửi request thứ 21 trong ngày | POST | `429` |
+| AC-R6 | Upload `.html` / `.svg` / `.jpg` thực chất là exe | POST | `415` |
+| AC-R7 | File 21 MB | POST | `413` |
+
+## 3. Luồng E2E (Playwright)
+
+1. **Onboarding:** đăng nhập → cấu hình ngân hàng → tạo dịch vụ → tạo khách → tạo link portal.
+2. **Dự án mới:** tạo dự án + 2 deliverable từ service → viết & confirm brief → báo giá INITIAL → gửi →
+   đánh dấu ACCEPTED → DEPOSIT_PAID → dự án IN_PROGRESS.
+3. **Revision vượt quota:** khách (context trình duyệt riêng, mở magic link) gửi 4 request cho Logo →
+   designer triage từng cái → request thứ 4 gợi ý tính phí → tạo báo giá phát sinh → gửi →
+   khách thấy báo giá + QR đúng số tiền.
+4. **Version báo giá:** báo giá SENT → tạo version mới, sửa giá → gửi → portal hiển thị v2, v1 ở lịch sử.
+5. **Thu hồi link:** designer tạo link mới → session khách cũ bị 401 → link mới vào được.
+
+## 4. Test cô lập Portal (bắt buộc, tự động sinh)
+
+Với **mỗi** endpoint Portal có tham số id (project, quotation, file, request, version…):
+
+```text
+Given khách A có tài nguyên X; khách B đã đăng nhập portal
+When  B gọi endpoint với id của X
+Then  404, body không chứa bất kỳ trường nào của X
+```
+
+Thêm:
+- Portal list endpoints của B không trả phần tử nào thuộc A.
+- B không xem được báo giá DRAFT của chính B; không xem được file `visible_to_client=false`.
+- Portal response không chứa khóa JSON `internalNotes`, `notes`, `scopeOverrideReason` (test snapshot schema).
+- Portal bị tắt / khách archived / token version cũ → 401.
+- Request portal không có header CSRF → 403.
+
+Triển khai: một test `[Theory]` lấy danh sách route từ `EndpointDataSource`, lọc prefix `/api/portal`,
+và **fail nếu có route mới chưa được khai báo trong bảng isolation-case** — buộc mọi endpoint mới có test.
+
+## 5. Test bất biến DB (integration)
+
+- UPDATE `quotations.total` khi status ≠ DRAFT → exception.
+- INSERT `quotation_items` vào báo giá SENT → exception.
+- UPDATE/DELETE `activity_logs` → exception.
+- UPDATE `project_briefs` CONFIRMED → exception.
+- 2 báo giá cùng `number` ở SENT → unique violation.
+
+## 6. Kiểm thử thủ công trước go-live
+
+- [ ] Quét QR (cọc/toàn bộ/còn lại) bằng 3 app ngân hàng, chuyển thử khoản nhỏ.
+- [ ] Portal trên iPhone Safari & Android Chrome: mở link từ Zalo (in-app browser của Zalo), upload ảnh từ camera.
+- [ ] Checklist bảo mật 07 §9.
+- [ ] Backup → restore trên máy khác → dữ liệu và file đầy đủ.

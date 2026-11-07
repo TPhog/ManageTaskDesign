@@ -1,0 +1,38 @@
+# CLAUDE.md — FreelanceFlow (CamCam)
+
+> Copy file này vào root repo thành `CLAUDE.md` khi bắt đầu code. Cập nhật lệnh build/test khi đã có thực tế.
+
+## Project
+Web app cá nhân cho 1 designer: quản lý khách, dự án, deliverable, revision (quota), task, báo giá có VietQR,
+Client Portal (khách chỉ xem + gửi request). **Không xử lý thanh toán.**
+
+## Docs (nguồn sự thật)
+- Rules: `docs/02-business-rules.md` (BR-xx) — mọi logic domain phải khớp; trích BR-xx trong test name.
+- DB: `docs/04-database-design.md` · API: `docs/05-api-spec.md` · Security: `docs/07-security.md`
+- Thứ tự làm: `docs/10-implementation-plan.md`
+
+## Stack
+Backend .NET 10 Minimal API + EF Core 10 + PostgreSQL 17 · Frontend React + TS + Vite + Tailwind + shadcn + TanStack Query.
+
+## Commands
+```bash
+docker compose -f docker-compose.dev.yml up -d      # Postgres dev
+dotnet test backend/FreelanceFlow.sln
+cd frontend && npm run dev | npm test | npm run lint | npm run typecheck
+```
+
+## Hard rules
+- Tiền: `long` VND, tính ở backend, round half-up. Không `decimal`/`double` cho tiền.
+- Logic nghiệp vụ nằm trong `Domain/` (method trên entity), không ở endpoint.
+- Thay đổi trạng thái/tiền → ghi activity log trong cùng transaction.
+- Báo giá ≠ DRAFT là bất biến; hiển thị từ `snapshot`.
+- Portal: `clientId` chỉ lấy từ `PortalPrincipal`; tài nguyên ngoài scope → 404; DTO portal riêng.
+  Endpoint portal mới **phải** thêm case vào isolation test.
+- Thời gian: `IClock` (UTC + `TodayVn`); không gọi `DateTime.Now`.
+- Không log token portal, mật khẩu, body upload.
+
+## Debug first
+- Quota sai → `Domain/Revisions` (`SuggestBilling`, used rounds query).
+- Tiền báo giá sai → `Domain/Quotations` (tính tiền), snapshot builder.
+- QR không quét được → `Infrastructure/VietQr` + test vectors trong `docs/06-vietqr-spec.md`.
+- Khách thấy dữ liệu lạ → `Features/Portal` + isolation tests.
