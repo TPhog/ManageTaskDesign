@@ -13,7 +13,7 @@ public class AuthTests(AppFactory factory) : IntegrationTestBase(factory)
     {
         var response = await Client.PostAsJsonAsync("/api/auth/login", new
         {
-            email = AppFactory.TestEmail,
+            username = AppFactory.TestUsername,
             password = AppFactory.TestPassword,
         });
 
@@ -30,7 +30,7 @@ public class AuthTests(AppFactory factory) : IntegrationTestBase(factory)
     {
         var response = await Client.PostAsJsonAsync("/api/auth/login", new
         {
-            email = AppFactory.TestEmail,
+            username = AppFactory.TestUsername,
             password = "wrongpassword",
         });
 
@@ -45,12 +45,12 @@ public class AuthTests(AppFactory factory) : IntegrationTestBase(factory)
     }
 
     [Fact]
-    public async Task Me_after_login_returns_email()
+    public async Task Me_after_login_returns_username()
     {
         // Login first to get cookies
         var loginResp = await Client.PostAsJsonAsync("/api/auth/login", new
         {
-            email = AppFactory.TestEmail,
+            username = AppFactory.TestUsername,
             password = AppFactory.TestPassword,
         });
         loginResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -71,7 +71,7 @@ public class AuthTests(AppFactory factory) : IntegrationTestBase(factory)
 
         meResp.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await meResp.Content.ReadFromJsonAsync<JsonElement>();
-        body.GetProperty("email").GetString().Should().Be(AppFactory.TestEmail);
+        body.GetProperty("username").GetString().Should().Be(AppFactory.TestUsername);
     }
 
     [Fact]
@@ -80,7 +80,7 @@ public class AuthTests(AppFactory factory) : IntegrationTestBase(factory)
         // Login first
         var loginResp = await Client.PostAsJsonAsync("/api/auth/login", new
         {
-            email = AppFactory.TestEmail,
+            username = AppFactory.TestUsername,
             password = AppFactory.TestPassword,
         });
         loginResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -107,7 +107,7 @@ public class AuthTests(AppFactory factory) : IntegrationTestBase(factory)
         // Login first
         var loginResp = await Client.PostAsJsonAsync("/api/auth/login", new
         {
-            email = AppFactory.TestEmail,
+            username = AppFactory.TestUsername,
             password = AppFactory.TestPassword,
         });
         loginResp.StatusCode.Should().Be(HttpStatusCode.NoContent);
@@ -123,5 +123,13 @@ public class AuthTests(AppFactory factory) : IntegrationTestBase(factory)
 
         var resp = await Client.SendAsync(request);
         resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Login_missing_username_returns_400()
+    {
+        var response = await Client.PostAsJsonAsync("/api/auth/login", new { password = "whatever" });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 }

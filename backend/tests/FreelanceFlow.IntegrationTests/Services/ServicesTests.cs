@@ -96,7 +96,7 @@ public class ServicesTests(AppFactory factory) : IntegrationTestBase(factory)
     private async Task<(string AdminCookie, string CsrfCookie, string CsrfToken)> GetAuthCookiesAsync()
     {
         var resp = await Client.PostAsJsonAsync("/api/auth/login",
-            new { email = AppFactory.TestEmail, password = AppFactory.TestPassword });
+            new { username = AppFactory.TestUsername, password = AppFactory.TestPassword });
         resp.EnsureSuccessStatusCode();
 
         var cookies = resp.Headers.GetValues("Set-Cookie").ToList();

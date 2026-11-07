@@ -36,6 +36,13 @@ public static class AuthEndpoints
         IPasswordHasher<DesignerAccount> hasher,
         IClock clock)
     {
+        if (string.IsNullOrWhiteSpace(req.Username) || string.IsNullOrWhiteSpace(req.Password))
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["username"] = ["Bắt buộc"],
+                ["password"] = ["Bắt buộc"],
+            });
+
         var account = await db.DesignerAccounts
             .FirstOrDefaultAsync(a => a.Username == req.Username.ToLowerInvariant());
 

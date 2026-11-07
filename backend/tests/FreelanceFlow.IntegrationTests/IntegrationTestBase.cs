@@ -11,35 +11,37 @@ public abstract class IntegrationTestBase : IClassFixture<AppFactory>
     protected IntegrationTestBase(AppFactory factory)
     {
         Factory = factory;
+        // Cookies are attached by hand: ff_csrf is issued with Secure=true, which a
+        // CookieContainer never sends to the test server's http:// base address.
         Client = factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             AllowAutoRedirect = false,
-            HandleCookies = true,
+            HandleCookies = false,
         });
     }
 
+    /// <summary>Logs in; afterwards every request on <see cref="Client"/> is authenticated and CSRF-valid.</summary>
     protected async Task LoginAsync()
     {
-        // POST login — CSRF is not checked for /api/auth/login (see CsrfMiddleware)
         var resp = await Client.PostAsJsonAsync("/api/auth/login", new
         {
-            email = AppFactory.TestEmail,
+            username = AppFactory.TestUsername,
             password = AppFactory.TestPassword,
         });
         resp.EnsureSuccessStatusCode();
 
-        // Extract ff_csrf cookie and set it as a header for subsequent mutating requests
-        if (resp.Headers.TryGetValues("Set-Cookie", out var setCookies))
-        {
-            var csrfCookie = setCookies
-                .Select(c => c.Split(';')[0])
-                .FirstOrDefault(c => c.StartsWith("ff_csrf=", StringComparison.OrdinalIgnoreCase));
-            if (csrfCookie != null)
-            {
-                var csrfValue = csrfCookie["ff_csrf=".Length..];
-                Client.DefaultRequestHeaders.Remove("X-CSRF-Token");
-                Client.DefaultRequestHeaders.Add("X-CSRF-Token", Uri.UnescapeDataString(csrfValue));
-            }
-        }
+        var cookies = resp.Headers.GetValues("Set-Cookie").Select(c => c.Split(';')[0]).ToList();
+        var admin = cookies.First(c => c.StartsWith("ff_admin=", StringComparison.Ordinal));
+        var csrf = cookies.First(c => c.StartsWith("ff_csrf=", StringComparison.Ordinal));
+
+        SetDefaultHeader("Cookie", $"{admin}; {csrf}");
+        SetDefaultHeader("X-CSRF-Token", Uri.UnescapeDataString(csrf["ff_csrf=".Length..]));
+        SetDefaultHeader("Origin", "http://localhost");
+    }
+
+    private void SetDefaultHeader(string name, string value)
+    {
+        Client.DefaultRequestHeaders.Remove(name);
+        Client.DefaultRequestHeaders.TryAddWithoutValidation(name, value);
     }
 }

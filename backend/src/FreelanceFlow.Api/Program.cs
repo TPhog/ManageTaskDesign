@@ -78,14 +78,15 @@ builder.Services.AddAuthorization(opt =>
     opt.AddPolicy("DesignerOnly", policy => policy.RequireAuthenticatedUser());
 });
 
-// Rate limiting
+// Rate limiting — login attempts per IP per minute (07-security); tests raise it via config
+var loginPermitLimit = builder.Configuration.GetValue("RateLimit:LoginPerMinute", 5);
 builder.Services.AddRateLimiter(opt =>
 {
     opt.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
         partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
         factory: _ => new FixedWindowRateLimiterOptions
         {
-            PermitLimit = 5,
+            PermitLimit = loginPermitLimit,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0,
         }));
