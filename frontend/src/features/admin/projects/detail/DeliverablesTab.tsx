@@ -40,11 +40,15 @@ export function DeliverablesTab({ project }: { project: ProjectDetail }) {
     mutationFn: ({ id, to }: { id: string; to: DeliverableStatus }) =>
       api.post(`/admin/deliverables/${id}/status`, { to }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['projects'] })
+      qc.invalidateQueries({ queryKey: ['projects', project.id] })
       toast.success('Đã cập nhật trạng thái')
     },
     onError: (err: ApiError) =>
-      toast.error(err.code === 'INVALID_TRANSITION' ? 'Chuyển trạng thái không hợp lệ' : 'Không thể cập nhật trạng thái'),
+      toast.error(
+        err.code === 'INVALID_TRANSITION'
+          ? 'Chuyển trạng thái không hợp lệ'
+          : (err.detail ?? 'Không thể cập nhật trạng thái'),
+      ),
   })
 
   function openCreate() {

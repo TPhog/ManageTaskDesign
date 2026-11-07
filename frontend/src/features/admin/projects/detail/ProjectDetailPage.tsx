@@ -199,7 +199,7 @@ export default function ProjectDetailPage() {
           <DeliverablesTab project={project} />
         </TabsContent>
 
-        <TabsContent value="brief" className="mt-4">
+        <TabsContent value="brief" forceMount className="mt-4 data-[state=inactive]:hidden">
           <BriefTab
             key={`${project.brief?.id}-${project.brief?.updatedAt}`}
             projectId={project.id}

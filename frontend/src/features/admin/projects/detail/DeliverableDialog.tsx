@@ -32,6 +32,15 @@ const schema = z.object({
 })
 type FormValues = z.infer<typeof schema>
 
+const CREATE_DEFAULTS: FormValues = {
+  name: '',
+  quantity: 1,
+  serviceId: NO_SERVICE,
+  includedRounds: 0,
+  extraRoundPrice: 0,
+  dueDate: '',
+}
+
 interface ServiceOption {
   id: string
   name: string
@@ -59,6 +68,7 @@ export function DeliverableDialog({ projectId, open, onClose, editing }: Props) 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { register, handleSubmit, reset, setValue, getValues, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema) as any,
+    defaultValues: CREATE_DEFAULTS,
   })
 
   useEffect(() => {
@@ -72,7 +82,7 @@ export function DeliverableDialog({ projectId, open, onClose, editing }: Props) 
           extraRoundPrice: editing.extraRoundPrice,
           dueDate: editing.dueDate ?? '',
         }
-      : { name: '', quantity: 1, serviceId: NO_SERVICE, includedRounds: 0, extraRoundPrice: 0, dueDate: '' })
+      : CREATE_DEFAULTS)
   }, [open, editing, reset])
 
   // Picking a service pre-fills the quota fields from its defaults (docs/05 §3.6)
@@ -107,7 +117,8 @@ export function DeliverableDialog({ projectId, open, onClose, editing }: Props) 
           })
     },
     onSuccess: res => {
-      qc.invalidateQueries({ queryKey: ['projects'] })
+      // create changes the list's deliverableCount; edit only affects this project
+      qc.invalidateQueries({ queryKey: editing ? ['projects', projectId] : ['projects'] })
       // BR-44: lowering the quota below used rounds is allowed but the API warns
       for (const w of (res as { warnings?: string[] } | undefined)?.warnings ?? []) toast.warning(w)
       toast.success(editing ? 'Đã cập nhật deliverable' : 'Đã thêm deliverable')

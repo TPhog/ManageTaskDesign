@@ -43,7 +43,11 @@ export function BriefTab({ projectId, brief }: Props) {
       refresh()
       toast.success('Đã xác nhận brief')
     },
-    onError: () => toast.error('Không thể xác nhận brief'),
+    // the save step may have succeeded before confirm failed, so refresh the cache either way
+    onError: (err: ApiError) => {
+      refresh()
+      toast.error(err.detail ?? 'Không thể xác nhận brief')
+    },
   })
 
   const newVersionMutation = useMutation({

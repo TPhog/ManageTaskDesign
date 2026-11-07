@@ -60,6 +60,13 @@ test.describe('Brief', () => {
     await expect(page.getByLabel('Nội dung brief')).toHaveValue('Khách cần logo chuyên nghiệp, tông xanh.')
   })
 
+  test('keeps unsaved brief edits when switching tabs', async ({ page }) => {
+    await page.getByLabel('Nội dung brief').fill('Bản nháp chưa lưu')
+    await page.getByRole('tab', { name: /Deliverables/ }).click()
+    await page.getByRole('tab', { name: 'Brief' }).click()
+    await expect(page.getByLabel('Nội dung brief')).toHaveValue('Bản nháp chưa lưu')
+  })
+
   test('can confirm a brief and start a new version', async ({ page }) => {
     await page.getByLabel('Nội dung brief').fill('Brief v1 E2E')
     await page.getByRole('button', { name: 'Xác nhận brief' }).click()
