@@ -1,7 +1,21 @@
+using System.Threading.RateLimiting;
 using FreelanceFlow.Api.Common;
+using FreelanceFlow.Api.Data;
+using FreelanceFlow.Api.Domain.Auth;
 using FreelanceFlow.Api.Domain.Common;
+using FreelanceFlow.Api.Features.Auth;
+using FreelanceFlow.Api.Features.Clients;
+using FreelanceFlow.Api.Features.Projects;
+using FreelanceFlow.Api.Features.Services;
+using FreelanceFlow.Api.Features.Settings;
+using FreelanceFlow.Api.Infrastructure;
+using FreelanceFlow.Api.Infrastructure.Security;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Serilog;
 using Serilog.Formatting.Compact;
+using StampValidator = FreelanceFlow.Api.Infrastructure.Security.DesignerStampValidator;
 
 // Builder setup
 var builder = WebApplication.CreateBuilder(args);
@@ -11,22 +25,123 @@ builder.Host.UseSerilog((ctx, cfg) => cfg
     .ReadFrom.Configuration(ctx.Configuration)
     .WriteTo.Console(new CompactJsonFormatter()));
 
-// Services
+// Core services
 builder.Services.AddSingleton<IClock, SystemClock>();
+builder.Services.AddScoped<ActivityWriter>();
 builder.Services.AddFreelanceFlowProblemDetails();
-// DbContext registration will be added in Task 3
-// Auth registration will be added in Task 7
+builder.Services.AddMemoryCache();
+
+// Config
+builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("App"));
+builder.Services.Configure<SeedSettings>(builder.Configuration.GetSection("Seed"));
+
+// DbContext
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? throw new InvalidOperationException("ConnectionString 'DefaultConnection' missing");
+
+builder.Services.AddSingleton<AuditInterceptor>();
+builder.Services.AddDbContext<AppDbContext>((sp, opt) =>
+    opt.UseNpgsql(connectionString)
+       .AddInterceptors(sp.GetRequiredService<AuditInterceptor>()));
+
+// Auth
+builder.Services.AddScoped<IPasswordHasher<DesignerAccount>, PasswordHasher<DesignerAccount>>();
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultScheme = "Designer";
+    options.DefaultChallengeScheme = "Designer";
+})
+.AddCookie("Designer", options =>
+{
+    options.Cookie.Name = "ff_admin";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    options.Cookie.SameSite = SameSiteMode.Strict;
+    options.SlidingExpiration = true;
+    options.ExpireTimeSpan = TimeSpan.FromDays(14);
+    options.Events.OnValidatePrincipal = StampValidator.ValidatePrincipal;
+    options.Events.OnRedirectToLogin = ctx =>
+    {
+        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return Task.CompletedTask;
+    };
+    options.Events.OnRedirectToAccessDenied = ctx =>
+    {
+        ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
+        return Task.CompletedTask;
+    };
+});
+
+builder.Services.AddAuthorization(opt =>
+{
+    opt.AddPolicy("DesignerOnly", policy => policy.RequireAuthenticatedUser());
+});
+
+// Rate limiting
+builder.Services.AddRateLimiter(opt =>
+{
+    opt.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
+    opt.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+});
 
 // App
 var app = builder.Build();
+
+// Auto-migrate on startup
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await db.Database.MigrateAsync();
+}
+
+// Seed designer account from env
+var seedCfg = app.Services.GetRequiredService<IOptions<SeedSettings>>().Value;
+if (!string.IsNullOrEmpty(seedCfg.DesignerUsername) && !string.IsNullOrEmpty(seedCfg.DesignerPassword))
+{
+    using var seedScope = app.Services.CreateScope();
+    var seedDb = seedScope.ServiceProvider.GetRequiredService<AppDbContext>();
+    var seedHasher = seedScope.ServiceProvider.GetRequiredService<IPasswordHasher<DesignerAccount>>();
+    if (!await seedDb.DesignerAccounts.AnyAsync())
+    {
+        var account = new DesignerAccount
+        {
+            Id = Guid.CreateVersion7(),
+            Username = seedCfg.DesignerUsername.ToLowerInvariant(),
+            SecurityStamp = Guid.NewGuid().ToString("N"),
+        };
+        account.PasswordHash = seedHasher.HashPassword(account, seedCfg.DesignerPassword);
+        seedDb.DesignerAccounts.Add(account);
+        await seedDb.SaveChangesAsync();
+    }
+}
+
 app.UseExceptionHandler();
 app.UseStatusCodePages();
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseMiddleware<CsrfMiddleware>();
 
-// Health check endpoint
-app.MapGet("/health", () =>
+// Endpoints
+app.MapAuthEndpoints();
+app.MapServicesEndpoints();
+app.MapSettingsEndpoints();
+app.MapClientsEndpoints();
+app.MapProjectsEndpoints();
+app.MapBriefsEndpoints();
+app.MapDeliverablesEndpoints();
+
+app.MapGet("/health", async (AppDbContext db) =>
 {
-    // Simple health check - returns 200 OK
-    // DB ping will be added in Task 3
+    await db.Database.ExecuteSqlRawAsync("SELECT 1");
     return Results.Ok(new { status = "healthy", timestamp = DateTimeOffset.UtcNow });
 });
 

@@ -9,6 +9,6 @@ public sealed class AppSettings
 
 public sealed class SeedSettings
 {
-    public string? DesignerEmail { get; init; }
+    public string? DesignerUsername { get; init; }
     public string? DesignerPassword { get; init; }
 }
