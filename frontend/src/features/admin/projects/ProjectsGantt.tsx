@@ -1,13 +1,24 @@
 import { useNavigate } from 'react-router-dom'
+import { CalendarRange } from 'lucide-react'
+import { EmptyState } from '@/components/EmptyState'
 import type { ProjectListItem, ProjectStatus } from '@/lib/types'
 
 const statusColor: Record<ProjectStatus, string> = {
-  DRAFT: '#9ca3af',
-  QUOTED: '#a78bfa',
+  DRAFT: '#94a3b8',
+  QUOTED: '#8b5cf6',
   IN_PROGRESS: '#3b82f6',
-  ON_HOLD: '#fb923c',
-  COMPLETED: '#22c55e',
+  ON_HOLD: '#f59e0b',
+  COMPLETED: '#10b981',
   CANCELLED: '#ef4444',
+}
+
+const statusLabel: Record<ProjectStatus, string> = {
+  DRAFT: 'Nháp',
+  QUOTED: 'Đã báo giá',
+  IN_PROGRESS: 'Đang làm',
+  ON_HOLD: 'Tạm dừng',
+  COMPLETED: 'Hoàn thành',
+  CANCELLED: 'Đã huỷ',
 }
 
 const ROW_H = 36
@@ -39,12 +50,15 @@ export function ProjectsGantt({ projects }: Props) {
 
   // filter projects that have at least one date
   const datable = projects.filter(p => p.startDate || p.dueDate)
+  const undatedCount = projects.length - datable.length
 
   if (datable.length === 0) {
     return (
-      <div className="text-center py-16 text-gray-400 text-sm">
-        Chưa có dự án nào có ngày bắt đầu / deadline
-      </div>
+      <EmptyState
+        icon={CalendarRange}
+        title="Chưa có dự án nào có ngày bắt đầu / deadline"
+        description="Thêm ngày cho dự án để xem trên timeline."
+      />
     )
   }
 
@@ -84,63 +98,76 @@ export function ProjectsGantt({ projects }: Props) {
   const todayX = xOf(today)
 
   return (
-    <div className="overflow-x-auto">
-      <svg width={svgW} height={svgH} className="select-none">
-        {/* header row */}
-        {monthTicks.map((t, i) => (
-          <g key={i}>
-            <line x1={t.x} y1={PADDING_Y + 20} x2={t.x} y2={svgH} stroke="#e5e7eb" strokeWidth={1} />
-            <text x={t.x + 4} y={PADDING_Y + 14} fontSize={11} fill="#9ca3af">{t.label}</text>
-          </g>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        {(Object.keys(statusColor) as ProjectStatus[]).map(s => (
+          <span key={s} className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm" style={{ background: statusColor[s] }} aria-hidden="true" />
+            {statusLabel[s]}
+          </span>
         ))}
-
-        {/* today line */}
-        {todayX >= LABEL_W && todayX <= svgW && (
-          <>
-            <line x1={todayX} y1={PADDING_Y + 20} x2={todayX} y2={svgH} stroke="#ef4444" strokeWidth={1.5} strokeDasharray="4,3" />
-            <text x={todayX + 3} y={PADDING_Y + 14} fontSize={10} fill="#ef4444">Hôm nay</text>
-          </>
+        {undatedCount > 0 && (
+          <span className="sm:ml-auto">{undatedCount} dự án chưa có ngày không hiển thị trên timeline</span>
         )}
-
-        {datable.map((p, i) => {
-          const y = PADDING_Y + 24 + i * ROW_H
-          const start = parseDate(p.startDate) ?? parseDate(p.dueDate)!
-          const end = parseDate(p.dueDate) ?? parseDate(p.startDate)!
-
-          const x1 = xOf(start)
-          const x2 = Math.max(x1 + MIN_BAR_W, xOf(end))
-          const barW = x2 - x1
-
-          const isOverdue =
-            p.dueDate &&
-            p.dueDate < today.toISOString().slice(0, 10) &&
-            p.status !== 'COMPLETED' &&
-            p.status !== 'CANCELLED'
-
-          const fillColor = isOverdue ? '#ef4444' : statusColor[p.status]
-
-          return (
-            <g key={p.id} onClick={() => navigate(`/admin/projects/${p.id}`)} style={{ cursor: 'pointer' }}>
-              {/* zebra */}
-              <rect x={0} y={y - 2} width={svgW} height={ROW_H} fill={i % 2 === 0 ? 'transparent' : '#f9fafb'} />
-              {/* label */}
-              <text x={4} y={y + ROW_H / 2 + 4} fontSize={12} fill="#374151" className="truncate">
-                {p.name.length > 22 ? p.name.slice(0, 20) + '…' : p.name}
-              </text>
-              {/* bar */}
-              <rect
-                x={x1}
-                y={y + 6}
-                width={barW}
-                height={ROW_H - 14}
-                rx={3}
-                fill={fillColor}
-                opacity={p.status === 'CANCELLED' ? 0.4 : 0.85}
-              />
+      </div>
+      <div className="overflow-x-auto">
+        <svg width={svgW} height={svgH} className="select-none" role="img" aria-label="Timeline dự án">
+          {/* header row */}
+          {monthTicks.map((t, i) => (
+            <g key={i}>
+              <line x1={t.x} y1={PADDING_Y + 20} x2={t.x} y2={svgH} stroke="#e5e7eb" strokeWidth={1} />
+              <text x={t.x + 4} y={PADDING_Y + 14} fontSize={11} fill="#9ca3af">{t.label}</text>
             </g>
-          )
-        })}
-      </svg>
+          ))}
+
+          {/* today line */}
+          {todayX >= LABEL_W && todayX <= svgW && (
+            <>
+              <line x1={todayX} y1={PADDING_Y + 20} x2={todayX} y2={svgH} stroke="#ef4444" strokeWidth={1.5} strokeDasharray="4,3" />
+              <text x={todayX + 3} y={PADDING_Y + 14} fontSize={10} fill="#ef4444">Hôm nay</text>
+            </>
+          )}
+
+          {datable.map((p, i) => {
+            const y = PADDING_Y + 24 + i * ROW_H
+            const start = parseDate(p.startDate) ?? parseDate(p.dueDate)!
+            const end = parseDate(p.dueDate) ?? parseDate(p.startDate)!
+
+            const x1 = xOf(start)
+            const x2 = Math.max(x1 + MIN_BAR_W, xOf(end))
+            const barW = x2 - x1
+
+            const isOverdue =
+              p.dueDate &&
+              p.dueDate < today.toISOString().slice(0, 10) &&
+              p.status !== 'COMPLETED' &&
+              p.status !== 'CANCELLED'
+
+            const fillColor = isOverdue ? '#ef4444' : statusColor[p.status]
+
+            return (
+              <g key={p.id} onClick={() => navigate(`/admin/projects/${p.id}`)} style={{ cursor: 'pointer' }}>
+                {/* zebra */}
+                <rect x={0} y={y - 2} width={svgW} height={ROW_H} fill={i % 2 === 0 ? 'transparent' : '#f9fafb'} />
+                {/* label */}
+                <text x={4} y={y + ROW_H / 2 + 4} fontSize={12} fill="#374151" className="truncate">
+                  {p.name.length > 22 ? p.name.slice(0, 20) + '…' : p.name}
+                </text>
+                {/* bar */}
+                <rect
+                  x={x1}
+                  y={y + 6}
+                  width={barW}
+                  height={ROW_H - 14}
+                  rx={3}
+                  fill={fillColor}
+                  opacity={p.status === 'CANCELLED' ? 0.4 : 0.85}
+                />
+              </g>
+            )
+          })}
+        </svg>
+      </div>
     </div>
   )
 }

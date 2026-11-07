@@ -3,6 +3,8 @@ import AdminLayout from './features/admin/AdminLayout'
 import PortalLayout from './features/portal/PortalLayout'
 import LoginPage from './features/admin/auth/LoginPage'
 import { ProtectedRoute } from './features/admin/ProtectedRoute'
+import NotFoundPage from './features/admin/NotFoundPage'
+import DashboardPage from './features/admin/dashboard/DashboardPage'
 import SettingsPage from './features/admin/settings/SettingsPage'
 import ServicesPage from './features/admin/services/ServicesPage'
 import ProjectsPage from './features/admin/projects/ProjectsPage'
@@ -17,8 +19,9 @@ export const router = createBrowserRouter([
   {
     path: '/admin',
     element: <ProtectedRoute><AdminLayout /></ProtectedRoute>,
+    errorElement: <NotFoundPage />,
     children: [
-      { index: true, element: <div className="text-gray-500 text-sm">Tổng quan — đang phát triển</div> },
+      { index: true, element: <DashboardPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'services', element: <ServicesPage /> },
       { path: 'projects', element: <ProjectsPage /> },
@@ -34,5 +37,9 @@ export const router = createBrowserRouter([
     path: '/p',
     element: <PortalLayout />,
     children: [],
+  },
+  {
+    path: '*',
+    element: <NotFoundPage />,
   },
 ])

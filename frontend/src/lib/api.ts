@@ -19,15 +19,35 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   })
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ title: res.statusText })) as { title?: string; detail?: string }
+    const err = await res.json().catch(() => ({ title: res.statusText })) as {
+      title?: string; detail?: string; code?: string; errors?: Record<string, string[]>
+    }
     throw Object.assign(new Error(err.title ?? res.statusText), {
       status: res.status,
       detail: err.detail,
-    })
+      code: err.code,
+      errors: err.errors,
+    }) as ApiError
   }
 
   if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
+}
+
+export type ApiError = Error & {
+  status: number
+  detail?: string
+  /** DomainException code from ProblemDetails extensions */
+  code?: string
+  /** ValidationProblem field errors, keyed by camelCase field name */
+  errors?: Record<string, string[]>
+}
+
+/** Optional form fields: map '' (empty input) to null so the API never receives blank strings. */
+export function emptyToNull<T extends Record<string, unknown>>(values: T): T {
+  return Object.fromEntries(
+    Object.entries(values).map(([k, v]) => [k, v === '' ? null : v]),
+  ) as T
 }
 
 export const api = {

@@ -1,18 +1,23 @@
-const colorMap: Record<string, string> = {
-  DRAFT: 'bg-gray-100 text-gray-600',
-  QUOTED: 'bg-purple-100 text-purple-700',
-  IN_PROGRESS: 'bg-blue-100 text-blue-700',
-  ON_HOLD: 'bg-orange-100 text-orange-700',
-  COMPLETED: 'bg-green-100 text-green-700',
-  CANCELLED: 'bg-red-100 text-red-500',
-  SENT: 'bg-blue-100 text-blue-700',
-  ACCEPTED: 'bg-green-100 text-green-700',
-  REJECTED: 'bg-red-100 text-red-500',
-  EXPIRED: 'bg-orange-100 text-orange-700',
-  SUPERSEDED: 'bg-gray-100 text-gray-400 line-through',
-  NEW: 'bg-blue-100 text-blue-700',
-  TRIAGED: 'bg-green-100 text-green-700',
-  DECLINED: 'bg-red-100 text-red-500',
+// Each status: [badge classes, dot color]. Text colors are the -700 shade for ≥ 4.5:1 on the -50 tint.
+const styleMap: Record<string, [string, string]> = {
+  DRAFT: ['bg-slate-100 text-slate-700 ring-slate-200', 'bg-slate-400'],
+  QUOTED: ['bg-violet-50 text-violet-700 ring-violet-200', 'bg-violet-500'],
+  IN_PROGRESS: ['bg-blue-50 text-blue-700 ring-blue-200', 'bg-blue-500'],
+  ON_HOLD: ['bg-amber-50 text-amber-700 ring-amber-200', 'bg-amber-500'],
+  COMPLETED: ['bg-emerald-50 text-emerald-700 ring-emerald-200', 'bg-emerald-500'],
+  CANCELLED: ['bg-red-50 text-red-700 ring-red-200', 'bg-red-500'],
+  SENT: ['bg-blue-50 text-blue-700 ring-blue-200', 'bg-blue-500'],
+  ACCEPTED: ['bg-emerald-50 text-emerald-700 ring-emerald-200', 'bg-emerald-500'],
+  REJECTED: ['bg-red-50 text-red-700 ring-red-200', 'bg-red-500'],
+  EXPIRED: ['bg-amber-50 text-amber-700 ring-amber-200', 'bg-amber-500'],
+  SUPERSEDED: ['bg-slate-100 text-slate-500 ring-slate-200 line-through', 'bg-slate-300'],
+  NEW: ['bg-blue-50 text-blue-700 ring-blue-200', 'bg-blue-500'],
+  TRIAGED: ['bg-emerald-50 text-emerald-700 ring-emerald-200', 'bg-emerald-500'],
+  DECLINED: ['bg-red-50 text-red-700 ring-red-200', 'bg-red-500'],
+  PENDING: ['bg-slate-100 text-slate-700 ring-slate-200', 'bg-slate-400'],
+  CONFIRMED: ['bg-emerald-50 text-emerald-700 ring-emerald-200', 'bg-emerald-500'],
+  ACTIVE: ['bg-emerald-50 text-emerald-700 ring-emerald-200', 'bg-emerald-500'],
+  INACTIVE: ['bg-slate-100 text-slate-600 ring-slate-200', 'bg-slate-400'],
 }
 
 const labelMap: Record<string, string> = {
@@ -30,14 +35,20 @@ const labelMap: Record<string, string> = {
   NEW: 'Mới',
   TRIAGED: 'Đã xem',
   DECLINED: 'Từ chối',
+  PENDING: 'Chờ làm',
+  CONFIRMED: 'Đã xác nhận',
+  ACTIVE: 'Đang hoạt động',
+  INACTIVE: 'Lưu trữ',
 }
 
-export function StatusBadge({ status }: { status: string }) {
-  const cls = colorMap[status] ?? 'bg-gray-100 text-gray-600'
-  const label = labelMap[status] ?? status
+export function StatusBadge({ status, label }: { status: string; label?: string }) {
+  const [cls, dot] = styleMap[status] ?? styleMap.DRAFT
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${cls}`}>
-      {label}
+    <span
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${cls}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${dot}`} aria-hidden="true" />
+      {label ?? labelMap[status] ?? status}
     </span>
   )
 }

@@ -19,7 +19,8 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
-      <Toaster richColors />
+      {/* top-center: bottom-right toasts covered the primary buttons at the end of long forms */}
+      <Toaster richColors position="top-center" />
     </QueryClientProvider>
   </StrictMode>,
 )

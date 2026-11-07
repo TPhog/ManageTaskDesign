@@ -1,5 +1,8 @@
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { FolderKanban, Plus, SearchX } from 'lucide-react'
 import { StatusBadge } from '@/components/StatusBadge'
+import { EmptyState } from '@/components/EmptyState'
+import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/format'
 import type { ProjectListItem } from '@/lib/types'
 
@@ -17,17 +20,29 @@ const designTypeLabel: Record<string, string> = {
 
 interface Props {
   projects: ProjectListItem[]
+  filtering: boolean
+  onCreate: () => void
 }
 
-export function ProjectsTable({ projects }: Props) {
+export function ProjectsTable({ projects, filtering, onCreate }: Props) {
   const navigate = useNavigate()
   const today = new Date().toISOString().slice(0, 10)
 
   if (projects.length === 0) {
-    return (
-      <div className="text-center py-16 text-gray-400 text-sm">
-        Chưa có dự án nào
-      </div>
+    return filtering ? (
+      <EmptyState icon={SearchX} title="Không tìm thấy dự án phù hợp" description="Thử từ khoá khác hoặc bỏ bộ lọc." />
+    ) : (
+      <EmptyState
+        icon={FolderKanban}
+        title="Chưa có dự án nào"
+        description="Tạo dự án đầu tiên cho khách của bạn."
+        action={
+          <Button onClick={onCreate}>
+            <Plus aria-hidden="true" />
+            Tạo dự án
+          </Button>
+        }
+      />
     )
   }
 
@@ -35,17 +50,17 @@ export function ProjectsTable({ projects }: Props) {
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-gray-100 text-left">
-            <th className="pb-2 pr-4 font-medium text-gray-500 w-[260px]">Tên dự án</th>
-            <th className="pb-2 pr-4 font-medium text-gray-500">Khách hàng</th>
-            <th className="pb-2 pr-4 font-medium text-gray-500">Loại</th>
-            <th className="pb-2 pr-4 font-medium text-gray-500">Trạng thái</th>
-            <th className="pb-2 pr-4 font-medium text-gray-500">Bắt đầu</th>
-            <th className="pb-2 pr-4 font-medium text-gray-500">Deadline</th>
-            <th className="pb-2 font-medium text-gray-500 text-right">Deliverable</th>
+          <tr className="whitespace-nowrap border-b bg-muted/50 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            <th scope="col" className="px-4 py-3">Tên dự án</th>
+            <th scope="col" className="hidden px-4 py-3 md:table-cell">Khách hàng</th>
+            <th scope="col" className="hidden px-4 py-3 lg:table-cell">Loại</th>
+            <th scope="col" className="px-4 py-3">Trạng thái</th>
+            <th scope="col" className="hidden px-4 py-3 lg:table-cell">Bắt đầu</th>
+            <th scope="col" className="px-4 py-3">Deadline</th>
+            <th scope="col" className="hidden px-4 py-3 text-right sm:table-cell">Deliverable</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y">
           {projects.map(p => {
             const isOverdue =
               p.dueDate &&
@@ -57,27 +72,36 @@ export function ProjectsTable({ projects }: Props) {
               <tr
                 key={p.id}
                 onClick={() => navigate(`/admin/projects/${p.id}`)}
-                className="border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition-colors"
+                className="cursor-pointer transition-colors duration-150 hover:bg-muted/40"
               >
-                <td className="py-3 pr-4">
-                  <span className="font-medium text-gray-900 line-clamp-1">{p.name}</span>
+                <td className="px-4 py-3.5">
+                  {/* real link so the row is reachable by keyboard and opens in a new tab */}
+                  <Link
+                    to={`/admin/projects/${p.id}`}
+                    onClick={e => e.stopPropagation()}
+                    className="line-clamp-1 font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                  >
+                    {p.name}
+                  </Link>
+                  <span className="text-xs text-muted-foreground md:hidden">{p.client.name}</span>
                 </td>
-                <td className="py-3 pr-4 text-gray-600">{p.client.name}</td>
-                <td className="py-3 pr-4 text-gray-500">
+                <td className="hidden px-4 py-3.5 text-muted-foreground md:table-cell">{p.client.name}</td>
+                <td className="hidden px-4 py-3.5 text-muted-foreground lg:table-cell">
                   {designTypeLabel[p.designType] ?? p.designType}
                 </td>
-                <td className="py-3 pr-4">
+                <td className="px-4 py-3.5">
                   <StatusBadge status={p.status} />
                 </td>
-                <td className="py-3 pr-4 text-gray-500 tabular-nums">
+                <td className="hidden px-4 py-3.5 tabular-nums text-muted-foreground lg:table-cell">
                   {formatDate(p.startDate)}
                 </td>
-                <td className="py-3 pr-4">
-                  <span className={`tabular-nums ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-500'}`}>
+                <td className="px-4 py-3.5">
+                  <span className={`tabular-nums ${isOverdue ? 'font-medium text-red-700' : 'text-muted-foreground'}`}>
                     {formatDate(p.dueDate)}
+                    {isOverdue && <span className="sr-only"> (quá hạn)</span>}
                   </span>
                 </td>
-                <td className="py-3 text-right text-gray-500">{p.deliverableCount}</td>
+                <td className="hidden px-4 py-3.5 text-right tabular-nums text-muted-foreground sm:table-cell">{p.deliverableCount}</td>
               </tr>
             )
           })}

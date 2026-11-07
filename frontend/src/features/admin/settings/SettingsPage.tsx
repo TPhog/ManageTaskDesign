@@ -1,19 +1,19 @@
-import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { useState, type ReactNode } from 'react'
+import { useForm, type FieldValues, type Path, type UseFormSetError } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Check, ChevronsUpDown } from 'lucide-react'
 import { toast } from 'sonner'
-import { api } from '@/lib/api'
+import { api, emptyToNull, type ApiError } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
-import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PageHeader } from '@/components/PageHeader'
 import { cn } from '@/lib/utils'
 
 interface Bank { bin: string; code: string; shortName: string; name: string }
@@ -36,11 +36,11 @@ const settingsSchema = z.object({
   contactEmail: z.string().email('Email không hợp lệ').or(z.literal('')).nullable(),
   contactPhone: z.string().nullable(),
   bankBin: z.string().nullable(),
-  bankAccountNo: z.string().nullable(),
+  bankAccountNo: z.string().regex(/^[A-Za-z0-9]{4,19}$/, '4–19 ký tự chữ hoặc số').or(z.literal('')).nullable(),
   bankAccountName: z.string().nullable(),
   quotationPrefix: z.string().regex(/^[A-Z]{1,5}$/, 'Chỉ 1–5 chữ hoa A-Z'),
-  defaultValidityDays: z.coerce.number().int().min(1).max(365),
-  defaultDepositPercent: z.coerce.number().int().min(0).max(100),
+  defaultValidityDays: z.coerce.number().int().min(1, 'Từ 1 đến 365').max(365, 'Từ 1 đến 365'),
+  defaultDepositPercent: z.coerce.number().int().min(0, 'Từ 0 đến 100').max(100, 'Từ 0 đến 100'),
   defaultTerms: z.string(),
 })
 type SettingsForm = z.infer<typeof settingsSchema>
@@ -54,6 +54,47 @@ const passwordSchema = z.object({
   path: ['confirmPassword'],
 })
 type PasswordForm = z.infer<typeof passwordSchema>
+
+/** Copy ValidationProblem field errors from the API onto the matching form fields. Returns true if any matched. */
+function applyServerErrors<T extends FieldValues>(err: ApiError, setError: UseFormSetError<T>): boolean {
+  if (!err.errors) return false
+  for (const [field, messages] of Object.entries(err.errors)) {
+    setError(field as Path<T>, { message: messages[0] })
+  }
+  return Object.keys(err.errors).length > 0
+}
+
+function Section({ title, description, children }: { title: string; description: string; children: ReactNode }) {
+  return (
+    <section className="grid gap-6 rounded-xl border bg-card p-6 shadow-card md:grid-cols-3">
+      <div>
+        <h2 className="font-semibold text-foreground">{title}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      </div>
+      <div className="space-y-5 md:col-span-2">{children}</div>
+    </section>
+  )
+}
+
+function Field({ id, label, hint, error, children }: {
+  id: string
+  label: ReactNode
+  hint?: string
+  error?: string
+  children: ReactNode
+}) {
+  return (
+    <div className="space-y-2">
+      <Label htmlFor={id}>{label}</Label>
+      {children}
+      {error ? (
+        <p id={`${id}-error`} className="text-sm text-destructive">{error}</p>
+      ) : hint ? (
+        <p className="text-xs text-muted-foreground">{hint}</p>
+      ) : null}
+    </div>
+  )
+}
 
 export default function SettingsPage() {
   const queryClient = useQueryClient()
@@ -70,7 +111,7 @@ export default function SettingsPage() {
   })
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<SettingsForm>({
+  const { register, handleSubmit, watch, setValue, setError, formState: { errors } } = useForm<SettingsForm>({
     resolver: zodResolver(settingsSchema) as any,
     values: settings ? {
       displayName: settings.displayName,
@@ -91,77 +132,101 @@ export default function SettingsPage() {
   const selectedBank = banks?.find(b => b.bin === selectedBin)
 
   const updateMutation = useMutation({
-    mutationFn: (body: SettingsForm & { rowVersion: number }) => api.put('/admin/settings', body),
+    // blank optional inputs must reach the API as null (e.g. '' fails the bank account format check)
+    mutationFn: (body: SettingsForm & { rowVersion: number }) => api.put('/admin/settings', emptyToNull(body)),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] })
       toast.success('Đã lưu cài đặt')
     },
-    onError: () => toast.error('Lưu thất bại. Vui lòng thử lại.'),
+    onError: (err: ApiError) => {
+      if (applyServerErrors(err, setError)) toast.error('Vui lòng kiểm tra lại các trường được đánh dấu.')
+      else if (err.status === 409) toast.error('Cài đặt đã thay đổi ở nơi khác. Vui lòng tải lại trang.')
+      else toast.error('Lưu thất bại. Vui lòng thử lại.')
+    },
   })
 
-  const { register: regPw, handleSubmit: handlePwSubmit, formState: { errors: pwErrors }, reset: resetPw } = useForm<PasswordForm>({
+  const {
+    register: regPw,
+    handleSubmit: handlePwSubmit,
+    setError: setPwError,
+    formState: { errors: pwErrors },
+    reset: resetPw,
+  } = useForm<PasswordForm>({
     resolver: zodResolver(passwordSchema),
   })
 
   const changePwMutation = useMutation({
-    mutationFn: (body: PasswordForm) => api.post('/auth/change-password', body),
+    mutationFn: ({ currentPassword, newPassword }: PasswordForm) =>
+      api.post('/admin/account/password', { currentPassword, newPassword }),
     onSuccess: () => {
       toast.success('Đã đổi mật khẩu')
       resetPw()
     },
-    onError: () => toast.error('Đổi mật khẩu thất bại. Kiểm tra mật khẩu hiện tại.'),
+    onError: (err: ApiError) => {
+      if (err.status === 401) setPwError('currentPassword', { message: 'Mật khẩu hiện tại không đúng' })
+      else if (!applyServerErrors(err, setPwError)) toast.error('Đổi mật khẩu thất bại. Vui lòng thử lại.')
+    },
+  })
+
+  const a11y = (name: keyof SettingsForm) => ({
+    'aria-invalid': !!errors[name],
+    'aria-describedby': errors[name] ? `settings-${name}-error` : undefined,
   })
 
   if (loadingSettings) {
     return (
-      <div className="max-w-2xl space-y-4">
+      <div className="space-y-6">
         <Skeleton className="h-8 w-40" />
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-56 w-full rounded-xl" />
+        <Skeleton className="h-56 w-full rounded-xl" />
       </div>
     )
   }
 
   return (
-    <div className="max-w-2xl space-y-8">
-      <h1 className="text-xl font-semibold">Cài đặt</h1>
+    <div className="space-y-6">
+      <PageHeader title="Cài đặt" description="Hồ sơ, tài khoản nhận tiền và mặc định cho báo giá." />
 
-      <form onSubmit={handleSubmit(data => updateMutation.mutate({ ...data, rowVersion: settings!.rowVersion }))} className="space-y-6">
-        {/* Hồ sơ */}
-        <section className="space-y-4">
-          <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Hồ sơ</h2>
-          <div className="space-y-1">
-            <Label>Tên hiển thị</Label>
-            <Input {...register('displayName')} />
-            {errors.displayName && <p className="text-sm text-red-500">{errors.displayName.message}</p>}
+      <form
+        onSubmit={handleSubmit(data => updateMutation.mutate({ ...data, rowVersion: settings!.rowVersion }))}
+        className="space-y-6"
+        noValidate
+      >
+        <Section title="Hồ sơ" description="Thông tin hiển thị trên báo giá gửi khách.">
+          <Field id="settings-displayName" label="Tên hiển thị" error={errors.displayName?.message}>
+            <Input id="settings-displayName" {...a11y('displayName')} {...register('displayName')} />
+          </Field>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field id="settings-contactEmail" label="Email liên hệ" error={errors.contactEmail?.message}>
+              <Input id="settings-contactEmail" type="email" {...a11y('contactEmail')} {...register('contactEmail')} />
+            </Field>
+            <Field id="settings-contactPhone" label="Số điện thoại" error={errors.contactPhone?.message}>
+              <Input id="settings-contactPhone" type="tel" inputMode="tel" {...a11y('contactPhone')} {...register('contactPhone')} />
+            </Field>
           </div>
-          <div className="space-y-1">
-            <Label>Email liên hệ</Label>
-            <Input type="email" {...register('contactEmail')} />
-            {errors.contactEmail && <p className="text-sm text-red-500">{errors.contactEmail.message}</p>}
-          </div>
-          <div className="space-y-1">
-            <Label>Số điện thoại</Label>
-            <Input {...register('contactPhone')} />
-          </div>
-        </section>
+        </Section>
 
-        <Separator />
-
-        {/* Ngân hàng */}
-        <section className="space-y-4">
-          <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Ngân hàng</h2>
-          <div className="space-y-1">
-            <Label>Ngân hàng</Label>
+        <Section title="Ngân hàng" description="Dùng để tạo mã VietQR trên báo giá. Có thể để trống.">
+          <Field id="settings-bank" label="Ngân hàng" error={errors.bankBin?.message}>
             <Popover open={bankOpen} onOpenChange={setBankOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between font-normal">
-                  {selectedBank ? `${selectedBank.shortName} — ${selectedBank.name}` : 'Chọn ngân hàng...'}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                <Button
+                  id="settings-bank"
+                  type="button"
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={bankOpen}
+                  className="w-full justify-between font-normal"
+                >
+                  <span className={cn('truncate', !selectedBank && 'text-muted-foreground')}>
+                    {selectedBank ? `${selectedBank.shortName} — ${selectedBank.name}` : 'Chọn ngân hàng…'}
+                  </span>
+                  <ChevronsUpDown className="opacity-50" aria-hidden="true" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-full p-0">
+              <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
                 <Command>
-                  <CommandInput placeholder="Tìm theo tên hoặc BIN..." />
+                  <CommandInput placeholder="Tìm theo tên hoặc BIN…" />
                   <CommandList>
                     <CommandEmpty>Không tìm thấy ngân hàng.</CommandEmpty>
                     <CommandGroup>
@@ -183,89 +248,85 @@ export default function SettingsPage() {
                 </Command>
               </PopoverContent>
             </Popover>
-          </div>
-          <div className="space-y-1">
-            <Label>Số tài khoản</Label>
-            <Input {...register('bankAccountNo')} />
-          </div>
-          <div className="space-y-1">
-            <Label>Tên chủ tài khoản <span className="text-xs text-gray-400">(in hoa)</span></Label>
-            <Input {...register('bankAccountName')} placeholder="NGUYEN VAN A" className="uppercase" />
+          </Field>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field id="settings-bankAccountNo" label="Số tài khoản" error={errors.bankAccountNo?.message}>
+              <Input id="settings-bankAccountNo" inputMode="numeric" {...a11y('bankAccountNo')} {...register('bankAccountNo')} />
+            </Field>
+            <Field
+              id="settings-bankAccountName"
+              label="Tên chủ tài khoản"
+              hint="Viết hoa, không dấu"
+              error={errors.bankAccountName?.message}
+            >
+              <Input
+                id="settings-bankAccountName"
+                placeholder="NGUYEN VAN A"
+                className="uppercase"
+                {...a11y('bankAccountName')}
+                {...register('bankAccountName')}
+              />
+            </Field>
           </div>
           {selectedBin && bankAccountNo && (
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Button type="button" variant="outline" size="sm" onClick={() => setShowQr(v => !v)}>
                 {showQr ? 'Ẩn QR' : 'Thử QR 10.000 ₫'}
               </Button>
               {showQr && (
-                <div className="space-y-1">
-                  <img src="/api/admin/settings/test-qr.png" alt="Test QR" className="w-48 h-48 border rounded" />
-                  <p className="text-xs text-gray-500">Quét để kiểm tra tài khoản nhận tiền của bạn</p>
+                <div className="flex items-center gap-4 rounded-lg border bg-muted/40 p-4">
+                  <img src="/api/admin/settings/test-qr.png" alt="Mã QR thử 10.000 ₫" className="h-40 w-40 rounded-md border bg-white" />
+                  <p className="text-sm text-muted-foreground">Quét bằng app ngân hàng để kiểm tra tài khoản nhận tiền của bạn.</p>
                 </div>
               )}
             </div>
           )}
-        </section>
+        </Section>
 
-        <Separator />
-
-        {/* Mặc định báo giá */}
-        <section className="space-y-4">
-          <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Mặc định báo giá</h2>
-          <div className="grid grid-cols-3 gap-4">
-            <div className="space-y-1">
-              <Label>Tiền tố số BG</Label>
-              <Input {...register('quotationPrefix')} placeholder="BG" className="uppercase" />
-              {errors.quotationPrefix && <p className="text-sm text-red-500">{errors.quotationPrefix.message}</p>}
-            </div>
-            <div className="space-y-1">
-              <Label>Hiệu lực (ngày)</Label>
-              <Input type="number" min={1} max={365} {...register('defaultValidityDays')} />
-              {errors.defaultValidityDays && <p className="text-sm text-red-500">{errors.defaultValidityDays.message}</p>}
-            </div>
-            <div className="space-y-1">
-              <Label>Đặt cọc (%)</Label>
-              <Input type="number" min={0} max={100} {...register('defaultDepositPercent')} />
-              {errors.defaultDepositPercent && <p className="text-sm text-red-500">{errors.defaultDepositPercent.message}</p>}
-            </div>
+        <Section title="Mặc định báo giá" description="Áp dụng cho các báo giá mới tạo.">
+          <div className="grid gap-5 sm:grid-cols-3">
+            <Field id="settings-quotationPrefix" label="Tiền tố số BG" error={errors.quotationPrefix?.message}>
+              <Input id="settings-quotationPrefix" placeholder="BG" className="uppercase" {...a11y('quotationPrefix')} {...register('quotationPrefix')} />
+            </Field>
+            <Field id="settings-defaultValidityDays" label="Hiệu lực (ngày)" error={errors.defaultValidityDays?.message}>
+              <Input id="settings-defaultValidityDays" type="number" min={1} max={365} {...a11y('defaultValidityDays')} {...register('defaultValidityDays')} />
+            </Field>
+            <Field id="settings-defaultDepositPercent" label="Đặt cọc (%)" error={errors.defaultDepositPercent?.message}>
+              <Input id="settings-defaultDepositPercent" type="number" min={0} max={100} {...a11y('defaultDepositPercent')} {...register('defaultDepositPercent')} />
+            </Field>
           </div>
-          <div className="space-y-1">
-            <Label>Điều khoản mặc định</Label>
-            <Textarea rows={4} {...register('defaultTerms')} />
-          </div>
-        </section>
+          <Field id="settings-defaultTerms" label="Điều khoản mặc định" error={errors.defaultTerms?.message}>
+            <Textarea id="settings-defaultTerms" rows={4} {...register('defaultTerms')} />
+          </Field>
+        </Section>
 
-        <Button type="submit" disabled={updateMutation.isPending}>
-          {updateMutation.isPending ? 'Đang lưu...' : 'Lưu thay đổi'}
-        </Button>
+        <div className="flex justify-end">
+          <Button type="submit" disabled={updateMutation.isPending} className="min-w-36">
+            {updateMutation.isPending ? 'Đang lưu…' : 'Lưu thay đổi'}
+          </Button>
+        </div>
       </form>
 
-      <Separator />
-
-      {/* Đổi mật khẩu */}
-      <section className="space-y-4">
-        <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wide">Đổi mật khẩu</h2>
-        <form onSubmit={handlePwSubmit(data => changePwMutation.mutate(data))} className="space-y-4 max-w-sm">
-          <div className="space-y-1">
-            <Label>Mật khẩu hiện tại</Label>
-            <Input type="password" {...regPw('currentPassword')} />
-            {pwErrors.currentPassword && <p className="text-sm text-red-500">{pwErrors.currentPassword.message}</p>}
+      <form onSubmit={handlePwSubmit(data => changePwMutation.mutate(data))} noValidate>
+        <Section title="Đổi mật khẩu" description="Mật khẩu mới tối thiểu 12 ký tự.">
+          <Field id="pw-current" label="Mật khẩu hiện tại" error={pwErrors.currentPassword?.message}>
+            <Input id="pw-current" type="password" autoComplete="current-password" aria-invalid={!!pwErrors.currentPassword} {...regPw('currentPassword')} />
+          </Field>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field id="pw-new" label="Mật khẩu mới" error={pwErrors.newPassword?.message}>
+              <Input id="pw-new" type="password" autoComplete="new-password" aria-invalid={!!pwErrors.newPassword} {...regPw('newPassword')} />
+            </Field>
+            <Field id="pw-confirm" label="Xác nhận mật khẩu" error={pwErrors.confirmPassword?.message}>
+              <Input id="pw-confirm" type="password" autoComplete="new-password" aria-invalid={!!pwErrors.confirmPassword} {...regPw('confirmPassword')} />
+            </Field>
           </div>
-          <div className="space-y-1">
-            <Label>Mật khẩu mới</Label>
-            <Input type="password" {...regPw('newPassword')} />
-            {pwErrors.newPassword && <p className="text-sm text-red-500">{pwErrors.newPassword.message}</p>}
+          <div className="flex justify-end">
+            <Button type="submit" variant="outline" disabled={changePwMutation.isPending}>
+              {changePwMutation.isPending ? 'Đang xử lý…' : 'Đổi mật khẩu'}
+            </Button>
           </div>
-          <div className="space-y-1">
-            <Label>Xác nhận mật khẩu</Label>
-            <Input type="password" {...regPw('confirmPassword')} />
-            {pwErrors.confirmPassword && <p className="text-sm text-red-500">{pwErrors.confirmPassword.message}</p>}
-          </div>
-          <Button type="submit" variant="outline" disabled={changePwMutation.isPending}>
-            {changePwMutation.isPending ? 'Đang xử lý...' : 'Đổi mật khẩu'}
-          </Button>
-        </form>
-      </section>
+        </Section>
+      </form>
     </div>
   )
 }

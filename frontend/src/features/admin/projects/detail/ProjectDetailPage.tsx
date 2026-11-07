@@ -1,6 +1,6 @@
-import { useParams, useNavigate, Link } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, ChevronDown } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileText, Package, History, SearchX } from 'lucide-react'
 import { toast } from 'sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
@@ -13,8 +13,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { StatusBadge } from '@/components/StatusBadge'
 import { QuotaMeter } from '@/components/QuotaMeter'
+import { EmptyState } from '@/components/EmptyState'
 import { formatDate } from '@/lib/format'
-import { api } from '@/lib/api'
+import { api, type ApiError } from '@/lib/api'
 import type { ProjectDetail, ProjectStatus, Deliverable } from '@/lib/types'
 
 const designTypeLabel: Record<string, string> = {
@@ -45,44 +46,55 @@ const statusTransitions: Record<ProjectStatus, { to: ProjectStatus; label: strin
   CANCELLED: [{ to: 'DRAFT', label: 'Mở lại' }],
 }
 
+const panelClass = 'rounded-xl border bg-card p-5 shadow-card'
+
 function DeliverableRow({ d }: { d: Deliverable }) {
   return (
-    <div className="flex items-center gap-3 py-2.5 border-b border-gray-50 last:border-0">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 truncate">{d.name}</p>
-        <p className="text-xs text-gray-400">SL: {d.quantity}</p>
+    <div className="flex flex-col gap-3 py-3.5 sm:flex-row sm:items-center sm:gap-4">
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">{d.name}</p>
+        <p className="text-xs text-muted-foreground">Số lượng: {d.quantity}</p>
       </div>
-      <div className="w-36">
+      <div className="w-full sm:w-40">
         <QuotaMeter used={d.usedRounds} total={d.includedRounds} label="vòng" />
       </div>
-      <StatusBadge status={d.status} />
-      <span className="text-xs text-gray-400 w-20 text-right">{formatDate(d.dueDate)}</span>
+      <div className="flex items-center justify-between gap-4 sm:justify-end">
+        <StatusBadge status={d.status} />
+        <span className="w-24 text-right text-xs tabular-nums text-muted-foreground">{formatDate(d.dueDate)}</span>
+      </div>
+    </div>
+  )
+}
+
+function InfoItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-sm font-medium text-foreground">{value}</dd>
     </div>
   )
 }
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const qc = useQueryClient()
 
   const { data: project, isLoading, error } = useQuery({
     queryKey: ['projects', id],
-    queryFn: () => api.get<ProjectDetail>(`/api/admin/projects/${id}`),
+    queryFn: () => api.get<ProjectDetail>(`/admin/projects/${id}`),
     enabled: !!id,
   })
 
   const statusMutation = useMutation({
     mutationFn: (body: { to: ProjectStatus; rowVersion: number }) =>
-      api.post(`/api/admin/projects/${id}/status`, body),
+      api.post(`/admin/projects/${id}/status`, body),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['projects'] })
       toast.success('Đã cập nhật trạng thái')
     },
-    onError: (err: any) => {
-      const code = err?.response?.data?.code
-      if (code === 'INVALID_TRANSITION') toast.error('Chuyển trạng thái không hợp lệ')
-      else if (code === 'CONCURRENCY_CONFLICT') toast.error('Dữ liệu đã thay đổi, vui lòng tải lại')
+    onError: (err: ApiError) => {
+      if (err.code === 'INVALID_TRANSITION') toast.error('Chuyển trạng thái không hợp lệ')
+      else if (err.code === 'CONCURRENCY_CONFLICT' || err.status === 409) toast.error('Dữ liệu đã thay đổi, vui lòng tải lại')
       else toast.error('Không thể cập nhật trạng thái')
     },
   })
@@ -90,115 +102,109 @@ export default function ProjectDetailPage() {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-6 w-48" />
-        <Skeleton className="h-32 w-full" />
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-5 w-48" />
+        <Skeleton className="h-28 w-full rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-xl" />
       </div>
     )
   }
 
   if (error || !project) {
     return (
-      <div className="text-center py-16 text-gray-400">
-        <p>Không tìm thấy dự án</p>
-        <Button variant="ghost" size="sm" className="mt-2" onClick={() => navigate('/admin/projects')}>
-          Quay lại
-        </Button>
+      <div className={panelClass}>
+        <EmptyState
+          icon={SearchX}
+          title="Không tìm thấy dự án"
+          description="Dự án có thể đã bị xoá hoặc đường dẫn không đúng."
+          action={
+            <Button asChild variant="outline">
+              <Link to="/admin/projects">Về danh sách dự án</Link>
+            </Button>
+          }
+        />
       </div>
     )
   }
 
   const transitions = statusTransitions[project.status] ?? []
+  const designType = designTypeLabel[project.designType] ?? project.designType
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       {/* breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-gray-500">
-        <Link to="/admin/projects" className="flex items-center gap-1 hover:text-gray-900">
-          <ArrowLeft className="h-3.5 w-3.5" />
+      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-muted-foreground">
+        <Link to="/admin/projects" className="rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           Dự án
         </Link>
-        <span>/</span>
-        <span className="text-gray-900 font-medium">{project.name}</span>
-      </div>
+        <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+        <span className="truncate font-medium text-foreground" aria-current="page">{project.name}</span>
+      </nav>
 
       {/* header */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
-        <div className="flex items-start justify-between gap-4">
+      <div className={panelClass}>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <h1 className="text-lg font-semibold text-gray-900 truncate">{project.name}</h1>
-            <div className="flex items-center gap-3 mt-1 text-sm text-gray-500">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground">{project.name}</h1>
+              <StatusBadge status={project.status} />
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
               <span>{project.client.name}</span>
-              <span>·</span>
-              <span>{designTypeLabel[project.designType] ?? project.designType}</span>
-              {project.startDate && (
+              <span aria-hidden="true">·</span>
+              <span>{designType}</span>
+              {(project.startDate || project.dueDate) && (
                 <>
-                  <span>·</span>
-                  <span>{formatDate(project.startDate)} → {formatDate(project.dueDate)}</span>
+                  <span aria-hidden="true">·</span>
+                  <span className="tabular-nums">{formatDate(project.startDate)} → {formatDate(project.dueDate)}</span>
                 </>
               )}
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <StatusBadge status={project.status} />
-            {transitions.length > 0 && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" disabled={statusMutation.isPending}>
-                    Đổi trạng thái
-                    <ChevronDown className="h-3.5 w-3.5 ml-1" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {transitions.map(t => (
-                    <DropdownMenuItem
-                      key={t.to}
-                      onClick={() => statusMutation.mutate({ to: t.to, rowVersion: project.rowVersion })}
-                    >
-                      {t.label}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-          </div>
+          {transitions.length > 0 && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" disabled={statusMutation.isPending} className="shrink-0">
+                  Đổi trạng thái
+                  <ChevronDown aria-hidden="true" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                {transitions.map(t => (
+                  <DropdownMenuItem
+                    key={t.to}
+                    className={t.to === 'CANCELLED' ? 'text-red-700 focus:text-red-700' : undefined}
+                    onClick={() => statusMutation.mutate({ to: t.to, rowVersion: project.rowVersion })}
+                  >
+                    {t.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
 
       {/* tabs */}
       <Tabs defaultValue="overview">
-        <TabsList>
+        <TabsList className="h-auto w-full justify-start overflow-x-auto sm:w-auto">
           <TabsTrigger value="overview">Tổng quan</TabsTrigger>
           <TabsTrigger value="deliverables">Deliverables ({project.deliverables.length})</TabsTrigger>
           <TabsTrigger value="brief">Brief</TabsTrigger>
           <TabsTrigger value="activity">Lịch sử</TabsTrigger>
         </TabsList>
 
-        {/* overview tab */}
-        <TabsContent value="overview">
-          <div className="bg-white rounded-lg border border-gray-200 p-4 mt-2 space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <p className="text-gray-500 text-xs mb-0.5">Khách hàng</p>
-                <p className="font-medium">{project.client.name}</p>
-              </div>
-              <div>
-                <p className="text-gray-500 text-xs mb-0.5">Loại thiết kế</p>
-                <p className="font-medium">{designTypeLabel[project.designType] ?? project.designType}</p>
-              </div>
-              <div>
-                <p className="text-gray-500 text-xs mb-0.5">Ngày bắt đầu</p>
-                <p className="font-medium">{formatDate(project.startDate)}</p>
-              </div>
-              <div>
-                <p className="text-gray-500 text-xs mb-0.5">Deadline</p>
-                <p className="font-medium">{formatDate(project.dueDate)}</p>
-              </div>
-            </div>
+        <TabsContent value="overview" className="mt-4">
+          <div className={`${panelClass} space-y-5`}>
+            <dl className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              <InfoItem label="Khách hàng" value={project.client.name} />
+              <InfoItem label="Loại thiết kế" value={designType} />
+              <InfoItem label="Ngày bắt đầu" value={formatDate(project.startDate)} />
+              <InfoItem label="Deadline" value={formatDate(project.dueDate)} />
+            </dl>
             {project.internalNotes && (
               <div>
-                <p className="text-gray-500 text-xs mb-1">Ghi chú nội bộ</p>
-                <p className="text-sm text-gray-700 bg-gray-50 rounded p-3 whitespace-pre-wrap">
+                <p className="mb-1.5 text-xs font-medium text-muted-foreground">Ghi chú nội bộ</p>
+                <p className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm text-foreground">
                   {project.internalNotes}
                 </p>
               </div>
@@ -206,13 +212,12 @@ export default function ProjectDetailPage() {
           </div>
         </TabsContent>
 
-        {/* deliverables tab */}
-        <TabsContent value="deliverables">
-          <div className="bg-white rounded-lg border border-gray-200 p-4 mt-2">
+        <TabsContent value="deliverables" className="mt-4">
+          <div className={panelClass}>
             {project.deliverables.length === 0 ? (
-              <p className="text-center text-sm text-gray-400 py-8">Chưa có deliverable</p>
+              <EmptyState icon={Package} title="Chưa có deliverable" description="Các hạng mục bàn giao của dự án sẽ hiện ở đây." />
             ) : (
-              <div>
+              <div className="divide-y">
                 {project.deliverables
                   .slice()
                   .sort((a, b) => a.sortOrder - b.sortOrder)
@@ -222,40 +227,32 @@ export default function ProjectDetailPage() {
           </div>
         </TabsContent>
 
-        {/* brief tab */}
-        <TabsContent value="brief">
-          <div className="bg-white rounded-lg border border-gray-200 p-4 mt-2">
+        <TabsContent value="brief" className="mt-4">
+          <div className={panelClass}>
             {!project.brief ? (
-              <p className="text-center text-sm text-gray-400 py-8">Chưa có brief</p>
+              <EmptyState icon={FileText} title="Chưa có brief" description="Yêu cầu chi tiết của khách sẽ hiện ở đây." />
             ) : (
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 text-xs text-gray-400">
-                  <span>Version {project.brief.version}</span>
-                  <span>·</span>
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span>Phiên bản {project.brief.version}</span>
                   <StatusBadge status={project.brief.status} />
-                  {project.brief.confirmedAt && (
-                    <>
-                      <span>·</span>
-                      <span>Confirmed {formatDate(project.brief.confirmedAt)}</span>
-                    </>
-                  )}
+                  {project.brief.confirmedAt && <span>Xác nhận {formatDate(project.brief.confirmedAt)}</span>}
                 </div>
                 {project.brief.content ? (
-                  <div className="prose prose-sm max-w-none text-gray-700 whitespace-pre-wrap text-sm">
+                  <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
                     {project.brief.content}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-400 italic">Brief chưa có nội dung</p>
+                  <p className="text-sm italic text-muted-foreground">Brief chưa có nội dung</p>
                 )}
               </div>
             )}
           </div>
         </TabsContent>
 
-        {/* activity tab (placeholder) */}
-        <TabsContent value="activity">
-          <div className="bg-white rounded-lg border border-gray-200 p-4 mt-2">
-            <p className="text-center text-sm text-gray-400 py-8">Lịch sử hoạt động — đang phát triển</p>
+        <TabsContent value="activity" className="mt-4">
+          <div className={panelClass}>
+            <EmptyState icon={History} title="Lịch sử hoạt động" description="Tính năng đang được phát triển." />
           </div>
         </TabsContent>
       </Tabs>

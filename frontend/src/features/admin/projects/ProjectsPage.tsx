@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, List, GanttChartSquare } from 'lucide-react'
+import { Plus, List, GanttChartSquare, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { PageHeader } from '@/components/PageHeader'
 import { api } from '@/lib/api'
+import { cn } from '@/lib/utils'
 import type { PagedResult, ProjectListItem } from '@/lib/types'
 import { ProjectsTable } from './ProjectsTable'
 import { ProjectsGantt } from './ProjectsGantt'
@@ -13,8 +15,11 @@ import { CreateProjectDialog } from './CreateProjectDialog'
 
 type ViewMode = 'list' | 'gantt'
 
+// Radix Select reserves '' for "no value", so "all" uses a sentinel.
+const ALL = '_all'
+
 const statusOptions: { value: string; label: string }[] = [
-  { value: '', label: 'Tất cả trạng thái' },
+  { value: ALL, label: 'Tất cả trạng thái' },
   { value: 'DRAFT', label: 'Nháp' },
   { value: 'QUOTED', label: 'Đã báo giá' },
   { value: 'IN_PROGRESS', label: 'Đang làm' },
@@ -26,84 +31,93 @@ const statusOptions: { value: string; label: string }[] = [
 export default function ProjectsPage() {
   const [view, setView] = useState<ViewMode>('list')
   const [q, setQ] = useState('')
-  const [status, setStatus] = useState<string>('')
+  const [status, setStatus] = useState<string>(ALL)
   const [createOpen, setCreateOpen] = useState(false)
 
   const params = new URLSearchParams()
   if (q) params.set('q', q)
-  if (status) params.set('status', status)
+  if (status !== ALL) params.set('status', status)
   params.set('pageSize', '100')
 
   const { data, isLoading } = useQuery({
     queryKey: ['projects', q, status],
-    queryFn: () => api.get<PagedResult<ProjectListItem>>(`/api/admin/projects?${params}`),
+    queryFn: () => api.get<PagedResult<ProjectListItem>>(`/admin/projects?${params}`),
   })
 
   const projects = data?.items ?? []
+  const filtering = !!q || status !== ALL
+
+  const viewButton = (mode: ViewMode, label: string, Icon: typeof List) => (
+    <button
+      type="button"
+      onClick={() => setView(mode)}
+      title={label}
+      aria-label={label}
+      aria-pressed={view === mode}
+      className={cn(
+        'inline-flex h-9 w-9 items-center justify-center rounded-md transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        view === mode ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+      )}
+    >
+      <Icon className="h-4 w-4" aria-hidden="true" />
+    </button>
+  )
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">Dự án</h1>
-        <Button size="sm" onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-1.5" />
-          Tạo dự án
-        </Button>
-      </div>
-
-      {/* toolbar */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Input
-          placeholder="Tìm dự án…"
-          value={q}
-          onChange={e => setQ(e.target.value)}
-          className="max-w-xs"
-        />
-        <Select value={status} onValueChange={setStatus}>
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {statusOptions.map(o => (
-              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-
-        <div className="ml-auto flex items-center gap-1 border border-gray-200 rounded-md p-0.5">
-          <Button
-            variant={view === 'list' ? 'secondary' : 'ghost'}
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => setView('list')}
-            title="Danh sách"
-          >
-            <List className="h-3.5 w-3.5" />
+    <div className="space-y-6">
+      <PageHeader
+        title="Dự án"
+        description="Theo dõi trạng thái, deadline và số deliverable."
+        actions={
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus aria-hidden="true" />
+            Tạo dự án
           </Button>
-          <Button
-            variant={view === 'gantt' ? 'secondary' : 'ghost'}
-            size="icon"
-            className="h-7 w-7"
-            onClick={() => setView('gantt')}
-            title="Timeline Gantt"
-          >
-            <GanttChartSquare className="h-3.5 w-3.5" />
-          </Button>
+        }
+      />
+
+      <div className="rounded-xl border bg-card shadow-card">
+        {/* toolbar */}
+        <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <Input
+              aria-label="Tìm dự án"
+              placeholder="Tìm dự án…"
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger className="w-full sm:w-48" aria-label="Lọc theo trạng thái">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {statusOptions.map(o => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <div className="flex items-center gap-1 rounded-lg bg-muted p-1 sm:ml-auto" role="group" aria-label="Chế độ xem">
+            {viewButton('list', 'Danh sách', List)}
+            {viewButton('gantt', 'Timeline Gantt', GanttChartSquare)}
+          </div>
         </div>
-      </div>
 
-      {/* content */}
-      <div className="bg-white rounded-lg border border-gray-200 p-4">
         {isLoading ? (
-          <div className="space-y-2">
+          <div className="space-y-2 p-4">
             {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
+              <Skeleton key={i} className="h-11 w-full" />
             ))}
           </div>
         ) : view === 'list' ? (
-          <ProjectsTable projects={projects} />
+          <ProjectsTable projects={projects} filtering={filtering} onCreate={() => setCreateOpen(true)} />
         ) : (
-          <ProjectsGantt projects={projects} />
+          <div className="p-4">
+            <ProjectsGantt projects={projects} />
+          </div>
         )}
       </div>
 

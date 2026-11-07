@@ -13,7 +13,8 @@ import { Toaster as Sonner } from "sonner"
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+  // app is light-only (no ThemeProvider), so default to light instead of following the OS
+  const { theme = "light" } = useTheme()
 
   return (
     <Sonner

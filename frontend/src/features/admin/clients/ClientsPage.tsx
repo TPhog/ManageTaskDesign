@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, ExternalLink } from 'lucide-react'
+import { Plus, Search, Users, SearchX } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -11,13 +10,16 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Skeleton } from '@/components/ui/skeleton'
-import { api } from '@/lib/api'
+import { PageHeader } from '@/components/PageHeader'
+import { EmptyState } from '@/components/EmptyState'
+import { StatusBadge } from '@/components/StatusBadge'
+import { api, emptyToNull } from '@/lib/api'
 import type { PagedResult, ClientListItem } from '@/lib/types'
 
 const clientSchema = z.object({
-  name: z.string().min(1, 'Bắt buộc'),
+  name: z.string().min(1, 'Vui lòng nhập tên khách'),
   company: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().email('Email không hợp lệ').optional().or(z.literal('')),
@@ -25,18 +27,6 @@ const clientSchema = z.object({
   notes: z.string().optional(),
 })
 type ClientForm = z.infer<typeof clientSchema>
-
-function StatusChip({ status }: { status: 'ACTIVE' | 'INACTIVE' }) {
-  return status === 'ACTIVE' ? (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
-      Đang hoạt động
-    </span>
-  ) : (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500">
-      Lưu trữ
-    </span>
-  )
-}
 
 export default function ClientsPage() {
   const qc = useQueryClient()
@@ -51,7 +41,7 @@ export default function ClientsPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['clients', q, status],
-    queryFn: () => api.get<PagedResult<ClientListItem & { portalEnabled: boolean }>>(`/api/admin/clients?${params}`),
+    queryFn: () => api.get<PagedResult<ClientListItem & { portalEnabled: boolean }>>(`/admin/clients?${params}`),
   })
 
   const { register, handleSubmit, formState: { errors }, reset } = useForm<ClientForm>({
@@ -59,139 +49,170 @@ export default function ClientsPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: (body: ClientForm) => api.post('/api/admin/clients', body),
+    mutationFn: (body: ClientForm) => api.post('/admin/clients', emptyToNull(body)),
     onSuccess: () => {
       toast.success('Đã tạo khách hàng')
       qc.invalidateQueries({ queryKey: ['clients'] })
       setSheetOpen(false)
       reset()
     },
-    onError: () => toast.error('Lỗi khi tạo khách hàng'),
+    onError: () => toast.error('Không thể tạo khách hàng. Vui lòng thử lại.'),
   })
 
   const clients = data?.items ?? []
+  const filtering = !!(q || status)
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">Khách hàng</h1>
-        <Button size="sm" onClick={() => setSheetOpen(true)}>
-          <Plus className="h-4 w-4 mr-1.5" />
-          Thêm khách
-        </Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Khách hàng"
+        description="Danh sách khách và số dự án của từng người."
+        actions={
+          <Button onClick={() => setSheetOpen(true)}>
+            <Plus aria-hidden="true" />
+            Thêm khách
+          </Button>
+        }
+      />
 
-      {/* toolbar */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <Input
-          placeholder="Tìm theo tên, công ty, SĐT…"
-          value={q}
-          onChange={e => setQ(e.target.value)}
-          className="max-w-xs"
-        />
-        <Select value={status || '_all'} onValueChange={v => setStatus(v === '_all' ? '' : v)}>
-          <SelectTrigger className="w-44">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="_all">Tất cả</SelectItem>
-            <SelectItem value="ACTIVE">Đang hoạt động</SelectItem>
-            <SelectItem value="INACTIVE">Lưu trữ</SelectItem>
-          </SelectContent>
-        </Select>
-        <span className="text-sm text-gray-400 ml-auto">{data?.total ?? 0} khách</span>
-      </div>
+      <div className="rounded-xl border bg-card shadow-card">
+        {/* toolbar */}
+        <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:max-w-xs">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <Input
+              aria-label="Tìm khách hàng"
+              placeholder="Tìm theo tên, công ty, SĐT…"
+              value={q}
+              onChange={e => setQ(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          <Select value={status || '_all'} onValueChange={v => setStatus(v === '_all' ? '' : v)}>
+            <SelectTrigger className="w-full sm:w-48" aria-label="Lọc theo trạng thái">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="_all">Tất cả trạng thái</SelectItem>
+              <SelectItem value="ACTIVE">Đang hoạt động</SelectItem>
+              <SelectItem value="INACTIVE">Lưu trữ</SelectItem>
+            </SelectContent>
+          </Select>
+          <span className="text-sm text-muted-foreground sm:ml-auto" aria-live="polite">
+            {data?.total ?? 0} khách
+          </span>
+        </div>
 
-      {/* table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
         {isLoading ? (
-          <div className="p-4 space-y-2">
+          <div className="space-y-2 p-4">
             {Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full" />
+              <Skeleton key={i} className="h-11 w-full" />
             ))}
           </div>
         ) : clients.length === 0 ? (
-          <div className="p-12 text-center text-sm text-gray-400">
-            {q || status ? 'Không tìm thấy khách phù hợp' : 'Chưa có khách hàng nào'}
-          </div>
+          filtering ? (
+            <EmptyState icon={SearchX} title="Không tìm thấy khách phù hợp" description="Thử từ khoá khác hoặc bỏ bộ lọc." />
+          ) : (
+            <EmptyState
+              icon={Users}
+              title="Chưa có khách hàng nào"
+              description="Thêm khách đầu tiên để bắt đầu tạo dự án."
+              action={
+                <Button onClick={() => setSheetOpen(true)}>
+                  <Plus aria-hidden="true" />
+                  Thêm khách
+                </Button>
+              }
+            />
+          )
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wider">Tên</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Công ty</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">SĐT</th>
-                <th className="text-left px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
-                <th className="text-right px-4 py-2.5 text-xs font-medium text-gray-500 uppercase tracking-wider">Dự án</th>
-                <th className="px-4 py-2.5" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {clients.map(c => (
-                <tr key={c.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-900">{c.name}</td>
-                  <td className="px-4 py-3 text-gray-500 hidden md:table-cell">{c.company ?? '—'}</td>
-                  <td className="px-4 py-3 text-gray-500 hidden lg:table-cell">{c.phone ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <StatusChip status={c.status} />
-                  </td>
-                  <td className="px-4 py-3 text-right text-gray-500">{c.projectCount}</td>
-                  <td className="px-4 py-3 text-right">
-                    <Link
-                      to={`/admin/clients/${c.id}`}
-                      className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800"
-                    >
-                      Chi tiết <ExternalLink className="h-3 w-3" />
-                    </Link>
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="whitespace-nowrap border-b bg-muted/50 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  <th scope="col" className="px-4 py-3">Tên</th>
+                  <th scope="col" className="hidden px-4 py-3 md:table-cell">Công ty</th>
+                  <th scope="col" className="hidden px-4 py-3 lg:table-cell">SĐT</th>
+                  <th scope="col" className="px-4 py-3">Trạng thái</th>
+                  <th scope="col" className="px-4 py-3 text-right">Dự án</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y">
+                {clients.map(c => (
+                  <tr key={c.id} className="transition-colors duration-150 hover:bg-muted/40">
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold uppercase text-secondary-foreground" aria-hidden="true">
+                          {c.name.slice(0, 1)}
+                        </div>
+                        <span className="font-medium text-foreground">{c.name}</span>
+                      </div>
+                    </td>
+                    <td className="hidden px-4 py-3.5 text-muted-foreground md:table-cell">{c.company ?? '—'}</td>
+                    <td className="hidden px-4 py-3.5 tabular-nums text-muted-foreground lg:table-cell">{c.phone ?? '—'}</td>
+                    <td className="px-4 py-3.5">
+                      <StatusBadge status={c.status} />
+                    </td>
+                    <td className="px-4 py-3.5 text-right tabular-nums text-muted-foreground">{c.projectCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
 
       {/* create sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-md">
           <SheetHeader>
             <SheetTitle>Thêm khách hàng</SheetTitle>
+            <SheetDescription>Chỉ tên là bắt buộc, các thông tin khác có thể bổ sung sau.</SheetDescription>
           </SheetHeader>
-          <form
-            onSubmit={handleSubmit(d => createMutation.mutate(d))}
-            className="mt-4 space-y-4"
-          >
-            <div className="space-y-1.5">
-              <Label htmlFor="name">Tên khách *</Label>
-              <Input id="name" {...register('name')} />
-              {errors.name && <p className="text-xs text-red-500">{errors.name.message}</p>}
+          <form onSubmit={handleSubmit(d => createMutation.mutate(d))} className="mt-6 space-y-5" noValidate>
+            <div className="space-y-2">
+              <Label htmlFor="name">Tên khách <span className="text-destructive">*</span></Label>
+              <Input
+                id="name"
+                aria-invalid={!!errors.name}
+                aria-describedby={errors.name ? 'name-error' : undefined}
+                {...register('name')}
+              />
+              {errors.name && <p id="name-error" className="text-sm text-destructive">{errors.name.message}</p>}
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label htmlFor="company">Công ty</Label>
               <Input id="company" {...register('company')} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
                 <Label htmlFor="phone">Số điện thoại</Label>
-                <Input id="phone" {...register('phone')} />
+                <Input id="phone" type="tel" inputMode="tel" {...register('phone')} />
               </div>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" {...register('email')} />
-                {errors.email && <p className="text-xs text-red-500">{errors.email.message}</p>}
+                <Input
+                  id="email"
+                  type="email"
+                  aria-invalid={!!errors.email}
+                  aria-describedby={errors.email ? 'email-error' : undefined}
+                  {...register('email')}
+                />
+                {errors.email && <p id="email-error" className="text-sm text-destructive">{errors.email.message}</p>}
               </div>
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label htmlFor="contactChannel">Kênh liên hệ</Label>
               <Input id="contactChannel" placeholder="Zalo, Facebook…" {...register('contactChannel')} />
             </div>
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <Label htmlFor="notes">Ghi chú nội bộ</Label>
               <Textarea id="notes" rows={3} {...register('notes')} />
+              <p className="text-xs text-muted-foreground">Khách không nhìn thấy ghi chú này.</p>
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>
-                Hủy
+                Huỷ
               </Button>
               <Button type="submit" disabled={createMutation.isPending}>
                 {createMutation.isPending ? 'Đang lưu…' : 'Tạo khách'}
