@@ -1,8 +1,6 @@
 using System.Globalization;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using FreelanceFlow.Api.Data;
-using FreelanceFlow.Api.Features.Auth;
 using FreelanceFlow.Api.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
@@ -50,16 +48,11 @@ public static class PortalSessionEndpoints
             new Claim(PortalPrincipal.TokenVersionClaim, client.PortalTokenVersion.ToString(CultureInfo.InvariantCulture)),
         };
         await ctx.SignInAsync(PortalPrincipal.Scheme,
-            new ClaimsPrincipal(new ClaimsIdentity(claims, PortalPrincipal.Scheme)));
+            new ClaimsPrincipal(new ClaimsIdentity(claims, PortalPrincipal.Scheme)),
+            new AuthenticationProperties { IsPersistent = true }); // 30-day sliding, survives browser restart
 
         // Double-submit CSRF cookie for later portal POSTs (07-security §3) — same shape as designer login.
-        ctx.Response.Cookies.Append("ff_csrf", Base64Url.Encode(RandomNumberGenerator.GetBytes(16)), new CookieOptions
-        {
-            HttpOnly = false,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
-            Path = "/",
-        });
+        CsrfCookie.Issue(ctx);
 
         return Results.NoContent();
     }
@@ -71,8 +64,12 @@ public static class PortalSessionEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> Me([FromServices] PortalPrincipal principal, AppDbContext db)
+    private static async Task<IResult> Me([FromServices] PortalPrincipal principal, AppDbContext db, HttpContext ctx)
     {
+        // ff_csrf is a session cookie but ff_portal outlives the browser: re-issue it when missing
+        // so portal POSTs (logout) keep working after a restart.
+        if (!ctx.Request.Cookies.ContainsKey(CsrfCookie.Name)) CsrfCookie.Issue(ctx);
+
         var clientName = await db.Clients.AsNoTracking()
             .Where(c => c.Id == principal.ClientId)
             .Select(c => c.Name)

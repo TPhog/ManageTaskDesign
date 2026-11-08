@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Auth;
 using FreelanceFlow.Api.Domain.Common;
+using FreelanceFlow.Api.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -75,15 +76,7 @@ public static class AuthEndpoints
         var principal = new ClaimsPrincipal(new ClaimsIdentity(claims, "Designer"));
         await ctx.SignInAsync("Designer", principal);
 
-        // Set CSRF cookie (not HttpOnly so JS can read it)
-        var csrfToken = Base64Url.Encode(RandomNumberGenerator.GetBytes(16));
-        ctx.Response.Cookies.Append("ff_csrf", csrfToken, new CookieOptions
-        {
-            HttpOnly = false,
-            Secure = true,
-            SameSite = SameSiteMode.Strict,
-            Path = "/",
-        });
+        CsrfCookie.Issue(ctx); // not HttpOnly so JS can read it
 
         return Results.NoContent();
     }

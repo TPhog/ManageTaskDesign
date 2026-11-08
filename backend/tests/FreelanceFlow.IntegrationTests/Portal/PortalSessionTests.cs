@@ -111,4 +111,62 @@ public class PortalSessionTests(AppFactory factory) : PortalTestBase(factory)
         resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
         resp.Headers.GetValues("Set-Cookie").Should().Contain(c => c.StartsWith("ff_portal=;", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public async Task Logout_with_correct_origin_but_missing_or_wrong_csrf_token_returns_403()
+    {
+        await LoginAsync();
+        var (_, token) = await CreateClientWithPortalLinkAsync();
+        var portal = await OpenPortalSessionAsync(token);
+        var cookie = string.Join("; ", portal.DefaultRequestHeaders.GetValues("Cookie"));
+
+        foreach (var csrfHeader in new string?[] { null, "wrong-token-value" })
+        {
+            using var req = new HttpRequestMessage(HttpMethod.Post, "/api/portal/logout");
+            req.Headers.TryAddWithoutValidation("Cookie", cookie);
+            req.Headers.TryAddWithoutValidation("Origin", "http://localhost");
+            if (csrfHeader is not null) req.Headers.TryAddWithoutValidation("X-CSRF-Token", csrfHeader);
+
+            (await CreateBareClient().SendAsync(req)).StatusCode.Should().Be(HttpStatusCode.Forbidden, $"header '{csrfHeader}'");
+        }
+    }
+
+    [Fact]
+    public async Task Session_cookie_is_persistent_and_forwarded_https_makes_cookies_secure()
+    {
+        await LoginAsync();
+        var (_, token) = await CreateClientWithPortalLinkAsync();
+
+        using var req = new HttpRequestMessage(HttpMethod.Post, "/api/portal/session")
+        {
+            Content = JsonContent.Create(new { token }),
+        };
+        req.Headers.TryAddWithoutValidation("X-Forwarded-Proto", "https");
+        var resp = await CreateBareClient().SendAsync(req);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var portalCookie = resp.Headers.GetValues("Set-Cookie").First(c => c.StartsWith("ff_portal=", StringComparison.Ordinal));
+        portalCookie.Should().ContainEquivalentOf("expires=");
+        portalCookie.Should().ContainEquivalentOf("; secure");
+    }
+
+    [Fact]
+    public async Task Me_reissues_csrf_cookie_only_when_missing()
+    {
+        await LoginAsync();
+        var (_, token) = await CreateClientWithPortalLinkAsync();
+        var portal = await OpenPortalSessionAsync(token);
+        var cookies = portal.DefaultRequestHeaders.GetValues("Cookie").Single().Split("; ");
+        var sessionOnly = cookies.First(c => c.StartsWith("ff_portal=", StringComparison.Ordinal));
+
+        using var without = new HttpRequestMessage(HttpMethod.Get, "/api/portal/me");
+        without.Headers.TryAddWithoutValidation("Cookie", sessionOnly);
+        var resp = await CreateBareClient().SendAsync(without);
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        resp.Headers.GetValues("Set-Cookie").Should().Contain(c => c.StartsWith("ff_csrf=", StringComparison.Ordinal));
+
+        var withCsrf = await portal.GetAsync("/api/portal/me");
+        withCsrf.Headers.TryGetValues("Set-Cookie", out var set);
+        (set ?? Enumerable.Empty<string>()).Should().NotContain(c => c.StartsWith("ff_csrf=", StringComparison.Ordinal));
+    }
 }
