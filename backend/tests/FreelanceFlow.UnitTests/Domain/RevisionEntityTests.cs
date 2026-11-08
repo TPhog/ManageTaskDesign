@@ -1,6 +1,7 @@
 using FluentAssertions;
 using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Requests;
+using FreelanceFlow.Api.Domain.Revisions;
 
 namespace FreelanceFlow.UnitTests.Domain;
 
@@ -126,6 +127,15 @@ public class RevisionItemTests
     }
 
     [Fact]
+    public void Unknown_target_work_status_is_a_validation_error_not_a_transition()
+    {
+        var item = DeliverableRound().AddItem("x", "MINOR", "IN_QUOTA", 10);
+
+        FluentActions.Invoking(() => item.ChangeWorkStatus("FOO", null, false))
+            .Should().Throw<DomainException>().Which.Code.Should().Be("VALIDATION_FAILED");
+    }
+
+    [Fact]
     public void In_quota_item_moves_without_reason()   // AC-S6
     {
         var item = DeliverableRound().AddItem("x", "MINOR", "IN_QUOTA", 10);
@@ -201,6 +211,26 @@ public class RevisionItemTests
 
         item.Billing.Should().Be("FREE_FIX");
         item.QuotationItemId.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData("x", "HUGE", "CHARGEABLE")]
+    [InlineData("x", "MINOR", "FREE")]
+    [InlineData("   ", "MINOR", "CHARGEABLE")]
+    public void Edit_validates_type_billing_and_description(string description, string type, string billing) =>
+        FluentActions.Invoking(() => Chargeable().Edit(description, type, billing, "", true, null))
+            .Should().Throw<DomainException>().Which.Code.Should().Be("VALIDATION_FAILED");
+
+    [Fact]
+    public void Unlinked_item_can_change_billing_to_in_quota()   // BR-45 path (activity before/after is logged by the endpoint)
+    {
+        var item = Chargeable();
+
+        item.Edit("Thêm tagline", "MAJOR", "IN_QUOTA", "", roundHasDeliverable: true, linkedQuotationStatus: null);
+
+        item.Billing.Should().Be("IN_QUOTA");
+        item.QuotationItemId.Should().BeNull();
+        RevisionQuota.CountsTowardQuota(item.Billing, item.WorkStatus).Should().BeTrue();
     }
 
     [Fact]

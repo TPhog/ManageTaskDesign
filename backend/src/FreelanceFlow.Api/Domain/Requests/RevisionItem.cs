@@ -44,6 +44,7 @@ public class RevisionItem : IAuditable
     /// </summary>
     public bool ChangeWorkStatus(string to, string? overrideReason, bool linkedToAcceptedQuotation)
     {
+        if (!RevisionWorkStatuses.All.Contains(to)) throw Invalid("Trạng thái không hợp lệ");
         var allowed = (WorkStatus, to) switch
         {
             (RevisionWorkStatuses.Todo, RevisionWorkStatuses.InProgress) => true,

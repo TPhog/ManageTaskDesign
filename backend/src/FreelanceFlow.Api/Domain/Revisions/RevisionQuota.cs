@@ -64,19 +64,25 @@ public static class RevisionQuota
     }
 
     /// <summary>
-    /// Billing of each item of one new round, in order: explicit billing wins, null takes the suggestion; once an item
-    /// is IN_QUOTA the round is counted and later suggestions stay IN_QUOTA (BR-42 — one round costs one quota round).
+    /// Billing of each item of one new round, independent of item order: explicit billing wins, null takes the suggestion.
+    /// An explicit IN_QUOTA item makes the round counted up front, so null items then stay IN_QUOTA (BR-42 — one round
+    /// costs one quota round). Explicit IN_QUOTA on a project-level round is rejected (BR-41).
     /// </summary>
     public static RoundPlan PlanRound(DeliverableQuota? quota, IReadOnlyList<PlannedItemInput> items)
     {
-        var counted = false;
-        var planned = new List<PlannedItem>(items.Count);
         foreach (var input in items)
         {
             if (!RevisionItemTypes.All.Contains(input.Type))
                 throw new DomainException("VALIDATION_FAILED", "Loại yêu cầu sửa không hợp lệ");
             if (input.Billing is not null && !RevisionBillings.All.Contains(input.Billing))
                 throw new DomainException("VALIDATION_FAILED", "Cách tính phí không hợp lệ");
+            if (quota is null && input.Billing == RevisionBillings.InQuota)
+                throw RevisionItem.ProjectLevelInQuota();
+        }
+        var counted = items.Any(i => i.Billing == RevisionBillings.InQuota);
+        var planned = new List<PlannedItem>(items.Count);
+        foreach (var input in items)
+        {
             var suggestion = SuggestBilling(input.Type, quota, counted);
             var billing = input.Billing ?? suggestion.Billing;
             if (billing == RevisionBillings.InQuota) counted = true;

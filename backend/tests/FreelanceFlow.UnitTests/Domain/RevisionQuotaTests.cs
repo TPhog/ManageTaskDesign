@@ -62,6 +62,38 @@ public class RevisionQuotaTests
         plan.Counted.Should().BeTrue();
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Plan_on_exhausted_quota_is_order_independent_when_an_item_is_explicitly_in_quota(bool explicitFirst)   // BR-42
+    {
+        PlannedItemInput[] items = explicitFirst
+            ? [new("MINOR", "IN_QUOTA"), new("MINOR", null)]
+            : [new("MINOR", null), new("MINOR", "IN_QUOTA")];
+
+        var plan = RevisionQuota.PlanRound(Logo(used: 3), items);
+
+        plan.Items.Select(i => i.Billing).Should().Equal("IN_QUOTA", "IN_QUOTA");
+        plan.Counted.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Plan_on_exhausted_quota_without_explicit_in_quota_stays_chargeable()
+    {
+        var plan = RevisionQuota.PlanRound(Logo(used: 3), [new("MINOR", null), new("MAJOR", "CHARGEABLE")]);
+
+        plan.Items.Select(i => i.Billing).Should().Equal("CHARGEABLE", "CHARGEABLE");
+        plan.Counted.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Plan_on_a_project_level_round_rejects_explicit_in_quota()   // BR-41
+    {
+        FluentActions.Invoking(() => RevisionQuota.PlanRound(null, [new("MINOR", "IN_QUOTA")]))
+            .Should().Throw<DomainException>().Which.Code.Should().Be("BUSINESS_RULE");
+        RevisionQuota.PlanRound(null, [new("MINOR", null), new("MINOR", "FREE_FIX")]).Counted.Should().BeFalse();
+    }
+
     [Fact]
     public void Plan_of_a_free_fix_round_is_not_counted()   // AC-Q4, BR-43
     {

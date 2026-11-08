@@ -162,6 +162,25 @@ public class RequestsTests(AppFactory factory) : RevisionTestBase(factory)
     }
 
     [Fact]
+    public async Task Exhausted_quota_triage_gives_the_same_billing_for_either_item_order()   // BR-42
+    {
+        await LoginAsync();
+        var projectId = await CreateProjectAsync();
+        var logo = await CreateQuotaDeliverableAsync(projectId, "Logo", 1);
+        await TriageNewRequestAsync(projectId, Round(logo, ("R1", "MINOR", null)));   // 1/1 used
+
+        var a = await TriageNewRequestAsync(projectId, Round(logo, ("A", "MINOR", "IN_QUOTA"), ("B", "MINOR", null)));
+        var b = await TriageNewRequestAsync(projectId, Round(logo, ("A", "MINOR", null), ("B", "MINOR", "IN_QUOTA")));
+
+        foreach (var detail in new[] { a, b })
+        {
+            ItemsOfRounds(detail).Select(i => i.GetProperty("billing").GetString()).Should().Equal("IN_QUOTA", "IN_QUOTA");
+            detail.GetProperty("rounds")[0].GetProperty("counted").GetBoolean().Should().BeTrue();
+        }
+        (await UsedRoundsAsync(projectId, logo)).Should().Be(3);
+    }
+
+    [Fact]
     public async Task One_round_uses_one_quota_round_and_free_fix_uses_none()   // AC-Q3, AC-Q4, BR-42/43
     {
         await LoginAsync();
