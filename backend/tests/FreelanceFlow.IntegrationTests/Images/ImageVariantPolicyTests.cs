@@ -44,6 +44,45 @@ public class ImageVariantPolicyTests(AppFactory factory) : ImageTestBase(factory
     }
 
     [Fact]
+    public async Task Portal_and_admin_original_responses_are_cached_briefly_and_only_the_etag_validates()
+    {
+        var (_, token, projectId) = await ArrangeAsync("Dự án cache");
+        var taskId = await CreateTaskAsync(projectId);
+        var id = (await UploadTaskImagesAsync(Client, taskId, TestImages.Png(120, 80)))[0].GetProperty("id").GetGuid();
+        var portal = await OpenPortalSessionAsync(token);
+
+        // hide / delete / logout must take effect on a shared device: the portal never caches for long
+        var viaPortal = await portal.GetAsync($"/api/portal/images/{id}/preview");
+        viaPortal.StatusCode.Should().Be(HttpStatusCode.OK);
+        viaPortal.Headers.CacheControl!.Private.Should().BeTrue();
+        viaPortal.Headers.CacheControl.MaxAge.Should().Be(TimeSpan.FromMinutes(10));
+        viaPortal.Headers.CacheControl.Extensions.Should().NotContain(e => e.Name == "immutable");
+        var etag = viaPortal.Headers.ETag!.Tag;
+        using (var revalidate = new HttpRequestMessage(HttpMethod.Get, $"/api/portal/images/{id}/preview"))
+        {
+            revalidate.Headers.TryAddWithoutValidation("If-None-Match", etag);
+            var notModified = await portal.SendAsync(revalidate);
+            notModified.StatusCode.Should().Be(HttpStatusCode.NotModified);
+            notModified.Headers.CacheControl!.MaxAge.Should().Be(TimeSpan.FromMinutes(10));
+        }
+
+        // the admin original can fall back to the preview after a cleanup: short cache, never immutable
+        var original = await Client.GetAsync($"/api/admin/images/{id}/original");
+        original.Headers.CacheControl!.MaxAge.Should().Be(TimeSpan.FromMinutes(10));
+        original.Headers.CacheControl.Extensions.Should().NotContain(e => e.Name == "immutable");
+        var thumb = await Client.GetAsync($"/api/admin/images/{id}/thumb");
+        thumb.Headers.CacheControl!.MaxAge.Should().Be(TimeSpan.FromDays(365));
+        thumb.Headers.CacheControl.Extensions.Should().Contain(e => e.Name == "immutable");
+
+        // If-Modified-Since alone never answers 304: the served object behind a URL can change, only the ETag says which
+        using var sinceOnly = new HttpRequestMessage(HttpMethod.Get, $"/api/admin/images/{id}/original");
+        sinceOnly.Headers.IfModifiedSince = DateTimeOffset.UtcNow.AddDays(1);
+        var fresh = await Client.SendAsync(sinceOnly);
+        fresh.StatusCode.Should().Be(HttpStatusCode.OK);
+        fresh.Content.Headers.LastModified.Should().BeNull();
+    }
+
+    [Fact]
     public async Task Client_photo_is_stored_once_and_its_preview_streams_that_object()
     {
         var (_, token, projectId) = await ArrangeAsync("Dự án ảnh khách");

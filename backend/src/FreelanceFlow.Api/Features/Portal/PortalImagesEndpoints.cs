@@ -55,6 +55,6 @@ public static class PortalImagesEndpoints
     {
         if (!ImageVariants.ClientVisible.Contains(variant)) return Results.NotFound(); // never the original (spec §4)
         var image = await PortalImages.VisibleTo(db, principal).FirstOrDefaultAsync(f => f.Id == id, ct);
-        return image is null ? Results.NotFound() : await ImageDelivery.ServeAsync(image, variant, storage, http, ct);
+        return image is null ? Results.NotFound() : await ImageDelivery.ServeAsync(image, variant, portal: true, storage, http, ct);
     }
 }

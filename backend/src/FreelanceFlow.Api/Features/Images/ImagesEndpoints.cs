@@ -155,6 +155,6 @@ public static class ImagesEndpoints
         if (!ImageVariants.All.Contains(variant)) return Results.NotFound();
         var image = await db.Files.AsNoTracking()
             .FirstOrDefaultAsync(f => f.Id == id && f.OwnerType != null && f.DeletedAt == null, ct);
-        return image is null ? Results.NotFound() : await ImageDelivery.ServeAsync(image, variant, storage, http, ct);
+        return image is null ? Results.NotFound() : await ImageDelivery.ServeAsync(image, variant, portal: false, storage, http, ct);
     }
 }
