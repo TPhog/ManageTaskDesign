@@ -23,6 +23,22 @@ public static class DashboardRules
     /// <summary>The deadline list is a short to-do list, not a report.</summary>
     public const int MaxUpcomingProjects = 10;
 
+    /// <summary>P11 BR-91: the work schedule shows today … today + 6.</summary>
+    public const int ScheduleDays = 7;
+    public const int MaxScheduleOverdue = 10;
+    public const int MaxScheduleTasksPerDay = 20;
+
+    /// <summary>P11 BR-94: project deadlines and quotation expiries reported by the digest: [today, today + 3].</summary>
+    public const int DigestDeadlineDays = 3;
+
+    public static DateOnly ScheduleUntil(DateOnly today) => today.AddDays(ScheduleDays - 1);
+
+    public static IReadOnlyList<DateOnly> ScheduleDates(DateOnly today) =>
+        Enumerable.Range(0, ScheduleDays).Select(today.AddDays).ToList();
+
+    /// <summary>Vietnam has no DST: UTC+7 all year.</summary>
+    public static int VnHour(DateTimeOffset utc) => utc.ToOffset(TimeSpan.FromHours(7)).Hour;
+
     /// <summary>Projects still being worked on: COMPLETED and CANCELLED have no meaningful deadline.</summary>
     public static readonly string[] OpenProjectStatuses = ["DRAFT", "QUOTED", "IN_PROGRESS", "ON_HOLD"];
 
