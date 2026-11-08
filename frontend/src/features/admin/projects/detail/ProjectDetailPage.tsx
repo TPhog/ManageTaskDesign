@@ -19,6 +19,8 @@ import { BriefTab } from './BriefTab'
 import { QuotationsTab } from './QuotationsTab'
 import { DeliverablesTab } from './DeliverablesTab'
 import { TasksTab } from './TasksTab'
+import { RevisionsTab } from './RevisionsTab'
+import { ProgressUpdateCard } from './ProgressUpdateCard'
 import type { ProjectDetail, ProjectStatus } from '@/lib/types'
 
 const designTypeLabel: Record<string, string> = {
@@ -176,13 +178,14 @@ export default function ProjectDetailPage() {
         <TabsList className="h-auto w-full justify-start overflow-x-auto sm:w-auto">
           <TabsTrigger value="overview">Tổng quan</TabsTrigger>
           <TabsTrigger value="deliverables">Deliverables ({project.deliverables.length})</TabsTrigger>
+          <TabsTrigger value="revisions">Yêu cầu & Revision</TabsTrigger>
           <TabsTrigger value="brief">Brief</TabsTrigger>
           <TabsTrigger value="tasks">Công việc</TabsTrigger>
           <TabsTrigger value="quotations">Báo giá</TabsTrigger>
           <TabsTrigger value="activity">Lịch sử</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-4">
+        <TabsContent value="overview" className="mt-4 space-y-4">
           <div className={`${panelClass} space-y-5`}>
             <dl className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
               <InfoItem label="Khách hàng" value={project.client.name} />
@@ -199,10 +202,15 @@ export default function ProjectDetailPage() {
               </div>
             )}
           </div>
+          <ProgressUpdateCard projectId={project.id} />
         </TabsContent>
 
         <TabsContent value="deliverables" className="mt-4">
           <DeliverablesTab project={project} />
+        </TabsContent>
+
+        <TabsContent value="revisions" className="mt-4">
+          <RevisionsTab project={project} />
         </TabsContent>
 
         <TabsContent value="quotations" className="mt-4">
