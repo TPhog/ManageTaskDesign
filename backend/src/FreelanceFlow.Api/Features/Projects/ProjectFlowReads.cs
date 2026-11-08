@@ -64,7 +64,7 @@ internal static class ProjectFlowReads
         var newRequests = await db.ClientRequests.AsNoTracking()
             .Where(r => ids.Contains(r.ProjectId) && r.Status == RequestStatuses.New)
             .OrderBy(r => r.CreatedAt).ThenBy(r => r.Id)
-            .Select(r => new { r.ProjectId, r.Id })
+            .Select(r => new { r.ProjectId, r.Id, r.DeliverableId })
             .ToListAsync();
 
         // BR-46: CHARGEABLE items that are not on a quotation line yet
@@ -92,6 +92,7 @@ internal static class ProjectFlowReads
         var deliverablesByProject = deliverables.ToLookup(d => d.ProjectId);
         var quotationsByProject = quotations.ToLookup(q => q.ProjectId);
         var requestsByProject = newRequests.ToLookup(r => r.ProjectId);
+        var newRequestDeliverables = newRequests.Where(r => r.DeliverableId != null).Select(r => r.DeliverableId!.Value).ToHashSet();
 
         return statuses.ToDictionary(p => p.Key, p => new FlowFacts(
             p.Value,
@@ -101,7 +102,7 @@ internal static class ProjectFlowReads
                 var tasks = taskCounts.GetValueOrDefault(d.Id);
                 return new FlowDeliverable(d.Id, d.Name, d.Status, tasks?.Total ?? 0, tasks?.Done ?? 0,
                     d.ClientDecision, d.IncludedRounds, usedRounds.GetValueOrDefault(d.Id),
-                    openRevisions.GetValueOrDefault(d.Id));
+                    openRevisions.GetValueOrDefault(d.Id), newRequestDeliverables.Contains(d.Id));
             }).ToList(),
             quotationsByProject[p.Key].Select(q => new FlowQuotation(
                 q.Id, q.Kind, q.Status, q.Number, q.Version, q.ExpiryDate, q.PaymentStatus,

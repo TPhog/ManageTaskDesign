@@ -318,6 +318,21 @@ public class ProjectFlowTests
         completed.Actions[0].Label.Should().Be("Khách báo đã chuyển phần còn lại 1.000.000 ₫ cho BG-2026-0001 (v1) — kiểm tra & xác nhận");
     }
 
+    [Theory]
+    [InlineData(0, false, true)]
+    [InlineData(2, false, false)]
+    [InlineData(0, true, false)]
+    [InlineData(1, true, false)]
+    public void Confirm_approval_is_offered_only_while_the_client_has_no_open_change(int openRevisions, bool newRequest, bool offered)
+    {
+        var d = D("IN_REVIEW", decision: "APPROVED", openRevisions: openRevisions) with { HasNewRequest = newRequest };
+
+        var s = Eval(Facts("IN_PROGRESS", true, [d], [Q("ACCEPTED", payment: "PAID")]));
+
+        s.Stage.Should().Be("REVIEW");
+        Kinds(s).Contains("CONFIRM_APPROVAL").Should().Be(offered);
+    }
+
     [Fact]
     public void Deliverable_in_review_with_open_revision_items_warns_the_designer()
     {

@@ -1,4 +1,5 @@
 using System.Globalization;
+using FreelanceFlow.Api.Domain.Projects;
 using FreelanceFlow.Api.Domain.Quotations;
 using FreelanceFlow.Api.Domain.Revisions;
 
@@ -62,10 +63,13 @@ public static class FlowWarningKinds
     public const string ReviewWithOpenRevisions = "REVIEW_WITH_OPEN_REVISIONS";
 }
 
-/// <summary>A deliverable as the flow sees it (TaskTotal/TaskDone from TaskProgress, UsedRounds from RevisionQuota).</summary>
+/// <summary>
+/// A deliverable as the flow sees it (TaskTotal/TaskDone from TaskProgress, UsedRounds from RevisionQuota).
+/// HasNewRequest (Plan 12 BR-48): a NEW client request is tied to it.
+/// </summary>
 public sealed record FlowDeliverable(
     Guid Id, string Name, string Status, int TaskTotal, int TaskDone, string? ClientDecision, int IncludedRounds, int UsedRounds,
-    int OpenRevisionItems = 0);
+    int OpenRevisionItems = 0, bool HasNewRequest = false);
 
 /// <summary>A non-SUPERSEDED quotation of the project.</summary>
 public sealed record FlowQuotation(
@@ -215,7 +219,9 @@ public static class ProjectFlow
 
     private static void Review(Builder b, FlowFacts f, List<FlowDeliverable> active)
     {
-        foreach (var d in active.Where(d => d.Status == "IN_REVIEW" && d.ClientDecision == "APPROVED"))
+        // Plan 12 BR-48: same single state as the portal — an approval followed by an open change is not confirmable
+        foreach (var d in active.Where(d => ClientReviewStates.Of(d.Status, d.ClientDecision,
+                     d.OpenRevisionItems > 0 || d.HasNewRequest) == ClientReviewStates.ClientApproved))
             b.Act(FlowActionKinds.ConfirmApproval, $"Xác nhận khách đã duyệt: {d.Name}", new FlowTarget(DeliverableId: d.Id));
         var approved = active.Where(d => d.Status == "APPROVED").ToList();
         foreach (var d in approved)

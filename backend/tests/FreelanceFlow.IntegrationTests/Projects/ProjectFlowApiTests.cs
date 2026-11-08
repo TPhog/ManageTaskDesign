@@ -403,6 +403,26 @@ public class ProjectFlowApiTests(AppFactory factory) : PortalTestBase(factory)
     }
 
     [Fact]
+    public async Task Confirm_approval_is_not_offered_while_a_new_request_is_open_for_the_deliverable()   // Plan 12 BR-48
+    {
+        await LoginAsync();
+        var projectId = await NewProjectAsync();
+        var logo = await CreateDeliverableAsync(projectId, "Logo");
+        await QuotedAsync(projectId);
+        (await StartAsync(projectId, Array.Empty<object>())).EnsureSuccessStatusCode();
+        await MoveDeliverableAsync(logo, "IN_REVIEW");
+        await RecordClientApprovalAsync(logo);
+        Kinds((await FlowAsync(projectId)).GetProperty("actions")).Should().Contain("CONFIRM_APPROVAL");
+
+        (await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/requests",
+            new { content = "Sửa logo", source = "ZALO", deliverableId = logo })).EnsureSuccessStatusCode();
+
+        var flow = await FlowAsync(projectId);
+        flow.GetProperty("stage").GetString().Should().Be("REVIEW");
+        Kinds(flow.GetProperty("actions")).Should().NotContain("CONFIRM_APPROVAL").And.Contain("TRIAGE_REQUEST");
+    }
+
+    [Fact]
     public async Task Confirm_approval_approves_the_deliverable_and_clears_the_client_decision()
     {
         await LoginAsync();
