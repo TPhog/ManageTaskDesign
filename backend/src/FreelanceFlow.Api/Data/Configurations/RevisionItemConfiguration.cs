@@ -38,7 +38,8 @@ public class RevisionItemConfiguration : IEntityTypeConfiguration<RevisionItem>
 
         b.HasIndex(x => new { x.RoundId, x.SortOrder }).HasDatabaseName("ix_items_round");
         b.HasIndex(x => x.QuotationItemId).HasDatabaseName("ix_items_quotation_item");
-        // BR-48: one deliverable per item, one item per deliverable — the DB backs the accept idempotency
+        // BR-48: one item per deliverable. It does NOT stop a double accept (each would make a new deliverable id):
+        // that is the xmin check on the tracked quotation and revision_items rows in the accept command.
         b.HasIndex(x => x.CreatedDeliverableId).IsUnique()
             .HasFilter("created_deliverable_id IS NOT NULL").HasDatabaseName("ux_items_created_deliverable");
 

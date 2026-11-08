@@ -41,9 +41,9 @@ public static class AdditionalQuotationEndpoints
 
     private sealed record Quotable(Project Project, Guid[] Ids, List<Row> Ordered, Dictionary<Guid, Deliverable> Deliverables);
 
-    /// <summary>Shared by preview and create: 404 / 400 / 422 as BR-46 requires; rows tracked (create writes the links with xmin).</summary>
+    /// <summary>Shared by preview and create: 404 / 400 / 422 as BR-46 requires; create tracks the rows (links written with xmin).</summary>
     private static async Task<(Quotable? Value, IResult? Error)> LoadQuotableAsync(
-        AppDbContext db, Guid projectId, Guid[]? revisionItemIds, string? title)
+        AppDbContext db, Guid projectId, Guid[]? revisionItemIds, string? title, bool track)
     {
         var project = await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == projectId);
         if (project is null) return (null, Results.NotFound());
@@ -54,8 +54,10 @@ public static class AdditionalQuotationEndpoints
         if (title is { Length: > 200 }) errors["title"] = ["Tối đa 200 ký tự"];
         if (errors.Count > 0) return (null, Results.ValidationProblem(errors));
 
-        var rows = await (from i in db.RevisionItems
-                          join r in db.RevisionRounds on i.RoundId equals r.Id
+        var revisionItems = track ? db.RevisionItems : db.RevisionItems.AsNoTracking();
+        var revisionRounds = track ? db.RevisionRounds : db.RevisionRounds.AsNoTracking();
+        var rows = await (from i in revisionItems
+                          join r in revisionRounds on i.RoundId equals r.Id
                           where r.ProjectId == projectId && ids.Contains(i.Id)
                           select new { Item = i, Round = r }).ToListAsync();
         if (rows.Count != ids.Length) return (null, Invalid("revisionItemIds", "Có mục không thuộc dự án này"));
@@ -90,7 +92,7 @@ public static class AdditionalQuotationEndpoints
     /// <summary>Plan 09: the lines from-revisions would build with no price typed (suggestions only). Writes nothing.</summary>
     private static async Task<IResult> Preview(Guid projectId, AdditionalPreviewRequest body, AppDbContext db)
     {
-        var (q, error) = await LoadQuotableAsync(db, projectId, body.RevisionItemIds, null);
+        var (q, error) = await LoadQuotableAsync(db, projectId, body.RevisionItemIds, null, track: false);
         if (error is not null) return error;
 
         var plan = AdditionalQuotation.Plan(q!.Ordered.Select(x => ToChargeable(x, q, null, null)).ToList(), q.Project.Name);
@@ -104,7 +106,7 @@ public static class AdditionalQuotationEndpoints
     private static async Task<IResult> CreateFromRevisions(
         Guid projectId, CreateAdditionalQuotationRequest body, AppDbContext db, ActivityWriter activity)
     {
-        var (q, error) = await LoadQuotableAsync(db, projectId, body.RevisionItemIds, body.Title);
+        var (q, error) = await LoadQuotableAsync(db, projectId, body.RevisionItemIds, body.Title, track: true);
         if (error is not null) return error;
         var rowsById = q!.Ordered.ToDictionary(x => x.Item.Id);
         bool IsNewDeliverable(Guid id) => rowsById.TryGetValue(id, out var x) && x.Item.Type == RevisionItemTypes.NewDeliverable;
