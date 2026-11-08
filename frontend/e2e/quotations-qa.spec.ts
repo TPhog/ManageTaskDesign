@@ -25,7 +25,8 @@ test.describe('Quotations QA (D-02, D-03, D-04, D-12)', () => {
     await createDeliverable(page, projectId, 'Menu A4')
 
     const dialog = await openCreateDialog(page, projectId)
-    await expect(dialog).toContainText('chưa có dịch vụ mẫu nên dòng báo giá sẽ là 0 ₫: Menu A4')
+    await expect(dialog).toContainText('Đơn giá hạng mục chưa có dịch vụ mẫu')   // plan 09: priced here instead of warned about
+    await expect(dialog.getByLabel('Đơn giá Menu A4')).toBeVisible()
     await dialog.getByRole('button', { name: 'Tạo nháp' }).click()
     await expectToast(page, 'Đã tạo báo giá nháp')
 

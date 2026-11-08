@@ -24,3 +24,13 @@ export async function triageRequest(page: Page, projectId: string, deliverableId
     rowVersion: detail.request.rowVersion,
   })
 }
+
+/** Records and triages a request into one round of the given item types with the suggested billing. */
+export async function triageItems(page: Page, projectId: string, deliverableId: string | null, items: { description: string; type: string }[]) {
+  const id = await createRequest(page, projectId, items.map(i => i.description).join('\n'), deliverableId)
+  const detail = await (await page.request.get(`/api/admin/requests/${id}`)).json()
+  return apiPost(page.request, page, `/api/admin/requests/${id}/triage`, {
+    rounds: [{ deliverableId, receivedAt: null, items: items.map(i => ({ description: i.description, type: i.type, billing: null })) }],
+    rowVersion: detail.request.rowVersion,
+  })
+}

@@ -27,6 +27,9 @@ test.describe('Revisions tab', () => {
 
     await tab.getByRole('checkbox', { name: 'Chọn Thêm tagline dưới logo' }).check()
     await tab.getByRole('button', { name: /Tạo báo giá phát sinh/ }).click()
+    const pricing = page.getByRole('dialog', { name: 'Tạo báo giá phát sinh' })
+    await expect(pricing.getByLabel('Đơn giá Vòng sửa thứ 2 — Logo E2E')).toHaveValue('200.000')   // suggestion prefilled
+    await pricing.getByRole('button', { name: 'Tạo báo giá nháp' }).click()
     await expectToast(page, 'Đã tạo báo giá phát sinh')
     await expect(page).toHaveURL(/\/admin\/quotations\/[0-9a-f-]{36}$/)
     const quotationId = page.url().split('/').pop()!
