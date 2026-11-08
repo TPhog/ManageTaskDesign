@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { qk } from '@/lib/queryKeys'
+import type { PortalImage } from '@/lib/imageTypes'
 import type {
   PortalMe,
   PortalProjectDetail,
@@ -62,9 +63,17 @@ export function usePortalRequests(projectId?: string, enabled = true) {
 export function useSendPortalRequest() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (values: RequestFormValues) =>
-      api.postForm<PortalRequest>(`/portal/projects/${values.projectId}/requests`, toRequestForm(values)),
+    mutationFn: ({ files = [], ...values }: RequestFormValues & { files?: File[] }) =>
+      api.postForm<PortalRequest>(`/portal/projects/${values.projectId}/requests`, toRequestForm(values, files)),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['portal', 'requests'] }),
+  })
+}
+
+export function usePortalImages(projectId: string, enabled = true) {
+  return useQuery({
+    queryKey: qk.portal.images(projectId),
+    queryFn: () => api.get<PortalImage[]>(`/portal/projects/${projectId}/images`),
+    enabled: enabled && !!projectId,
   })
 }
 

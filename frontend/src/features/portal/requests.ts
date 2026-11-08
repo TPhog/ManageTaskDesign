@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import type { ApiError } from '@/lib/api'
+import { imageErrorMessage, isStorageFull } from '@/lib/images'
 import type { ProjectStatus } from '@/lib/types'
 
 export const REQUEST_MAX_LENGTH = 5000
@@ -24,11 +25,12 @@ export const requestSchema = z.object({
 
 export type RequestFormValues = z.infer<typeof requestSchema>
 
-/** multipart body of POST /api/portal/projects/{id}/requests (docs/05 §4); attachments arrive with M3. */
-export function toRequestForm(values: Pick<RequestFormValues, 'deliverableId' | 'content'>): FormData {
+/** multipart body of POST /api/portal/projects/{id}/requests (docs/05 §4): text fields, then ≤ 5 photos (plan 08). */
+export function toRequestForm(values: Pick<RequestFormValues, 'deliverableId' | 'content'>, files: File[] = []): FormData {
   const form = new FormData()
   form.append('content', values.content.trim())
   if (values.deliverableId) form.append('deliverableId', values.deliverableId)
+  for (const f of files) form.append('files', f)
   return form
 }
 
@@ -38,6 +40,7 @@ export function requestErrorMessage(err: unknown): string {
   if (e.status === 429) {
     return `Hôm nay bạn đã gửi ${DAILY_REQUEST_LIMIT} yêu cầu — vui lòng gửi tiếp vào ngày mai hoặc nhắn trực tiếp cho designer.`
   }
+  if (isStorageFull(err) || e.status === 413 || e.status === 415) return imageErrorMessage(err, 'client')
   if (e.status === 401) return 'Phiên xem đã hết hạn — vui lòng mở lại link designer đã gửi.'
   if (e.status === 403) return 'Vui lòng tải lại trang rồi gửi lại.'
   if (e.status === 422) return unprocessableMessage(e.detail)

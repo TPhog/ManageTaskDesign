@@ -3,12 +3,14 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
-import { ArrowLeft, CircleCheck, FolderOpen } from 'lucide-react'
+import { ArrowLeft, CircleCheck, FolderOpen, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/EmptyState'
+import { ImagePicker } from '@/components/ImagePicker'
+import { MAX_PORTAL_IMAGES } from '@/lib/images'
 import { REQUEST_MAX_LENGTH, acceptsRequests, requestErrorMessage, requestSchema, type RequestFormValues } from './requests'
 import { usePortalProject, usePortalProjects, useSendPortalRequest } from './usePortal'
 
@@ -16,13 +18,14 @@ import { usePortalProject, usePortalProjects, useSendPortalRequest } from './use
 const selectClass =
   'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm'
 
-/** docs/08 §3.2 "/portal/requests/new" — text only until M3 adds photos (D2). */
+/** docs/08 §3.2 "/portal/requests/new" — text + up to 5 photos (plan 08). */
 export default function PortalRequestNewPage() {
   const [params] = useSearchParams()
   const presetProjectId = params.get('projectId') ?? ''
   const { data: projects, isLoading } = usePortalProjects()
   const send = useSendPortalRequest()
   const [sent, setSent] = useState(false)
+  const [files, setFiles] = useState<File[]>([])
 
   const { register, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm<RequestFormValues>({
     resolver: zodResolver(requestSchema),
@@ -44,9 +47,10 @@ export default function PortalRequestNewPage() {
   const backTo = presetProjectId ? `/portal/projects/${presetProjectId}` : '/portal/requests'
 
   function onSubmit(values: RequestFormValues) {
-    send.mutate(values, {
+    send.mutate({ ...values, files }, {
       onSuccess: () => {
         reset({ projectId: values.projectId, deliverableId: '', content: '' })
+        setFiles([])
         setSent(true)
       },
       onError: err => toast.error(requestErrorMessage(err)),
@@ -141,10 +145,33 @@ export default function PortalRequestNewPage() {
               {...register('content')}
             />
             <p id="request-content-hint" className="text-xs text-muted-foreground">
-              Mỗi ý một dòng giúp nhà thiết kế xử lý nhanh hơn. Góp ý cho một hạng mục được tính là 1 lần sửa của hạng mục đó. Đính kèm ảnh sẽ có ở bản cập nhật sau.
-            </p>
+              Mỗi ý một dòng giúp nhà thiết kế xử lý nhanh hơn. Góp ý cho một hạng mục được tính là 1 lần sửa của hạng mục đó.            </p>
             {errors.content && (
               <p id="request-content-error" className="text-sm text-destructive">{errors.content.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="request-images">Ảnh minh hoạ (tuỳ chọn)</Label>
+            <ImagePicker
+              id="request-images"
+              max={MAX_PORTAL_IMAGES - files.length}
+              disabled={send.isPending || files.length >= MAX_PORTAL_IMAGES}
+              onFiles={picked => setFiles(current => [...current, ...picked].slice(0, MAX_PORTAL_IMAGES))}
+              label="Thêm ảnh"
+              hint={`Chụp màn hình hoặc ảnh mẫu · tối đa ${MAX_PORTAL_IMAGES} ảnh, 20 MB/ảnh`}
+            />
+            {files.length > 0 && (
+              <ul className="flex flex-wrap gap-1.5" aria-label="Ảnh đính kèm">
+                {files.map((f, i) => (
+                  <li key={`${f.name}-${i}`} className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs">
+                    {f.name}
+                    <button type="button" aria-label={`Bỏ ${f.name}`} onClick={() => setFiles(files.filter((_, j) => j !== i))}>
+                      <X className="h-3 w-3" aria-hidden="true" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 

@@ -21,6 +21,7 @@ import { PortalRequestList } from './PortalRequestList'
 import { acceptsRequests } from './requests'
 import { usePortalQuotations, usePortalRequests, usePortalRevisions } from './usePortal'
 import { PortalRevisionsView } from './PortalRevisionsView'
+import { PortalImageStrip, PortalImagesSection } from './PortalImagesSection'
 
 const panelClass = 'rounded-xl border bg-card p-4 shadow-card sm:p-5'
 
@@ -169,6 +170,8 @@ export default function PortalProjectPage() {
         )}
       </section>
 
+      <PortalImagesSection projectId={project.id} />
+
       <section aria-labelledby="portal-quotations" className={panelClass}>
         <h2 id="portal-quotations" className="text-sm font-semibold text-foreground">Báo giá</h2>
         {!quotations ? (
@@ -254,6 +257,7 @@ export default function PortalProjectPage() {
                       ) : (
                         <p className="text-sm text-foreground">{t.message}</p>
                       )}
+                      <PortalImageStrip images={t.images ?? []} />
                       <time dateTime={t.occurredAt} className="text-xs text-muted-foreground">{timeOfDay(t.occurredAt)}</time>
                     </li>
                   ))}
