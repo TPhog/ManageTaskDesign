@@ -1,3 +1,5 @@
+import type { TaskListParams } from './types'
+
 export const qk = {
   settings:  ['settings']  as const,
   banks:     ['banks']     as const,
@@ -13,6 +15,13 @@ export const qk = {
     all:    ['projects']                               as const,
     list:   (clientId?: string) => ['projects', 'list', clientId] as const,
     detail: (id: string)        => ['projects', id]               as const,
+  },
+
+  tasks: {
+    all:    ['tasks']                                             as const,
+    lists:  ['tasks', 'list']                                     as const,
+    list:   (params: TaskListParams) => ['tasks', 'list', params] as const,
+    detail: (id: string)             => ['tasks', 'detail', id]   as const,
   },
 
   quotations: {

@@ -100,3 +100,75 @@ export interface PortalLinkResult {
   url: string
   createdAt: string
 }
+
+export type TaskStatus = 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'BLOCKED'
+export type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT'
+/** GET /admin/tasks?due= — server buckets by today(VN) and skips DONE tasks */
+export type TaskDueFilter = 'overdue' | 'today' | 'week'
+
+/** GET /admin/tasks item */
+export interface TaskListItem {
+  id: string
+  projectId: string
+  projectName: string
+  clientName: string
+  deliverableId: string | null
+  deliverableName: string | null
+  title: string
+  status: TaskStatus
+  priority: TaskPriority
+  startDate: string | null
+  dueDate: string | null
+  sortOrder: number
+  completedAt: string | null
+  isOverdue: boolean
+  checklistTotal: number
+  checklistDone: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ChecklistItem {
+  id: string
+  text: string
+  done: boolean
+  sortOrder: number
+}
+
+/** GET /admin/tasks/{id}; every task write returns this shape */
+export interface TaskDetail {
+  id: string
+  projectId: string
+  projectName: string
+  deliverableId: string | null
+  deliverableName: string | null
+  title: string
+  description: string
+  status: TaskStatus
+  priority: TaskPriority
+  startDate: string | null
+  dueDate: string | null
+  sortOrder: number
+  completedAt: string | null
+  isOverdue: boolean
+  checklist: ChecklistItem[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface TaskListParams {
+  projectId?: string
+  status?: TaskStatus
+  due?: TaskDueFilter
+}
+
+/** PUT /admin/tasks/{id} body */
+export interface TaskUpdateInput {
+  title: string
+  description: string
+  status: TaskStatus
+  priority: TaskPriority
+  startDate: string | null
+  dueDate: string | null
+  deliverableId: string | null
+}
