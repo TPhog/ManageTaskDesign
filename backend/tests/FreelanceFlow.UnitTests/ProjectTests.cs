@@ -121,6 +121,34 @@ public class ProjectTests
     }
 
     [Fact]
+    public void ValidateTransition_ToCompletedWithOpenTasksAndRevisionItems_ListsThem()   // P14 DF-08
+    {
+        var warnings = InProgress.ValidateTransition("COMPLETED", null, true, false, false,
+            openTaskTitles: ["A"], openRevisionItems: 2);
+
+        Assert.Contains("Còn 1 công việc chưa xong: A", warnings);
+        Assert.Contains("Còn 2 mục sửa chưa xong (Cần làm / Đang làm)", warnings);
+    }
+
+    [Fact]
+    public void ValidateTransition_ToCompletedWithManyOpenTasks_ShowsThreeTitlesAndTheRest()
+    {
+        var warnings = InProgress.ValidateTransition("COMPLETED", null, true, false, false,
+            openTaskTitles: ["T1", "T2", "T3", "T4", "T5"]);
+
+        Assert.Equal(["Còn 5 công việc chưa xong: T1, T2, T3, … (+2)"], warnings);
+    }
+
+    [Fact]
+    public void ValidateTransition_ToInProgress_IgnoresOpenItems()
+    {
+        var warnings = Draft.ValidateTransition("IN_PROGRESS", null, true, false, false,
+            openTaskTitles: ["A"], openRevisionItems: 2);
+
+        Assert.Empty(warnings);
+    }
+
+    [Fact]
     public void ApplyStatusChange_SetsStatusAndReason()
     {
         var project = new Project { Status = "IN_PROGRESS" };

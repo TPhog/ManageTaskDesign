@@ -56,7 +56,8 @@ public static class ProjectFlowEndpoints
 
     private static async Task<IResult> StartPreview(Guid id, AppDbContext db)
     {
-        if (!await db.Projects.AnyAsync(p => p.Id == id)) return Results.NotFound();
+        var project = await db.Projects.AsNoTracking().Where(p => p.Id == id).Select(p => new { p.DueDate }).FirstOrDefaultAsync();
+        if (project is null) return Results.NotFound();
 
         var rows = await (
                 from d in db.Deliverables.AsNoTracking()
@@ -70,12 +71,14 @@ public static class ProjectFlowEndpoints
                     d.Name,
                     ServiceName = s == null ? null : s.Name,
                     Template = s == null ? null : s.TaskTemplateJson,
+                    d.DueDate,
                 })
             .ToListAsync();
 
         return Results.Ok(rows.Select(r => new StartPreviewItemDto(
             r.Id, r.Name, r.ServiceName,
-            r.Template is null ? [] : Service.ParseTaskTemplate(r.Template))).ToList());
+            r.Template is null ? [] : Service.ParseTaskTemplate(r.Template),
+            r.DueDate ?? project.DueDate)).ToList());   // P14 DF-19: "Hạn chung" defaults to the deliverable's, else the project's
     }
 
     /// <summary>
@@ -125,7 +128,7 @@ public static class ProjectFlowEndpoints
         {
             foreach (var title in entry.Titles ?? [])
             {
-                var task = ProjectTask.Create(id, title, "", "TODO", "MEDIUM", null, null, entry.DeliverableId, sortOrder, clock);
+                var task = ProjectTask.Create(id, title, "", "TODO", "MEDIUM", null, entry.DueDate, entry.DeliverableId, sortOrder, clock);
                 sortOrder += ProjectTask.SortStep;
                 db.Tasks.Add(task);
                 created++;
@@ -184,9 +187,11 @@ public sealed record FlowProjectActionsDto(
     Guid ProjectId, string ProjectName, string ClientName, string Stage,
     IReadOnlyList<FlowAction> Actions, IReadOnlyList<FlowWarning> Warnings);
 
-public sealed record StartPreviewItemDto(Guid DeliverableId, string Name, string? ServiceName, IReadOnlyList<string> Titles);
+public sealed record StartPreviewItemDto(
+    Guid DeliverableId, string Name, string? ServiceName, IReadOnlyList<string> Titles, DateOnly? SuggestedDueDate);
 
-public sealed record StartProjectTasks(Guid DeliverableId, List<string>? Titles);
+/// <summary>DueDate (P14 DF-19): one shared due date for every task created from this entry (start date stays empty).</summary>
+public sealed record StartProjectTasks(Guid DeliverableId, List<string>? Titles, DateOnly? DueDate = null);
 
 public sealed record StartProjectRequest(uint RowVersion, List<StartProjectTasks>? Tasks);
 

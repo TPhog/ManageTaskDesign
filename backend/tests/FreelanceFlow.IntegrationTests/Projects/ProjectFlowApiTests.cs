@@ -214,6 +214,54 @@ public class ProjectFlowApiTests(AppFactory factory) : PortalTestBase(factory)
     }
 
     [Fact]
+    public async Task Start_preview_suggests_a_shared_due_date_and_start_applies_it_to_the_template_tasks()   // DF-19
+    {
+        await LoginAsync();
+        var projectId = await NewProjectAsync();
+        var serviceId = await ServiceWithTemplateAsync("Logo Due " + Guid.NewGuid(), "A", "B");
+        var created = await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/deliverables",
+            new { name = "Logo", quantity = 1, serviceId, dueDate = "2026-12-05" });
+        created.EnsureSuccessStatusCode();
+        var logo = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var card = await CreateDeliverableAsync(projectId, "Danh thiếp");
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.Projects.FirstAsync(p => p.Id == projectId)).DueDate = new DateOnly(2026, 12, 20);
+            await db.SaveChangesAsync();
+        }
+
+        var preview = (await Client.GetFromJsonAsync<JsonElement>($"/api/admin/projects/{projectId}/start-preview"))
+            .EnumerateArray().ToList();
+
+        preview.Single(p => p.GetProperty("deliverableId").GetGuid() == logo)
+            .GetProperty("suggestedDueDate").GetString().Should().Be("2026-12-05");
+        preview.Single(p => p.GetProperty("deliverableId").GetGuid() == card)
+            .GetProperty("suggestedDueDate").GetString().Should().Be("2026-12-20");
+
+        var resp = await StartAsync(projectId, new[] { new { deliverableId = logo, titles = new[] { "A", "B" }, dueDate = "2026-12-01" } });
+        resp.StatusCode.Should().Be(HttpStatusCode.OK, await resp.Content.ReadAsStringAsync());
+
+        var tasks = await TasksAsync(projectId);
+        tasks.Should().HaveCount(2);
+        tasks.Should().OnlyContain(t => t.GetProperty("dueDate").GetString() == "2026-12-01"
+                                        && t.GetProperty("startDate").ValueKind == JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Start_preview_has_no_suggested_due_date_without_any_due_date()
+    {
+        await LoginAsync();
+        var projectId = await NewProjectAsync();
+        await CreateDeliverableAsync(projectId, "Logo");
+
+        var preview = (await Client.GetFromJsonAsync<JsonElement>($"/api/admin/projects/{projectId}/start-preview"))
+            .EnumerateArray().Single();
+
+        preview.GetProperty("suggestedDueDate").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
     public async Task Start_moves_the_project_and_its_deliverables_and_creates_the_tasks_in_one_go()
     {
         await LoginAsync();

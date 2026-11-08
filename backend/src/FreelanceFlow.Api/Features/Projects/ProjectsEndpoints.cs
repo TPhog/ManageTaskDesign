@@ -2,6 +2,7 @@ using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Projects;
 using FreelanceFlow.Api.Domain.Quotations;
+using FreelanceFlow.Api.Domain.Requests;
 using FreelanceFlow.Api.Domain.Revisions;
 using FreelanceFlow.Api.Domain.Tasks;
 using FreelanceFlow.Api.Infrastructure;
@@ -324,6 +325,25 @@ public static class ProjectsEndpoints
         var hasUnpaidAccepted = body.To == "COMPLETED" && await db.Quotations
             .AnyAsync(q => q.ProjectId == id && q.Status == "ACCEPTED" && q.PaymentStatus != "PAID");
 
+        // P14 DF-08: open tasks and TODO / IN_PROGRESS revision items (D-11) are listed when completing
+        List<string> openTaskTitles = [];
+        var openRevisionItems = 0;
+        if (body.To == "COMPLETED")
+        {
+            openTaskTitles = await db.Tasks.AsNoTracking()
+                .Where(t => t.ProjectId == id && t.Status != "DONE")
+                .OrderBy(t => t.SortOrder).ThenBy(t => t.CreatedAt)
+                .Select(t => t.Title)
+                .ToListAsync();
+            openRevisionItems = await (
+                    from i in db.RevisionItems.AsNoTracking()
+                    join r in db.RevisionRounds on i.RoundId equals r.Id
+                    where r.ProjectId == id
+                          && (i.WorkStatus == RevisionWorkStatuses.Todo || i.WorkStatus == RevisionWorkStatuses.InProgress)
+                    select i.Id)
+                .CountAsync();
+        }
+
         string[] warnings;
         try
         {
@@ -332,7 +352,9 @@ public static class ProjectsEndpoints
                 body.Reason,
                 hasAcceptedInitial,
                 hasIncompleteDeliverables,
-                hasUnpaidAccepted);
+                hasUnpaidAccepted,
+                openTaskTitles,
+                openRevisionItems);
         }
         catch (DomainException ex) when (ex.Code == "INVALID_TRANSITION")
         {

@@ -132,7 +132,7 @@ public static class TasksEndpoints
         var project = await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == projectId);
         if (project == null) return Results.NotFound();
 
-        var errors = TaskValidation.TaskFields(body.Title, body.Status, body.Priority, body.Description);
+        var errors = TaskValidation.TaskFields(body.Title, body.Status, body.Priority, body.Description, body.StartDate, body.DueDate);
         await CheckDeliverableAsync(db, projectId, body.DeliverableId, errors);
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
@@ -169,7 +169,7 @@ public static class TasksEndpoints
         var task = await db.Tasks.FindAsync(id);
         if (task == null) return Results.NotFound();
 
-        var errors = TaskValidation.TaskFields(body.Title, body.Status, body.Priority, body.Description);
+        var errors = TaskValidation.TaskFields(body.Title, body.Status, body.Priority, body.Description, body.StartDate, body.DueDate);
         await CheckDeliverableAsync(db, task.ProjectId, body.DeliverableId, errors);
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 

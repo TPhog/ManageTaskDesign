@@ -35,6 +35,29 @@ public class TaskTests
     }
 
     [Fact]
+    public void Create_WithDueBeforeStart_Throws()   // P14 DF-06
+    {
+        var ex = Assert.Throws<DomainException>(() => ProjectTask.Create(Guid.NewGuid(), "A", "", "TODO", "MEDIUM",
+            new DateOnly(2026, 11, 9), new DateOnly(2026, 11, 8), null, 1000, Clock));
+
+        Assert.Equal("VALIDATION_FAILED", ex.Code);
+        Assert.Equal("Hạn hoàn thành phải từ ngày bắt đầu trở đi", ex.Detail);
+    }
+
+    [Fact]
+    public void Edit_AllowsSameDayOrOnlyOneDate()
+    {
+        var task = NewTask();
+
+        task.Edit("A", "", "MEDIUM", D("2026-11-09"), D("2026-11-09"), null);
+        task.Edit("A", "", "MEDIUM", null, D("2026-11-01"), null);
+        task.Edit("A", "", "MEDIUM", D("2026-11-09"), null, null);
+
+        Assert.Equal(D("2026-11-09"), task.StartDate);
+        Assert.Null(task.DueDate);
+    }
+
+    [Fact]
     public void Create_AsDone_StampsCompletedAt()
     {
         var task = NewTask("DONE");

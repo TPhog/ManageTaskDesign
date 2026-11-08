@@ -127,6 +127,22 @@ public static class DeliverablesEndpoints
         var deliverable = await db.Deliverables.FindAsync(id);
         if (deliverable == null) return Results.NotFound();
 
+        // P14 DF-07: the optional delivery link + message only count when handing over
+        string? deliveryUrl = null, deliveryMessage = null;
+        if (body.To == "DELIVERED")
+        {
+            deliveryUrl = string.IsNullOrWhiteSpace(body.DeliveryUrl) ? null : body.DeliveryUrl.Trim();
+            deliveryMessage = string.IsNullOrWhiteSpace(body.ClientMessage) ? null : body.ClientMessage.Trim();
+            var errors = new Dictionary<string, string[]>();
+            if (deliveryUrl is { Length: > DeliveryLinks.MaxUrl })
+                errors["deliveryUrl"] = [$"Link tối đa {DeliveryLinks.MaxUrl} ký tự"];
+            else if (!DeliveryLinks.IsValid(deliveryUrl))
+                errors["deliveryUrl"] = ["Link phải bắt đầu bằng http:// hoặc https://"];
+            if (deliveryMessage is { Length: > DeliveryLinks.MaxMessage })
+                errors["clientMessage"] = [$"Tối đa {DeliveryLinks.MaxMessage} ký tự"];
+            if (errors.Count > 0) return Results.ValidationProblem(errors);
+        }
+
         var fromStatus = deliverable.Status;
         try
         {
@@ -143,14 +159,17 @@ public static class DeliverablesEndpoints
         {
             "IN_REVIEW" => $"{deliverable.Name}: Chờ duyệt",
             "APPROVED" => $"{deliverable.Name}: Đã duyệt",
-            "DELIVERED" => $"{deliverable.Name}: Đã bàn giao",
+            "DELIVERED" => string.Join("\n",
+                new[] { $"{deliverable.Name}: Đã bàn giao", deliveryMessage, deliveryUrl }.Where(x => x != null)),
             _ => null,
         };
 
         activity.Write("deliverable", deliverable.Id, "deliverable.status_changed",
             clientId: await ClientIdOfAsync(db, deliverable.ProjectId),
             projectId: deliverable.ProjectId,
-            data: new { from = fromStatus, to = body.To, name = deliverable.Name },
+            data: deliveryUrl is null
+                ? new { from = fromStatus, to = body.To, name = deliverable.Name }
+                : (object)new { from = fromStatus, to = body.To, name = deliverable.Name, deliveryUrl },
             visibleToClient: clientMessage != null,
             clientMessage: clientMessage);
 
@@ -288,6 +307,20 @@ record UpdateDeliverableRequest(
     DateOnly? DueDate,
     int SortOrder);
 
-record ChangeDeliverableStatusRequest(string To);
+/// <summary>DeliveryUrl / ClientMessage (P14 DF-07): only read when To == DELIVERED.</summary>
+record ChangeDeliverableStatusRequest(string To, string? DeliveryUrl = null, string? ClientMessage = null);
+
+/// <summary>P14 DF-07: a delivery link is an absolute http(s) URL without whitespace, at most <see cref="MaxUrl"/> characters.</summary>
+static class DeliveryLinks
+{
+    public const int MaxUrl = 500;
+    public const int MaxMessage = 500;
+
+    /// <summary>null / blank = no link (valid).</summary>
+    public static bool IsValid(string? url) =>
+        string.IsNullOrWhiteSpace(url)
+        || (url.Length <= MaxUrl && !url.Any(char.IsWhiteSpace)
+            && Uri.TryCreate(url, UriKind.Absolute, out var u) && u.Scheme is "http" or "https");
+}
 
 record SubmitReviewRequest(string? ClientMessage);

@@ -12,7 +12,8 @@ public static class TaskValidation
     public const int ChecklistDescriptionMaxLength = TaskChecklistItem.MaxDescription;
     public static readonly string[] DueFilters = ["overdue", "today", "week"];
 
-    public static Dictionary<string, string[]> TaskFields(string? title, string? status, string? priority, string? description = null)
+    public static Dictionary<string, string[]> TaskFields(string? title, string? status, string? priority, string? description = null,
+        DateOnly? startDate = null, DateOnly? dueDate = null)
     {
         var errors = new Dictionary<string, string[]>();
         if (string.IsNullOrWhiteSpace(title))
@@ -25,6 +26,8 @@ public static class TaskValidation
             errors["priority"] = ["Mức ưu tiên không hợp lệ"];
         if (description is { Length: > DescriptionMaxLength })
             errors["description"] = [$"Mô tả tối đa {DescriptionMaxLength} ký tự"];
+        if (startDate is { } s && dueDate is { } d && d < s)
+            errors["dueDate"] = [ProjectTask.DueBeforeStartMessage];
         return errors;
     }
 

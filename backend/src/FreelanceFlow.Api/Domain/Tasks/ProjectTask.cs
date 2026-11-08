@@ -14,6 +14,9 @@ public class ProjectTask : IAuditable
     /// <summary>Plan 06b F5: the description is Markdown, rendered without raw HTML on the client.</summary>
     public const int MaxDescription = 20_000;
 
+    /// <summary>P14 DF-06: due date before start date (both set) is rejected.</summary>
+    public const string DueBeforeStartMessage = "Hạn hoàn thành phải từ ngày bắt đầu trở đi";
+
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid ProjectId { get; set; }
     public Guid? DeliverableId { get; set; }
@@ -58,6 +61,8 @@ public class ProjectTask : IAuditable
             throw new DomainException("VALIDATION_FAILED", $"Mức ưu tiên không hợp lệ: {priority}");
         if (description.Length > MaxDescription)
             throw new DomainException("VALIDATION_FAILED", $"Mô tả tối đa {MaxDescription} ký tự");
+        if (startDate is { } s && dueDate is { } d && d < s)
+            throw new DomainException("VALIDATION_FAILED", DueBeforeStartMessage);
 
         Title = title.Trim();
         Description = description;
