@@ -6,9 +6,12 @@ import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
+import { Inbox } from 'lucide-react'
+import { useNewRequestCount } from '@/features/admin/revisions/useRevisions'
 
 const navItems = [
   { to: '/admin', label: 'Tổng quan', icon: LayoutDashboard, end: true },
+  { to: '/admin/requests', label: 'Yêu cầu', icon: Inbox },
   { to: '/admin/projects', label: 'Dự án', icon: FolderKanban },
   { to: '/admin/tasks', label: 'Công việc', icon: ListChecks },
   { to: '/admin/quotations', label: 'Báo giá', icon: FileText },
@@ -25,6 +28,20 @@ function BrandMark() {
       </div>
       <span className="font-semibold tracking-tight text-foreground">FreelanceFlow</span>
     </div>
+  )
+}
+
+/** REQ-03: number of NEW requests next to "Yêu cầu" */
+function NewRequestsBadge() {
+  const { data } = useNewRequestCount()
+  if (!data?.count) return null
+  return (
+    <span
+      className="ml-auto rounded-full bg-primary px-2 py-0.5 text-xs font-semibold tabular-nums text-primary-foreground"
+      aria-label={`${data.count} yêu cầu mới`}
+    >
+      {data.count}
+    </span>
   )
 }
 
@@ -57,6 +74,7 @@ function SidebarContent({ onNavigate, onLogout, loggingOut, username }: {
           >
             <item.icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
             {item.label}
+            {item.to === '/admin/requests' && <NewRequestsBadge />}
           </NavLink>
         ))}
       </nav>

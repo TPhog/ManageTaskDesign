@@ -16,6 +16,7 @@ import ClientsPage from './features/admin/clients/ClientsPage'
 import QuotationPage from './features/admin/quotations/QuotationPage'
 import QuotationsPage from './features/admin/quotations/QuotationsPage'
 import TasksPage from './features/admin/tasks/TasksPage'
+import RequestsPage from './features/admin/requests/RequestsPage'
 
 export const router = createBrowserRouter([
   {
@@ -28,6 +29,8 @@ export const router = createBrowserRouter([
     errorElement: <NotFoundPage />,
     children: [
       { index: true, element: <DashboardPage /> },
+      { path: 'requests', element: <RequestsPage /> },
+      { path: 'requests/:id', element: <RequestsPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'services', element: <ServicesPage /> },
       { path: 'projects', element: <ProjectsPage /> },
