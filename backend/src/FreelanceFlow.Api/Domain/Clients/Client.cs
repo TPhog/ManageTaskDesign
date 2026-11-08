@@ -46,6 +46,28 @@ public class Client : IAuditable
         PortalEnabled = false;
     }
 
+    // 07-security §4.1 + BR-12: new token and version (old link and every open session die) and portal on.
+    // Returns the raw token — the only moment it exists; only its SHA-256 hash is stored.
+    public string IssuePortalLink(IClock clock)
+    {
+        if (Status == "INACTIVE" || ArchivedAt != null)
+            throw new DomainException("BUSINESS_RULE", "Không thể tạo link cho khách đã lưu trữ");
+        var raw = GeneratePortalToken(clock);
+        EnablePortal();
+        return raw;
+    }
+
+    // "Thu hồi" (CLI-03): forget the hash and bump the version so the link and all sessions stop working.
+    public void RevokePortalLink()
+    {
+        if (PortalTokenHash == null)
+            throw new DomainException("BUSINESS_RULE", "Khách chưa có link portal");
+        PortalTokenHash = null;
+        PortalTokenCreatedAt = null;
+        PortalTokenVersion++;
+        PortalEnabled = false;
+    }
+
     // BR-10, BR-11
     public void Archive(IClock clock, bool hasActiveProjects)
     {

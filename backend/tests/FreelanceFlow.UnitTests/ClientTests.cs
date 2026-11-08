@@ -87,6 +87,55 @@ public class ClientTests
         client.DisablePortal();
         Assert.False(client.PortalEnabled);
     }
+
+    [Fact]
+    public void IssuePortalLink_EnablesPortal_AndBumpsVersion()
+    {
+        var client = new Client { Status = "ACTIVE", PortalTokenVersion = 1 };
+
+        var token = client.IssuePortalLink(FakeClock());
+
+        Assert.Equal(43, token.Length);
+        Assert.NotNull(client.PortalTokenHash);
+        Assert.True(client.PortalEnabled);
+        Assert.Equal(2, client.PortalTokenVersion); // BR-12
+        Assert.NotNull(client.PortalTokenCreatedAt);
+    }
+
+    [Fact]
+    public void IssuePortalLink_OnArchivedClient_ThrowsBusinessRule_AndKeepsNoHash()
+    {
+        var client = new Client { Status = "INACTIVE" };
+
+        var ex = Assert.Throws<DomainException>(() => client.IssuePortalLink(FakeClock()));
+
+        Assert.Equal("BUSINESS_RULE", ex.Code);
+        Assert.Null(client.PortalTokenHash);
+    }
+
+    [Fact]
+    public void RevokePortalLink_ClearsHash_BumpsVersion_AndDisables()
+    {
+        var client = new Client { Status = "ACTIVE" };
+        client.IssuePortalLink(FakeClock());
+
+        client.RevokePortalLink();
+
+        Assert.Null(client.PortalTokenHash);
+        Assert.Null(client.PortalTokenCreatedAt);
+        Assert.False(client.PortalEnabled);
+        Assert.Equal(2, client.PortalTokenVersion); // old sessions carry version 1 → rejected
+    }
+
+    [Fact]
+    public void RevokePortalLink_WithoutLink_ThrowsBusinessRule()
+    {
+        var client = new Client { Status = "ACTIVE" };
+
+        var ex = Assert.Throws<DomainException>(() => client.RevokePortalLink());
+
+        Assert.Equal("BUSINESS_RULE", ex.Code);
+    }
 }
 
 file class FakeClock(DateTimeOffset now) : IClock

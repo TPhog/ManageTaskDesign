@@ -22,6 +22,7 @@ public static class ClientsEndpoints
         group.MapPost("{id:guid}/portal-link", CreatePortalLink);
         group.MapPost("{id:guid}/portal/enable", EnablePortal);
         group.MapPost("{id:guid}/portal/disable", DisablePortal);
+        group.MapPost("{id:guid}/portal/revoke", RevokePortalLink);
         group.MapGet("{id:guid}/activity", GetActivity);
     }
 
@@ -146,6 +147,7 @@ public static class ClientsEndpoints
             client.PortalEnabled,
             client.PortalTokenVersion,
             client.PortalTokenCreatedAt,
+            HasPortalLink = client.PortalTokenHash != null,
             client.ArchivedAt,
             client.CreatedAt,
             client.UpdatedAt,
@@ -234,13 +236,23 @@ public static class ClientsEndpoints
     {
         var client = await db.Clients.FindAsync(id);
         if (client == null) return Results.NotFound();
-        if (client.Status == "INACTIVE")
-            return Results.Conflict(new { code = "BUSINESS_RULE", detail = "Không thể tạo link cho khách đã lưu trữ" });
 
-        var rawToken = client.GeneratePortalToken(clock);
+        var regenerated = client.PortalTokenHash != null;
+        string rawToken;
+        try
+        {
+            rawToken = client.IssuePortalLink(clock);
+        }
+        catch (DomainException ex)
+        {
+            return Results.Conflict(new { code = ex.Code, detail = ex.Detail });
+        }
+
+        // The raw token goes only into this response — never into logs or activity data (07-security §4).
         var portalUrl = $"{settings.Value.PublicBaseUrl.TrimEnd('/')}/p/{rawToken}";
 
-        activity.Write("client", client.Id, "client.portal_link_created",
+        activity.Write("client", client.Id,
+            regenerated ? "client.portal_link_regenerated" : "client.portal_link_created",
             clientId: client.Id,
             data: new { version = client.PortalTokenVersion },
             visibleToClient: false);
@@ -286,6 +298,32 @@ public static class ClientsEndpoints
         return Results.Ok(new { client.Id, client.PortalEnabled });
     }
 
+    private static async Task<IResult> RevokePortalLink(
+        Guid id,
+        AppDbContext db,
+        ActivityWriter activity)
+    {
+        var client = await db.Clients.FindAsync(id);
+        if (client == null) return Results.NotFound();
+
+        try
+        {
+            client.RevokePortalLink();
+        }
+        catch (DomainException ex)
+        {
+            return Results.Conflict(new { code = ex.Code, detail = ex.Detail });
+        }
+
+        activity.Write("client", client.Id, "client.portal_link_revoked",
+            clientId: client.Id,
+            data: new { version = client.PortalTokenVersion },
+            visibleToClient: false);
+
+        await db.SaveChangesAsync();
+        return Results.Ok(new { client.Id, client.PortalEnabled, hasPortalLink = false });
+    }
+
     private static async Task<IResult> GetActivity(
         Guid id,
         AppDbContext db,
@@ -325,6 +363,7 @@ public static class ClientsEndpoints
         {
             c.Id, c.Name, c.Company, c.Phone, c.Email, c.ContactChannel, c.Notes,
             c.Status, c.PortalEnabled, c.PortalTokenVersion, c.PortalTokenCreatedAt,
+            HasPortalLink = c.PortalTokenHash != null,
             c.ArchivedAt, c.CreatedAt, c.UpdatedAt,
             ProjectCount = projectCount, AcceptedTotal = acceptedTotal,
             Outstanding = outstanding, PendingQuotationTotal = pendingQuotationTotal,
