@@ -232,15 +232,22 @@ CREATE TABLE revision_items (
     billing            text NOT NULL CHECK (billing IN ('FREE_FIX','IN_QUOTA','CHARGEABLE')),
     work_status        text NOT NULL DEFAULT 'TODO' CHECK (work_status IN ('TODO','IN_PROGRESS','DONE','CANCELLED')),
     quotation_item_id  uuid,                                       -- FK thêm sau khi tạo quotation_items
+    service_id         uuid REFERENCES services(id) ON DELETE SET NULL,      -- BR-46: dịch vụ chọn cho NEW_DELIVERABLE
+    created_deliverable_id uuid REFERENCES deliverables(id) ON DELETE SET NULL, -- BR-48: deliverable sinh khi chấp nhận
     scope_override_reason text,
     internal_notes     text NOT NULL DEFAULT '',
     sort_order         int NOT NULL DEFAULT 0,
     created_at         timestamptz NOT NULL,
     updated_at         timestamptz NOT NULL,
     CHECK (billing = 'CHARGEABLE' OR quotation_item_id IS NULL)
+    ,CHECK (service_id IS NULL OR type = 'NEW_DELIVERABLE')               -- ck_items_service_type
+    ,CHECK (created_deliverable_id IS NULL OR type = 'NEW_DELIVERABLE')   -- ck_items_created_deliverable_type
 );
 CREATE INDEX ix_items_round ON revision_items (round_id, sort_order);
 CREATE INDEX ix_items_quotation_item ON revision_items (quotation_item_id);
+CREATE INDEX IX_revision_items_service_id ON revision_items (service_id);
+CREATE UNIQUE INDEX ux_items_created_deliverable ON revision_items (created_deliverable_id) WHERE created_deliverable_id IS NOT NULL;
+-- migration 20261112090000_AddRevisionItemServiceAndCreatedDeliverable
 
 -- ============ Tasks ============
 CREATE TABLE tasks (

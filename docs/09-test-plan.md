@@ -31,6 +31,12 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
 | AC-Q6 | Round 2 có 1 IN_QUOTA | Chuyển item đó CANCELLED | `usedRounds` giảm 1, activity có before/after |
 | AC-Q7 | Item NEW_DELIVERABLE | Tạo | Gợi ý CHARGEABLE |
 | AC-Q8 | Logo 3/3, round 4 có 3 item CHARGEABLE MINOR + 1 NEW_DELIVERABLE (service Banner) | `from-revisions` | DRAFT ADDITIONAL có 2 dòng: "Vòng sửa thứ 4 — Logo" 200.000 và Banner 500.000; cả 4 item có `quotation_item_id` |
+| AC-Q9 | Logo 0 vòng miễn phí: round 1 có 2 MINOR; round cấp dự án có NEW_DELIVERABLE "Banner FB" (service Banner), "Thiệp mời", "Poster" (service Banner) và SCOPE_CHANGE "Bản tiếng Anh" | `from-revisions/preview` rồi `from-revisions` với giá nhập: Đổi font 350.000, Thiệp mời 750.000, Poster 900.000, Bản tiếng Anh 400.000 | Preview: ROUND 200.000 gợi ý, NEW_DELIVERABLE/SCOPE_CHANGE 0, không link gì. DRAFT: 350.000 · Thiết kế Banner 500.000 · Thiệp mời 750.000 · Bản tiếng Anh 400.000 · Thiết kế Banner 900.000 (tổng 2.900.000); item Banner/Poster có `serviceId` |
+| AC-Q10 | Như AC-Q9 | Giá âm / > 100 tỷ / `linePrices` cho NEW_DELIVERABLE hoặc mục ngoài danh sách / 2 giá khác nhau cho 1 vòng / service không tồn tại | `400` đúng field (`newDeliverableServices` / `linePrices`); không item nào bị link |
+| AC-Q11 | Dự án IN_PROGRESS; báo giá phát sinh SENT có "Sticker" (service có 2 bước mẫu) và "Menu A5" (giá nhập, không service) | Accept | 2 deliverable `IN_PROGRESS` tên theo mô tả item (Sticker: service + quota của service; Menu: 0 vòng); item có `createdDeliverableId` và `workStatus = DONE`; 2 task TODO theo bước mẫu cho Sticker; activity `deliverable.created` `via=quotation.accepted` |
+| AC-Q12 | Như AC-Q11 nhưng dự án DRAFT (hoặc QUOTED / COMPLETED) | Accept | Deliverable `NOT_STARTED`, **không** task; DRAFT/QUOTED: `start-preview` đề xuất bước mẫu của Sticker |
+| AC-Q13 | Báo giá phát sinh SENT có NEW_DELIVERABLE | Reject; hoặc accept 2 lần; hoặc đổi loại item đã thành deliverable; hoặc đổi sang/khỏi NEW_DELIVERABLE trên dòng SENT/ACCEPTED | Reject: không deliverable. Accept lần 2: `409`, không thêm deliverable. Đổi loại item đã thành deliverable: `422 BUSINESS_RULE`. Đổi loại trên dòng SENT/ACCEPTED: `409 BILLING_LOCKED` |
+| AC-Q14 | Như AC-Q11 nhưng dự án CANCELLED | Accept | Báo giá ACCEPTED, **không** deliverable/task; activity `quotation.accepted` có `newDeliverablesSkipped = PROJECT_CANCELLED` + `skippedRevisionItemIds` |
 
 ### AC-QUO — Báo giá (BR-30..39, 70..75)
 
@@ -55,6 +61,8 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
 | AC-B17 | Settings chưa có ngân hàng | Send | `422` "Chưa cấu hình tài khoản nhận tiền" |
 | AC-B18 | DRAFT ADDITIONAL có link revision | DELETE | Xóa OK; các revision item `quotation_item_id = null` |
 | AC-B19 | SENT | DELETE | `409` |
+| AC-B20 | Logo (service 2.000.000), Thiệp mời + Sticker (không service) | Tạo INITIAL với `deliverablePrices` Thiệp mời 450.000, Logo 1.800.000 | Dòng: Logo 1.800.000 · Thiệp mời 450.000 · Sticker 0; giá âm / > 100 tỷ / deliverable ngoài tập / `fromDeliverables=false` → `400 errors.deliverablePrices` |
+| AC-B21 | DRAFT còn 1 dòng 0 ₫ "Menu A5" | Bấm "Gửi báo giá" | Hộp xác nhận nêu "1 dòng có đơn giá 0 ₫:" + "• Menu A5", nút "Vẫn gửi" (không chặn — BR-31) |
 
 ### AC-SCOPE — Scope guard (BR-60..62)
 
@@ -132,6 +140,7 @@ Thêm:
 - Portal list endpoints của B không trả phần tử nào thuộc A.
 - B không xem được báo giá DRAFT của chính B; không xem được file `visible_to_client=false`.
 - Portal response không chứa khóa JSON `internalNotes`, `notes`, `scopeOverrideReason` (test snapshot schema).
+7. **Báo giá phát sinh có giá (P09, `quotation-pricing.spec.ts`):** định giá báo giá phát sinh qua dialog → chấp nhận → hạng mục mới trong Deliverables (AC-Q9, AC-Q11); giá deliverable không dịch vụ + Chọn từ dịch vụ + xác nhận 0 ₫ (AC-B20, AC-B21).
 - Portal bị tắt / khách archived / token version cũ → 401.
 - Request portal không có header CSRF → 403.
 

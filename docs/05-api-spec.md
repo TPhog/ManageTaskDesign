@@ -155,10 +155,10 @@ Endpoint hỗ trợ UI xem trước gợi ý trước khi lưu:
 
 | Method | Path | Ghi chú |
 |---|---|---|
-| GET | `/api/admin/projects/{id}/revisions` | Rounds (theo deliverable) + items + liên kết báo giá |
+| GET | `/api/admin/projects/{id}/revisions` | Rounds (theo deliverable) + items + liên kết báo giá; item có `serviceId`, `serviceName`, `createdDeliverableId`, `createdDeliverableName` |
 | POST | `/api/admin/projects/{id}/rounds` | Tạo round không qua request: `{ deliverableId, receivedAt, items[] }` |
 | POST | `/api/admin/rounds/{roundId}/items` | `{ description, type, billing? }` |
-| PUT | `/api/admin/revision-items/{id}` | `{ description, type, billing, internalNotes, rowVersion }` — `409 BILLING_LOCKED` (BR-61) |
+| PUT | `/api/admin/revision-items/{id}` | `{ description, type, billing, internalNotes, rowVersion }` — `409 BILLING_LOCKED` (BR-61; cũng khi đổi sang/khỏi NEW_DELIVERABLE trên dòng SENT/ACCEPTED, BR-48); `422 BUSINESS_RULE` nếu item đã thành deliverable |
 | POST | `/api/admin/revision-items/{id}/work-status` | `{ to, overrideReason?, rowVersion }` — `428 SCOPE_GUARD` (BR-60) |
 | POST | `/api/admin/revision-items/{id}/tasks` | Tạo task liên kết |
 
@@ -178,15 +178,16 @@ Endpoint hỗ trợ UI xem trước gợi ý trước khi lưu:
 | Method | Path | Ghi chú |
 |---|---|---|
 | GET | `/api/admin/quotations?projectId=&status=&effectiveStatus=&page=` | Item có `effectiveStatus`, `outstanding` |
-| GET | `/api/admin/quotations/{id}` | DRAFT: dữ liệu bảng; khác DRAFT: `snapshot` + trạng thái + `qrOptions` |
-| POST | `/api/admin/projects/{id}/quotations` | INITIAL: `{ kind:"INITIAL", title, fromDeliverables: true }` → item theo deliverable (`quantity × service.base_price`) |
-| POST | `/api/admin/projects/{id}/quotations/from-revisions` | ADDITIONAL: `{ title, revisionItemIds: [...] }` (BR-46) |
+| GET | `/api/admin/quotations/{id}` | DRAFT: dữ liệu bảng; khác DRAFT: `snapshot` + trạng thái + `qrOptions`; kèm `newDeliverables: [{ revisionItemId, quotationItemId, lineDescription, serviceId, serviceName, createdDeliverableId, createdDeliverableName }]` |
+| POST | `/api/admin/projects/{id}/quotations` | INITIAL: `{ kind:"INITIAL", title, fromDeliverables: true, deliverableIds?, deliverablePrices?: [{ deliverableId, unitPrice }] }` → item theo deliverable (`quantity × (giá nhập → service.base_price → 0)`); `400 errors.deliverablePrices` (âm / > 100 tỷ / deliverable ngoài tập / `fromDeliverables=false`) |
+| POST | `/api/admin/projects/{id}/quotations/from-revisions/preview` | `{ revisionItemIds }` → `{ lines: [{ kind: ROUND/NEW_DELIVERABLE/SCOPE_CHANGE, revisionItemIds, description, details, suggestedUnitPrice }] }`; không ghi DB |
+| POST | `/api/admin/projects/{id}/quotations/from-revisions` | ADDITIONAL: `{ title, revisionItemIds, newDeliverableServices?: [{ revisionItemId, serviceId?, unitPrice? }], linePrices?: [{ revisionItemId, unitPrice }] }` (BR-46); `400 errors.newDeliverableServices` / `errors.linePrices` (giá âm / > 100 tỷ, `linePrices` cho NEW_DELIVERABLE hoặc item ngoài danh sách, 2 giá khác nhau cho 1 vòng, service không tồn tại) |
 | PUT | `/api/admin/quotations/{id}` | DRAFT: `{ title, validityDays, discountAmount, vatPercent, depositPercent, terms, notesToClient, internalNotes, items:[{id?, description, details, quantity, unitPrice, sourceType, sourceId}], rowVersion }` — thay toàn bộ items; server tính tiền |
 | DELETE | `/api/admin/quotations/{id}` | Chỉ DRAFT; gỡ liên kết `revision_items.quotation_item_id` |
 | POST | `/api/admin/quotations/{id}/send` | BR-31/34 |
 | POST | `/api/admin/quotations/{id}/new-version` | BR-33 → DRAFT mới |
 | POST | `/api/admin/quotations/{id}/duplicate` | Nhân bản thành chain mới (DRAFT, number null) |
-| POST | `/api/admin/quotations/{id}/accept` | `{ acceptedAt, note?, evidenceFileId?, rowVersion }` |
+| POST | `/api/admin/quotations/{id}/accept` | `{ acceptedAt, note?, evidenceFileId?, rowVersion }` — BR-48: tạo deliverable từ item NEW_DELIVERABLE của báo giá (cùng transaction; theo trạng thái dự án; CANCELLED không tạo, activity ghi `newDeliverablesSkipped`) |
 | POST | `/api/admin/quotations/{id}/reject` | `{ rejectedAt, reason, rowVersion }` |
 | POST | `/api/admin/quotations/{id}/payment-status` | `{ to, date, reason?, rowVersion }` (reason bắt buộc khi hoàn tác) |
 | GET | `/api/admin/quotations/{id}/qr/{purpose}` | `purpose ∈ deposit|remaining|full` → JSON `{ payload, amount, memo }` |
@@ -206,6 +207,7 @@ Liên kết revision ↔ báo giá qua các version (BR-47):
 - `new-version` copy dòng với `copied_from_item_id` = dòng cũ; liên kết vẫn trỏ dòng cũ.
 - `send` version mới: mọi revision item trỏ dòng cũ được **chuyển** sang dòng có `copied_from_item_id`
   tương ứng; dòng cũ bị xóa khỏi version mới → item được gỡ liên kết (trở lại "CHARGEABLE chưa báo giá").
+- `from-revisions` ghi `revision_items.service_id` cho item NEW_DELIVERABLE; `accept` ghi `revision_items.created_deliverable_id` (BR-48).
 
 ### 3.11 Files
 

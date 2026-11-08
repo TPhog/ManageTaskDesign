@@ -60,7 +60,11 @@ Sidebar: **Tổng quan** · **Yêu cầu** (badge NEW) · **Dự án** · **Côn
    (VD "Logo đã dùng 3/3 vòng → Tính phí 200.000 ₫/vòng").
 3. Có thể thêm round thứ 2 cho deliverable khác trong cùng request.
 4. "Lưu" → toast + nếu có item CHARGEABLE hiện banner "3 mục tính phí chưa báo giá — Tạo báo giá phát sinh".
-5. Tạo báo giá → chuyển tới trình soạn với dòng giá gợi ý (BR-46) → designer chỉnh → Gửi.
+5. "Tạo báo giá phát sinh" → dialog xem trước từng dòng (BR-46): "Hạng mục mới" có ô chọn dịch vụ mẫu (tìm được, điền tên +
+   giá gốc) và ô đơn giá; dòng vòng sửa / đổi phạm vi có ô đơn giá điền sẵn giá gợi ý; dòng còn 0 ₫ được nêu tên.
+   "Tạo báo giá nháp" → trình soạn → designer chỉnh (mỗi dòng có "Chọn từ dịch vụ") → Gửi. Còn dòng 0 ₫: hộp xác nhận liệt kê
+   tên dòng, nút "Vẫn gửi". "Đánh dấu đã chấp nhận" liệt kê các hạng mục mới sẽ thêm vào tab Deliverables (BR-48).
+   Dialog tạo báo giá ban đầu: deliverable chưa có dịch vụ mẫu có ô đơn giá ngay trong dialog.
 6. Sau khi Gửi: dialog "Đã gửi. Sao chép link portal / tin nhắn mẫu" với template:
    `"Chào anh/chị {tên}, em gửi báo giá {số} ({tổng}). Anh/chị xem và quét QR tại: {link portal}"`
    (link portal chỉ có nếu designer vừa tạo; nếu không, nhắc "khách mở link portal cũ để xem").

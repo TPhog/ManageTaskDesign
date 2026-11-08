@@ -92,14 +92,21 @@ suggestBilling(item, round):
 
 UI hiển thị gợi ý + lý do ("Deliverable Logo đã dùng 3/3 vòng"). Designer có thể chọn khác (kể cả FREE_FIX).
 
-### 5.4 Giá gợi ý khi tạo báo giá phát sinh (BR-46)
+### 5.4 Giá khi tạo báo giá phát sinh (BR-46)
 
-Từ tập item CHARGEABLE đã chọn (chưa có `quotation_item_id`):
+Từ tập item CHARGEABLE đã chọn (chưa có `quotation_item_id`). UI mở dialog "Tạo báo giá phát sinh" (xem trước bằng
+`from-revisions/preview`) để designer chọn dịch vụ / nhập đơn giá cho **từng dòng** trước khi tạo nháp.
+
+Đơn giá mỗi dòng = **giá designer nhập** → nếu không nhập: `service.base_price` (chỉ dòng Hạng mục mới có chọn dịch vụ)
+→ nếu không có: **giá gợi ý** bên dưới → 0 ₫ (UI nêu tên dòng 0 ₫, vẫn cho tạo — BR-31). Giá nhập: 0 … 100.000.000.000 ₫
+(`QuotationValidation.MaxUnitPrice`, 100 tỷ, giữ `quantity × unitPrice` xa ngưỡng tràn `long`).
 
 1. Nhóm các item MINOR/MAJOR theo **round** → mỗi round = **1 dòng**:
-   `"Vòng sửa thứ {round_no} — {deliverable.name}"`, qty 1, đơn giá = `deliverable.extra_round_price`.
-2. Mỗi item NEW_DELIVERABLE = 1 dòng; nếu designer chọn service → đơn giá = `service.base_price`, ngược lại 0.
-3. Mỗi item SCOPE_CHANGE = 1 dòng, đơn giá 0 (designer nhập).
+   `"Vòng sửa thứ {round_no} — {deliverable.name}"`, qty 1, gợi ý `deliverable.extra_round_price` (round cấp dự án: 0).
+   Một round chỉ nhận **một** giá nhập.
+2. Mỗi item NEW_DELIVERABLE = 1 dòng; chọn service → mô tả `service.name`, chi tiết = mô tả item, gợi ý `service.base_price`;
+   không chọn → mô tả item, gợi ý 0. Service đã chọn lưu ở `revision_items.service_id` (dùng ở BR-48).
+3. Mỗi item SCOPE_CHANGE = 1 dòng, gợi ý 0.
 4. Mỗi item được gán `quotation_item_id` của dòng tương ứng (nhiều item → 1 dòng được phép).
 
 ### 5.5 Liên kết qua version báo giá (BR-47)
@@ -109,6 +116,28 @@ Từ tập item CHARGEABLE đã chọn (chưa có `quotation_item_id`):
   `copied_from_item_id` tương ứng (cùng transaction với BR-34). Dòng bị xóa ở version mới → item gỡ liên kết.
 - Một revision item chỉ trỏ tới dòng của **một** version tại một thời điểm.
 - "Item đã được báo giá chấp nhận" ⇔ `quotation_item_id` thuộc báo giá `status = ACCEPTED`.
+
+### 5.6 Hạng mục mới thành deliverable khi chấp nhận (BR-48)
+
+- Khi designer **đánh dấu một báo giá đã chấp nhận**: mỗi item NEW_DELIVERABLE (chưa CANCELLED) đang trỏ dòng của báo giá
+  đó và chưa có `created_deliverable_id` → tạo **1 deliverable** trong cùng transaction: tên = **mô tả của revision item**
+  (không có thì tên service; ≤ 200 ký tự, cắt thêm "…"), số lượng = số lượng dòng, `service_id` = `revision_items.service_id`,
+  `included_rounds` / `extra_round_price` copy từ service (không service: 0 / 0). Ghi `revision_items.created_deliverable_id`;
+  item chuyển work status sang **DONE** (activity `revision_item.work_status_changed`, `via = quotation.accepted`; chuyển
+  này nằm ngoài sơ đồ BR-60 vì do lệnh accept thực hiện); activity `deliverable.created` (`via = quotation.accepted`).
+- Kết quả theo trạng thái dự án:
+
+| Dự án | Deliverable | Task |
+|---|---|---|
+| `IN_PROGRESS`, `ON_HOLD` | `IN_PROGRESS` (lệnh accept của designer đóng vai "Bắt đầu") | 1 task `TODO` cho mỗi bước mẫu của service (không service: không task) |
+| `DRAFT`, `QUOTED` | `NOT_STARTED` | không; "Bắt đầu dự án" đề xuất bước mẫu như mọi deliverable |
+| `COMPLETED` | `NOT_STARTED` | không (designer mở lại dự án) |
+| `CANCELLED` | **không tạo gì**; activity `quotation.accepted` ghi `newDeliverablesSkipped = "PROJECT_CANCELLED"` + `skippedRevisionItemIds` | — |
+
+- Báo giá nháp / đã gửi / bị từ chối: **không** tạo gì. Mỗi item chỉ tạo deliverable **1 lần** (unique index).
+  Item đã thành deliverable không đổi loại được (`422 BUSINESS_RULE`).
+- Item đang trỏ dòng báo giá **SENT/ACCEPTED** không được đổi loại sang/khỏi NEW_DELIVERABLE: `409 BILLING_LOCKED`
+  (cùng cơ chế BR-61, vì accept hành động theo loại item).
 
 ## 6. Client Request
 
@@ -133,6 +162,8 @@ TODO ──► IN_PROGRESS ──► DONE
   └───────────┴────────► CANCELLED
 DONE ──► IN_PROGRESS (mở lại)
 ```
+
+Ngoài sơ đồ: khi chấp nhận báo giá, item NEW_DELIVERABLE vừa thành deliverable được chuyển thẳng sang `DONE` (BR-48).
 
 | ID | Rule |
 |---|---|
