@@ -25,7 +25,9 @@ export const qk = {
   },
 
   quotations: {
+    all:    ['quotations']                                        as const,
     list:   (projectId: string) => ['quotations', 'list', projectId] as const,
+    search: (params: object)    => ['quotations', 'search', params]  as const,
     detail: (id: string)        => ['quotations', id]                as const,
   },
 

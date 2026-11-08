@@ -1,0 +1,96 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { api } from '@/lib/api'
+import { qk } from '@/lib/queryKeys'
+import type { PagedResult } from '@/lib/types'
+import type {
+  CreateQuotationBody,
+  CreateQuotationResult,
+  PaymentStatus,
+  QuotationDetail,
+  QuotationListItem,
+  QuotationListParams,
+  UpdateQuotationBody,
+} from '@/lib/quotationTypes'
+
+function toSearch(params: QuotationListParams): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') search.set(key, String(value))
+  }
+  return search.toString()
+}
+
+/** After a write: seed the detail cache with the server's answer, refresh lists and the project money summary. */
+function useOnQuotationChanged() {
+  const qc = useQueryClient()
+  return (detail?: QuotationDetail) => {
+    if (detail) qc.setQueryData(qk.quotations.detail(detail.id), detail)
+    qc.invalidateQueries({
+      predicate: q => q.queryKey[0] === 'quotations' && (q.queryKey[1] === 'list' || q.queryKey[1] === 'search'),
+    })
+    qc.invalidateQueries({ queryKey: qk.projects.all })
+  }
+}
+
+export function useProjectQuotations(projectId: string) {
+  return useQuery({
+    queryKey: qk.quotations.list(projectId),
+    queryFn: () => api.get<PagedResult<QuotationListItem>>(`/admin/quotations?projectId=${projectId}&pageSize=100`),
+  })
+}
+
+export function useQuotationSearch(params: QuotationListParams) {
+  return useQuery({
+    queryKey: qk.quotations.search(params),
+    queryFn: () => api.get<PagedResult<QuotationListItem>>(`/admin/quotations?${toSearch(params)}`),
+  })
+}
+
+export function useQuotation(id: string | undefined) {
+  return useQuery({
+    queryKey: qk.quotations.detail(id ?? ''),
+    queryFn: () => api.get<QuotationDetail>(`/admin/quotations/${id}`),
+    enabled: !!id,
+  })
+}
+
+export function useCreateQuotation(projectId: string) {
+  const changed = useOnQuotationChanged()
+  return useMutation({
+    mutationFn: (body: CreateQuotationBody) =>
+      api.post<CreateQuotationResult>(`/admin/projects/${projectId}/quotations`, body),
+    onSuccess: () => changed(),
+  })
+}
+
+export function useUpdateQuotation(id: string) {
+  const changed = useOnQuotationChanged()
+  return useMutation({
+    mutationFn: (body: UpdateQuotationBody) => api.put<QuotationDetail>(`/admin/quotations/${id}`, body),
+    onSuccess: detail => changed(detail),
+  })
+}
+
+export function useDeleteQuotation(id: string) {
+  const changed = useOnQuotationChanged()
+  return useMutation({
+    mutationFn: () => api.delete<void>(`/admin/quotations/${id}`),
+    onSuccess: () => changed(),
+  })
+}
+
+export type QuotationCommand =
+  | { action: 'send'; body: { rowVersion: number } }
+  | { action: 'new-version'; body: Record<string, never> }
+  | { action: 'accept'; body: { acceptedAt: string; note: string | null; rowVersion: number } }
+  | { action: 'reject'; body: { rejectedAt: string; reason: string; rowVersion: number } }
+  | { action: 'payment-status'; body: { to: PaymentStatus; date: string; reason: string | null; rowVersion: number } }
+
+/** Every command answers with the resulting quotation (for new-version: the new DRAFT). */
+export function useQuotationCommand(id: string) {
+  const changed = useOnQuotationChanged()
+  return useMutation({
+    mutationFn: (cmd: QuotationCommand) => api.post<QuotationDetail>(`/admin/quotations/${id}/${cmd.action}`, cmd.body),
+    onSuccess: detail => changed(detail),
+  })
+}
