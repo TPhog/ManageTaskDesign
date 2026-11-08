@@ -1,6 +1,5 @@
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
-using FreelanceFlow.Api.Domain.Projects;
 using FreelanceFlow.Api.Domain.Quotations;
 using FreelanceFlow.Api.Infrastructure;
 using FreelanceFlow.Api.Infrastructure.VietQr;
@@ -201,12 +200,13 @@ public static class QuotationWorkflowEndpoints
                 ["evidenceFileId"] = ["File bằng chứng không thuộc dự án này"],
             });
 
+        var project = await db.Projects.AsNoTracking().FirstAsync(p => p.Id == q.ProjectId);
         db.Entry(q).Property<uint>("xmin").OriginalValue = body.RowVersion;
-        IReadOnlyList<Deliverable> created;
+        AcceptedNewDeliverablesResult newDeliverables;
         try
         {
             q.MarkAccepted(body.AcceptedAt ?? clock.TodayVn, body.Note, body.EvidenceFileId);
-            created = await AcceptedNewDeliverables.CreateAsync(db, activity, clock, q);   // BR-48, same SaveChangesAsync
+            newDeliverables = await AcceptedNewDeliverables.CreateAsync(db, activity, clock, q, project);   // BR-48, same SaveChangesAsync
         }
         catch (DomainException ex)
         {
@@ -215,9 +215,13 @@ public static class QuotationWorkflowEndpoints
 
         q.UpdatedAt = clock.UtcNow;
         activity.Write("quotation", q.Id, "quotation.accepted",
-            clientId: await QuotationReads.ClientIdOfAsync(db, q.ProjectId), projectId: q.ProjectId,
-            data: new { number = q.Number, version = q.Version, acceptedAt = q.AcceptedAt, note = q.AcceptedNote, evidenceFileId = q.EvidenceFileId,
-                newDeliverableIds = created.Select(d => d.Id) },
+            clientId: project.ClientId, projectId: q.ProjectId,
+            data: new
+            {
+                number = q.Number, version = q.Version, acceptedAt = q.AcceptedAt, note = q.AcceptedNote, evidenceFileId = q.EvidenceFileId,
+                newDeliverableIds = newDeliverables.Created.Select(d => d.Id),
+                newDeliverablesSkipped = newDeliverables.SkippedReason, skippedRevisionItemIds = newDeliverables.SkippedItemIds,
+            },
             visibleToClient: true,
             clientMessage: $"Báo giá {q.Number} (v{q.Version}) đã được chấp nhận");
         return await SaveAndLoadAsync(db, q.Id, clock);

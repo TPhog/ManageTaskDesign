@@ -112,7 +112,7 @@ internal static class QuotationReads
                       && r.WorkStatus != RevisionWorkStatuses.Cancelled
                 orderby line.SortOrder, r.SortOrder
                 select new QuotationNewDeliverableDto(r.Id, line.Id, line.Description, r.ServiceId,
-                    s == null ? null : s.Name, r.CreatedDeliverableId, d == null ? null : d.Name))
+                    s == null ? null : s.Name, r.CreatedDeliverableId, d == null ? null : d.Name, r.Description))
             .ToListAsync();
 
         return new QuotationDetailDto(

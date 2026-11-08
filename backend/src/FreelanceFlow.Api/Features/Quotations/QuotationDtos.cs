@@ -47,10 +47,11 @@ public sealed record QrPayloadDto(string Purpose, long Amount, string Memo, stri
 
 public sealed record QuotationVersionDto(Guid Id, int Version, string Status, string EffectiveStatus);
 
-/// <summary>Plan 09 / BR-48: a NEW_DELIVERABLE item on a line of this quotation and the deliverable it became (null until accepted).</summary>
+/// <summary>Plan 09 / BR-48: a NEW_DELIVERABLE item on a line of this quotation and the deliverable it became (null until
+/// accepted). ItemDescription = the name the deliverable will get (service name when blank).</summary>
 public sealed record QuotationNewDeliverableDto(
     Guid RevisionItemId, Guid QuotationItemId, string LineDescription, Guid? ServiceId, string? ServiceName,
-    Guid? CreatedDeliverableId, string? CreatedDeliverableName);
+    Guid? CreatedDeliverableId, string? CreatedDeliverableName, string ItemDescription);
 
 public sealed record QuotationDetailDto(
     Guid Id, Guid ProjectId, string ProjectName, string ClientName,

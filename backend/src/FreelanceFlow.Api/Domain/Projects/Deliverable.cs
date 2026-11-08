@@ -31,12 +31,14 @@ public class Deliverable : IAuditable
     public const int MaxName = 200;
 
     /// <summary>
-    /// BR-48: a deliverable born from an accepted NEW_DELIVERABLE quotation line — NOT_STARTED (BR-01), quota copied
-    /// from the picked service (none: 0 rounds, 0 ₫), named after the line the client accepted.
+    /// BR-48: a deliverable born from an accepted NEW_DELIVERABLE quotation line — NOT_STARTED (the caller starts it in a
+    /// started project), quota copied from the picked service (none: 0 rounds, 0 ₫), named after the revision item
+    /// (blank: the service name) so two items on the same service do not get the same name.
     /// </summary>
-    public static Deliverable CreateFromAcceptedLine(Guid projectId, string lineDescription, int quantity, Service? service, int sortOrder)
+    public static Deliverable CreateFromAcceptedLine(Guid projectId, string itemDescription, int quantity, Service? service, int sortOrder)
     {
-        var name = lineDescription.Trim();
+        var name = itemDescription.Trim();
+        if (name.Length == 0) name = service?.Name.Trim() ?? "";
         if (name.Length == 0) throw new DomainException("VALIDATION_FAILED", "Tên hạng mục trống");
         if (name.Length > MaxName) name = name[..(MaxName - 1)] + "…";
         return new Deliverable

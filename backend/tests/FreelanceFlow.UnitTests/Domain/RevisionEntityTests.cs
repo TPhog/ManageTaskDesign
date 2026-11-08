@@ -292,9 +292,10 @@ public class RevisionItemTests
         var item = NewDeliverableItem();
         var deliverableId = Guid.NewGuid();
 
-        item.MarkDeliverableCreated(deliverableId);
+        item.MarkDeliverableCreated(deliverableId).Should().Be("TODO");
 
         item.CreatedDeliverableId.Should().Be(deliverableId);
+        item.WorkStatus.Should().Be("DONE");   // the work now lives on the deliverable
         FluentActions.Invoking(() => item.MarkDeliverableCreated(Guid.NewGuid()))
             .Should().Throw<DomainException>().Which.Code.Should().Be("BUSINESS_RULE");
         FluentActions.Invoking(() => Chargeable().MarkDeliverableCreated(deliverableId))
@@ -313,5 +314,26 @@ public class RevisionItemTests
         linked.LinkQuotationLine(Guid.NewGuid(), Guid.NewGuid());
         linked.Edit("Sticker dán ly", "SCOPE_CHANGE", "CHARGEABLE", "", true, "DRAFT");
         linked.ServiceId.Should().BeNull();
+    }
+
+    [Theory]   // BR-61 + BR-48: the accept acts on the type, so it is fixed once the line was sent
+    [InlineData("SENT")]
+    [InlineData("ACCEPTED")]
+    public void Retyping_into_or_out_of_new_deliverable_is_locked_on_a_sent_line(string quotationStatus)
+    {
+        var minor = Chargeable();
+        minor.LinkQuotationLine(Guid.NewGuid());
+        FluentActions.Invoking(() => minor.Edit("Thêm tagline", "NEW_DELIVERABLE", "CHARGEABLE", "", true, quotationStatus))
+            .Should().Throw<DomainException>().Which.Code.Should().Be("BILLING_LOCKED");
+        minor.Edit("Thêm tagline", "MINOR", "CHARGEABLE", "", true, quotationStatus);   // other retypes stay free
+        minor.Type.Should().Be("MINOR");
+
+        var service = Guid.NewGuid();
+        var sticker = NewDeliverableItem();
+        sticker.LinkQuotationLine(Guid.NewGuid(), service);
+        FluentActions.Invoking(() => sticker.Edit("Sticker dán ly", "SCOPE_CHANGE", "CHARGEABLE", "", true, quotationStatus))
+            .Should().Throw<DomainException>().Which.Code.Should().Be("BILLING_LOCKED");
+        sticker.Type.Should().Be("NEW_DELIVERABLE");
+        sticker.ServiceId.Should().Be(service);
     }
 }

@@ -28,6 +28,7 @@ public class RevisionItem : IAuditable
     /// <summary>
     /// BR-61 + BR-41. <paramref name="linkedQuotationStatus"/> = status of the quotation owning QuotationItemId (null when unlinked).
     /// Leaving CHARGEABLE while linked to a DRAFT/REJECTED line drops the link (ck_items_quotation).
+    /// BR-48: retyping into or out of NEW_DELIVERABLE is locked like billing once the line was sent (accept acts on the type).
     /// </summary>
     public void Edit(string description, string type, string billing, string internalNotes,
         bool roundHasDeliverable, string? linkedQuotationStatus)
@@ -38,6 +39,10 @@ public class RevisionItem : IAuditable
         if (!roundHasDeliverable && billing == RevisionBillings.InQuota) throw ProjectLevelInQuota();
         if (CreatedDeliverableId is not null && type != RevisionItemTypes.NewDeliverable)
             throw new DomainException("BUSINESS_RULE", "Mục đã thành hạng mục trong dự án — không đổi loại được (BR-48)");
+        if ((type == RevisionItemTypes.NewDeliverable) != (Type == RevisionItemTypes.NewDeliverable)
+            && linkedQuotationStatus is QuotationStatuses.Sent or QuotationStatuses.Accepted)
+            throw new DomainException("BILLING_LOCKED",
+                "Mục đã nằm trong báo giá đã gửi/chấp nhận — không đổi sang/khỏi \"Hạng mục mới\"; tạo version báo giá mới trước (BR-61)");
         SetContent(description, type, billing);
         InternalNotes = internalNotes;
         if (Billing != RevisionBillings.Chargeable) QuotationItemId = null;
@@ -89,12 +94,18 @@ public class RevisionItem : IAuditable
         ServiceId = Type == RevisionItemTypes.NewDeliverable ? serviceId : null;
     }
 
-    /// <summary>BR-48: the accepted NEW_DELIVERABLE line became deliverable <paramref name="deliverableId"/> — once only.</summary>
-    public void MarkDeliverableCreated(Guid deliverableId)
+    /// <summary>
+    /// BR-48: the accepted NEW_DELIVERABLE line became deliverable <paramref name="deliverableId"/> — once only. The item is
+    /// DONE from then on (its work lives on the deliverable). Returns the previous work status for the activity log.
+    /// </summary>
+    public string MarkDeliverableCreated(Guid deliverableId)
     {
         if (Type != RevisionItemTypes.NewDeliverable || CreatedDeliverableId is not null)
             throw new DomainException("BUSINESS_RULE", "Mục này đã thành hạng mục hoặc không phải \"Hạng mục mới\" (BR-48)");
         CreatedDeliverableId = deliverableId;
+        var from = WorkStatus;
+        WorkStatus = RevisionWorkStatuses.Done;
+        return from;
     }
 
     /// <summary>BR-47: when the next quotation version is sent, follow the copied line; a dropped line unlinks. True = moved.</summary>

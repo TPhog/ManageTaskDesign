@@ -35,4 +35,14 @@ public class QuotedDeliverableTests
         d.Quantity.Should().Be(1);
         d.Name.Should().HaveLength(Deliverable.MaxName).And.EndWith("…");
     }
+
+    [Fact]
+    public void A_blank_item_description_falls_back_to_the_service_name()
+    {
+        var service = new Service { Name = "Sticker" };
+
+        Deliverable.CreateFromAcceptedLine(Guid.NewGuid(), "   ", 1, service, 10).Name.Should().Be("Sticker");
+        FluentActions.Invoking(() => Deliverable.CreateFromAcceptedLine(Guid.NewGuid(), " ", 1, null, 10))
+            .Should().Throw<FreelanceFlow.Api.Domain.Common.DomainException>();
+    }
 }
