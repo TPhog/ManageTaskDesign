@@ -182,6 +182,7 @@ app.MapProjectsEndpoints();
 app.MapBriefsEndpoints();
 app.MapDeliverablesEndpoints();
 app.MapPortalSessionEndpoints();
+app.MapPortalProjectsEndpoints();
 
 app.MapGet("/health", async (AppDbContext db) =>
 {

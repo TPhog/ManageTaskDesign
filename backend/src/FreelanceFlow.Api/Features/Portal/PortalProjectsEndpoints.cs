@@ -1,0 +1,144 @@
+using FreelanceFlow.Api.Data;
+using FreelanceFlow.Api.Domain.Common;
+using FreelanceFlow.Api.Domain.Projects;
+using FreelanceFlow.Api.Infrastructure.Security;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+namespace FreelanceFlow.Api.Features.Portal;
+
+public static class PortalProjectsEndpoints
+{
+    public static void MapPortalProjectsEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/portal/projects").RequireAuthorization(PortalPrincipal.Policy);
+
+        group.MapGet("", ListProjects);
+        group.MapGet("{id:guid}", GetProject);
+        group.MapGet("{id:guid}/timeline", GetTimeline);
+    }
+
+    // 07-security §4.4: every portal query starts from the signed-in client's own, non-archived projects.
+    private static IQueryable<Project> OwnProjects(AppDbContext db, PortalPrincipal principal) =>
+        db.Projects.AsNoTracking().Where(p => p.ClientId == principal.ClientId && p.ArchivedAt == null);
+
+    private static async Task<IResult> ListProjects(
+        [FromServices] PortalPrincipal principal,
+        AppDbContext db,
+        IClock clock)
+    {
+        var today = clock.TodayVn;
+        var items = await OwnProjects(db, principal)
+            .OrderByDescending(p => p.CreatedAt)
+            .Select(p => new PortalProjectListItemDto(
+                p.Id,
+                p.Name,
+                p.DesignType,
+                p.Status,
+                p.DueDate,
+                new PortalDeliverableSummaryDto(
+                    db.Deliverables.Count(d => d.ProjectId == p.Id && d.Status != "CANCELLED"),
+                    db.Deliverables.Count(d => d.ProjectId == p.Id && d.Status == "DELIVERED"),
+                    db.Deliverables.Count(d => d.ProjectId == p.Id && d.Status == "APPROVED")),
+                db.Quotations.Any(q => q.ProjectId == p.Id && q.Status == "SENT" &&
+                                       (q.ExpiryDate == null || q.ExpiryDate >= today))))
+            .ToListAsync();
+
+        return Results.Ok(items);
+    }
+
+    private static async Task<IResult> GetProject(
+        Guid id,
+        [FromServices] PortalPrincipal principal,
+        AppDbContext db)
+    {
+        var project = await OwnProjects(db, principal)
+            .Where(p => p.Id == id)
+            .Select(p => new
+            {
+                p.Id, p.Name, p.DesignType, p.Status, p.StatusReason, p.StatusReasonPublic,
+                p.StartDate, p.DueDate,
+            })
+            .FirstOrDefaultAsync();
+        if (project is null) return Results.NotFound();
+
+        // Below this point `id` is proven to belong to the client.
+        var deliverables = await db.Deliverables.AsNoTracking()
+            .Where(d => d.ProjectId == id)
+            .OrderBy(d => d.SortOrder).ThenBy(d => d.CreatedAt)
+            .Select(d => new { d.Id, d.Name, d.Quantity, d.Status, d.IncludedRounds, d.DueDate })
+            .ToListAsync();
+
+        // used_rounds: same rule as the admin project detail (distinct rounds with ≥1 IN_QUOTA item not CANCELLED)
+        var usedRoundsMap = await db.RevisionRounds
+            .Where(r => r.ProjectId == id && r.DeliverableId != null)
+            .GroupBy(r => r.DeliverableId)
+            .Select(g => new
+            {
+                DeliverableId = g.Key!.Value,
+                UsedRounds = g.Count(r =>
+                    db.RevisionItems.Any(i => i.RoundId == r.Id &&
+                                              i.Billing == "IN_QUOTA" &&
+                                              i.WorkStatus != "CANCELLED")),
+            })
+            .ToDictionaryAsync(x => x.DeliverableId, x => x.UsedRounds);
+
+        var deliverableDtos = deliverables.Select(d =>
+        {
+            var used = usedRoundsMap.GetValueOrDefault(d.Id);
+            return new PortalDeliverableDto(d.Id, d.Name, d.Quantity, d.Status, d.IncludedRounds,
+                used, Math.Max(0, d.IncludedRounds - used), d.DueDate);
+        }).ToList();
+
+        var summary = new PortalDeliverableSummaryDto(
+            deliverables.Count(d => d.Status != "CANCELLED"),
+            deliverables.Count(d => d.Status == "DELIVERED"),
+            deliverables.Count(d => d.Status == "APPROVED"));
+
+        // BRF-04: only the newest CONFIRMED brief is visible to the client
+        var brief = await db.ProjectBriefs.AsNoTracking()
+            .Where(b => b.ProjectId == id && b.Status == "CONFIRMED")
+            .OrderByDescending(b => b.Version)
+            .Select(b => new PortalBriefDto(b.Version, b.Content, b.ConfirmedAt))
+            .FirstOrDefaultAsync();
+
+        return Results.Ok(new PortalProjectDetailDto(
+            project.Id,
+            project.Name,
+            project.DesignType,
+            project.Status,
+            project.StatusReasonPublic ? project.StatusReason : null,
+            project.StartDate,
+            project.DueDate,
+            summary,
+            deliverableDtos,
+            brief));
+    }
+
+    private static async Task<IResult> GetTimeline(
+        Guid id,
+        [FromServices] PortalPrincipal principal,
+        AppDbContext db,
+        int page = 1,
+        int pageSize = 20)
+    {
+        if (!await OwnProjects(db, principal).AnyAsync(p => p.Id == id)) return Results.NotFound();
+
+        page = Math.Max(1, page);
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        // BR-95: only actions written with visible_to_client = true and a client_message
+        var query = db.ActivityLogs.AsNoTracking()
+            .Where(a => a.ProjectId == id && a.VisibleToClient && a.ClientMessage != null);
+
+        var total = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(a => new PortalTimelineItemDto(a.OccurredAt, a.ClientMessage!))
+            .ToListAsync();
+
+        return Results.Ok(new PortalPagedDto<PortalTimelineItemDto>(items, page, pageSize, total));
+    }
+}
