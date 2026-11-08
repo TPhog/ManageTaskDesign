@@ -31,7 +31,7 @@ interface RoundEditorProps {
 /** One round being composed (docs/08 §2.3): deliverable, received date, items with the server's billing suggestion. */
 export function RoundEditor({ index, value, deliverables, onChange, onRemove }: RoundEditorProps) {
   const n = index + 1
-  const { data: suggestions } = useSuggestBilling(value.deliverableId, value.items.map(i => i.type))
+  const { data: suggestions } = useSuggestBilling(value.deliverableId, value.items.map(i => ({ type: i.type, billing: i.billing })))
 
   const setItem = (at: number, patch: Partial<RevisionItemInput>) =>
     onChange({ ...value, items: value.items.map((item, i) => (i === at ? { ...item, ...patch } : item)) })

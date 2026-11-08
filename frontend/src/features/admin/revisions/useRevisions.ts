@@ -1,10 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { qk } from '@/lib/queryKeys'
 import type { CreateQuotationResult } from '@/lib/quotationTypes'
 import type { PagedResult, TaskDetail } from '@/lib/types'
 import type {
   ActivityEntry,
+  Billing,
   BillingSuggestion,
   ClientRequest,
   CreateAdditionalQuotationBody,
@@ -26,8 +27,7 @@ import type {
 function useOnRevisionsChanged() {
   const qc = useQueryClient()
   return (projectId: string) => {
-    qc.invalidateQueries({ queryKey: qk.revisions.project(projectId) })
-    qc.invalidateQueries({ queryKey: qk.revisions.progress(projectId) })
+    qc.invalidateQueries({ queryKey: qk.revisions.all }) // project, progress and suggest-billing
     qc.invalidateQueries({ queryKey: qk.projects.detail(projectId) })
     qc.invalidateQueries({ queryKey: qk.requests.all })
   }
@@ -75,9 +75,14 @@ export function useTriageRequest(id: string) {
   const changed = useOnRevisionsChanged()
   return useMutation({
     mutationFn: (body: TriageBody) => api.post<RequestDetail>(`/admin/requests/${id}/triage`, body),
-    onSuccess: detail => {
-      qc.setQueryData(qk.requests.detail(id), detail)
-      changed(detail.request.projectId)
+    onSuccess: detail => qc.setQueryData(qk.requests.detail(id), detail),
+    onSettled: (detail, _err, _vars, _ctx) => {
+      if (detail) changed(detail.request.projectId)
+      else {
+        qc.invalidateQueries({ queryKey: qk.requests.detail(id) })
+        qc.invalidateQueries({ queryKey: qk.revisions.all })
+        qc.invalidateQueries({ queryKey: qk.requests.all })
+      }
     },
   })
 }
@@ -87,24 +92,30 @@ export function useDeclineRequest(id: string) {
   return useMutation({
     mutationFn: (body: { reason: string; rowVersion: number }) =>
       api.post<RequestDetail>(`/admin/requests/${id}/decline`, body),
-    onSuccess: detail => {
-      qc.setQueryData(qk.requests.detail(id), detail)
+    onSuccess: detail => qc.setQueryData(qk.requests.detail(id), detail),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: qk.requests.detail(id) })
       qc.invalidateQueries({ queryKey: qk.requests.all })
-      qc.invalidateQueries({ queryKey: qk.revisions.progress(detail.request.projectId) })
+      qc.invalidateQueries({ queryKey: qk.revisions.all })
     },
   })
 }
 
+type SuggestBillingInput = { type: RevisionItemType; billing?: Billing | null }
+
 /** docs/08 §2.3 step 2: billing the server would give a new round of these item types (saves nothing) */
-export function useSuggestBilling(deliverableId: string | null, types: RevisionItemType[]) {
+export function useSuggestBilling(deliverableId: string | null, items: SuggestBillingInput[]) {
+  const types = items.map(i => i.type)
+  const sig = items.map(i => `${i.type}:${i.billing ?? ''}`)
   return useQuery({
-    queryKey: qk.revisions.suggest(deliverableId, types),
+    queryKey: qk.revisions.suggest(deliverableId, sig),
     queryFn: () => api.post<BillingSuggestion[]>('/admin/revisions/suggest-billing', {
       deliverableId,
-      items: types.map(type => ({ type })),
+      items,
     }),
     enabled: types.length > 0,
-    staleTime: 30_000,
+    staleTime: 0,
+    placeholderData: keepPreviousData,
   })
 }
 
@@ -112,6 +123,7 @@ export function useProjectRevisions(projectId: string) {
   return useQuery({
     queryKey: qk.revisions.project(projectId),
     queryFn: () => api.get<ProjectRevisions>(`/admin/projects/${projectId}/revisions`),
+    staleTime: 0,
   })
 }
 
@@ -119,7 +131,7 @@ export function useCreateRound(projectId: string) {
   const changed = useOnRevisionsChanged()
   return useMutation({
     mutationFn: (body: RoundInput) => api.post<RevisionRound>(`/admin/projects/${projectId}/rounds`, body),
-    onSuccess: () => changed(projectId),
+    onSettled: () => changed(projectId),
   })
 }
 
@@ -128,7 +140,7 @@ export function useUpdateRevisionItem(projectId: string) {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: UpdateRevisionItemBody }) =>
       api.put<RevisionItem>(`/admin/revision-items/${id}`, body),
-    onSuccess: () => changed(projectId),
+    onSettled: () => changed(projectId),
   })
 }
 
@@ -137,7 +149,7 @@ export function useChangeWorkStatus(projectId: string) {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: WorkStatusBody }) =>
       api.post<RevisionItem>(`/admin/revision-items/${id}/work-status`, body),
-    onSuccess: () => changed(projectId),
+    onSettled: () => changed(projectId),
   })
 }
 
@@ -147,7 +159,7 @@ export function useCreateItemTask(projectId: string) {
   return useMutation({
     mutationFn: ({ id, body }: { id: string; body: CreateItemTaskBody }) =>
       api.post<TaskDetail>(`/admin/revision-items/${id}/tasks`, body),
-    onSuccess: () => {
+    onSettled: () => {
       changed(projectId)
       qc.invalidateQueries({ queryKey: qk.tasks.lists })
     },
@@ -160,7 +172,7 @@ export function useCreateAdditionalQuotation(projectId: string) {
   return useMutation({
     mutationFn: (body: CreateAdditionalQuotationBody) =>
       api.post<CreateQuotationResult>(`/admin/projects/${projectId}/quotations/from-revisions`, body),
-    onSuccess: () => {
+    onSettled: () => {
       changed(projectId)
       qc.invalidateQueries({ queryKey: qk.quotations.all })
     },
@@ -171,8 +183,8 @@ export function useCreateAdditionalQuotation(projectId: string) {
 export function useClientTimeline(projectId: string) {
   return useQuery({
     queryKey: qk.revisions.progress(projectId),
-    queryFn: () => api.get<PagedResult<ActivityEntry>>(`/admin/projects/${projectId}/activity?pageSize=50`),
-    select: page => page.items.filter(a => a.visibleToClient && a.clientMessage),
+    queryFn: () => api.get<PagedResult<ActivityEntry>>(`/admin/projects/${projectId}/activity?pageSize=50&visibleOnly=true`),
+    select: page => page.items,
   })
 }
 

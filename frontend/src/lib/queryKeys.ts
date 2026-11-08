@@ -39,6 +39,7 @@ export const qk = {
   },
 
   revisions: {
+    all:      ['revisions']                                            as const,
     project:  (projectId: string) => ['revisions', projectId]   as const,
     suggest:  (deliverableId: string | null, types: string[]) => ['revisions', 'suggest', deliverableId, types] as const,
     progress: (projectId: string) => ['revisions', 'progress', projectId] as const,

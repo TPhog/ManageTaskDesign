@@ -22,12 +22,13 @@ import { useUpdateRevisionItem } from './useRevisions'
 interface Props {
   item: RevisionItem
   projectId: string
+  deliverableId: string | null
   open: boolean
   onClose: () => void
 }
 
 /** PUT /admin/revision-items/{id}; BR-61 — billing is locked while the line sits on a SENT/ACCEPTED quotation. */
-export function EditItemDialog({ item, projectId, open, onClose }: Props) {
+export function EditItemDialog({ item, projectId, deliverableId, open, onClose }: Props) {
   const billingLocked = item.quotation?.status === 'SENT' || item.quotation?.status === 'ACCEPTED'
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
@@ -40,13 +41,13 @@ export function EditItemDialog({ item, projectId, open, onClose }: Props) {
               : 'Đổi cách tính phí sẽ cập nhật số vòng đã dùng của hạng mục.'}
           </DialogDescription>
         </DialogHeader>
-        <EditItemForm item={item} projectId={projectId} billingLocked={billingLocked} onClose={onClose} />
+        <EditItemForm item={item} projectId={projectId} deliverableId={deliverableId} billingLocked={billingLocked} onClose={onClose} />
       </DialogContent>
     </Dialog>
   )
 }
 
-function EditItemForm({ item, projectId, billingLocked, onClose }: Omit<Props, 'open'> & { billingLocked: boolean }) {
+function EditItemForm({ item, projectId, deliverableId, billingLocked, onClose }: Omit<Props, 'open'> & { billingLocked: boolean }) {
   const [description, setDescription] = useState(item.description)
   const [type, setType] = useState<RevisionItemType>(item.type)
   const [billing, setBilling] = useState<Billing>(item.billing)
@@ -90,7 +91,7 @@ function EditItemForm({ item, projectId, billingLocked, onClose }: Omit<Props, '
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {(Object.keys(billingLabel) as Billing[]).map(b => <SelectItem key={b} value={b}>{billingLabel[b]}</SelectItem>)}
+              {(Object.keys(billingLabel) as Billing[]).filter(b => deliverableId !== null || b !== 'IN_QUOTA').map(b => <SelectItem key={b} value={b}>{billingLabel[b]}</SelectItem>)}
             </SelectContent>
           </Select>
         </div>

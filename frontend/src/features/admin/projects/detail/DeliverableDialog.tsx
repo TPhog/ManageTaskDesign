@@ -119,6 +119,7 @@ export function DeliverableDialog({ projectId, open, onClose, editing }: Props) 
     onSuccess: res => {
       // create changes the list's deliverableCount; edit only affects this project
       qc.invalidateQueries({ queryKey: editing ? ['projects', projectId] : ['projects'] })
+      qc.invalidateQueries({ queryKey: ['revisions'] })
       // BR-44: lowering the quota below used rounds is allowed but the API warns
       for (const w of (res as { warnings?: string[] } | undefined)?.warnings ?? []) toast.warning(w)
       toast.success(editing ? 'Đã cập nhật deliverable' : 'Đã thêm deliverable')

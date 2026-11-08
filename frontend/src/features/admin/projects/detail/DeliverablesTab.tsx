@@ -41,6 +41,7 @@ export function DeliverablesTab({ project }: { project: ProjectDetail }) {
       api.post(`/admin/deliverables/${id}/status`, { to }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['projects', project.id] })
+      qc.invalidateQueries({ queryKey: ['revisions'] })
       toast.success('Đã cập nhật trạng thái')
     },
     onError: (err: ApiError) =>

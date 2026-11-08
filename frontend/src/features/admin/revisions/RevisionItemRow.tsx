@@ -22,12 +22,14 @@ import { useChangeWorkStatus, useCreateItemTask } from './useRevisions'
 interface Props {
   item: RevisionItem
   projectId: string
+  /** null = project-level round (no quota, BR-41) */
+  deliverableId: string | null
   selectable: boolean
   selected: boolean
   onToggle: () => void
 }
 
-export function RevisionItemRow({ item, projectId, selectable, selected, onToggle }: Props) {
+export function RevisionItemRow({ item, projectId, deliverableId, selectable, selected, onToggle }: Props) {
   const [guardTo, setGuardTo] = useState<WorkStatus | null>(null)
   const [editOpen, setEditOpen] = useState(false)
   const workStatus = useChangeWorkStatus(projectId)
@@ -125,7 +127,7 @@ export function RevisionItemRow({ item, projectId, selectable, selected, onToggl
         pending={workStatus.isPending}
         onConfirm={reason => { if (guardTo) change(guardTo, reason) }}
       />
-      <EditItemDialog item={item} projectId={projectId} open={editOpen} onClose={() => setEditOpen(false)} />
+      <EditItemDialog item={item} projectId={projectId} deliverableId={deliverableId} open={editOpen} onClose={() => setEditOpen(false)} />
     </li>
   )
 }

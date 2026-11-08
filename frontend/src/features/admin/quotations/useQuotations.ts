@@ -31,6 +31,7 @@ function useOnQuotationChanged() {
       predicate: q => !detail || q.queryKey[1] !== detail.id,
     })
     qc.invalidateQueries({ queryKey: qk.projects.all })
+    qc.invalidateQueries({ queryKey: qk.revisions.all }) // item→quotation links, quota and suggestions
   }
 }
 

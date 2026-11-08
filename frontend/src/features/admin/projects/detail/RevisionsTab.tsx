@@ -82,6 +82,7 @@ export function RevisionsTab({ project }: { project: ProjectDetail }) {
                 key={item.id}
                 item={item}
                 projectId={project.id}
+                deliverableId={round.deliverableId}
                 selectable={isQuotable(item)}
                 selected={selected.has(item.id)}
                 onToggle={() => toggle(item.id)}
