@@ -38,8 +38,8 @@ public static class ImageProcessor
         using var decoded = Decode(codec);
         using var oriented = Orient(decoded, codec.EncodedOrigin);
         using var original = Fit(oriented, OriginalMaxEdge);
-        using var preview = Copy(original);
-        using var thumb = Fit(original, ThumbMaxEdge);
+        using var preview = watermark is null ? Copy(original) : FlattenOnWhite(original);
+        using var thumb = watermark is null ? Fit(original, ThumbMaxEdge) : FlattenOnWhite(Fit(original, ThumbMaxEdge), disposeSource: true);
 
         if (watermark is not null)
         {
@@ -110,6 +110,20 @@ public static class ImageProcessor
         var height = Math.Max(1, (int)Math.Round(src.Height * scale, MidpointRounding.AwayFromZero));
         return src.Resize(src.Info.WithSize(width, height), Sampling)
             ?? throw new InvalidOperationException("Image resize failed");
+    }
+
+    /// <summary>Opaque copy over a white backdrop so transparency can neither hide nor strip the watermark.</summary>
+    private static SKBitmap FlattenOnWhite(SKBitmap src, bool disposeSource = false)
+    {
+        var dst = new SKBitmap(src.Info.WithAlphaType(SKAlphaType.Premul));
+        using (var canvas = new SKCanvas(dst))
+        {
+            canvas.Clear(SKColors.White);
+            canvas.DrawBitmap(src, 0, 0);
+            canvas.Flush();
+        }
+        if (disposeSource) src.Dispose();
+        return dst;
     }
 
     private static SKBitmap Copy(SKBitmap src) => src.Copy() ?? throw new InvalidOperationException("Image copy failed");

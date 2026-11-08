@@ -114,4 +114,21 @@ public class ImageProcessorTests
         act.Should().Throw<DomainException>().Which.Code.Should().Be("FILE_TOO_LARGE");
         ImageProcessor.GuardDimensions(10_000, 5_000); // exactly 50 MP is accepted
     }
+
+    [Fact]
+    public void Transparent_image_is_flattened_onto_white_so_the_watermark_stays_visible()
+    {
+        var png = TestImageFactory.Png(300, 300, SKColors.Transparent);
+
+        var result = ImageProcessor.Process(png, Strong);
+
+        using var preview = TestImageFactory.Decode(result.Preview);
+        using var thumb = TestImageFactory.Decode(result.Thumb);
+        foreach (var bitmap in new[] { preview, thumb })
+        {
+            bitmap.GetPixel(0, 0).Alpha.Should().Be(255, "transparency must not let the watermark be removed");
+            TestImageFactory.MeanLuminance(bitmap).Should().BeLessThan(0.99, "dark text on the white backdrop");
+            TestImageFactory.MeanLuminance(bitmap).Should().BeGreaterThan(0.8, "backdrop is white, not black");
+        }
+    }
 }
