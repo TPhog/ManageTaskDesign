@@ -3,6 +3,7 @@ using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Dashboard;
 using FreelanceFlow.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
+using SettingsEntity = FreelanceFlow.Api.Domain.Settings.Settings;
 
 namespace FreelanceFlow.Api.Features.Dashboard;
 
@@ -18,16 +19,21 @@ internal static class SetupChecklistEndpoints
     private static async Task<IResult> Get(AppDbContext db, CancellationToken ct)
     {
         var settings = await db.Settings.AsNoTracking()
-            .Select(s => new { s.DisplayName, s.BankBin, s.BankAccountNo, s.BankAccountName })
+            .Select(s => new { s.DisplayName, s.ContactEmail, s.ContactPhone, s.BankBin, s.BankAccountNo, s.BankAccountName })
             .FirstAsync(ct);
-        var hasPricedService = await db.Services.AsNoTracking().AnyAsync(s => s.Active && s.BasePrice > 0, ct);
+        // the seeded sample prices don't count: the designer must have created or edited a service
+        var seeded = SetupChecklist.SeedTimestamp;
+        var hasPricedService = await db.Services.AsNoTracking()
+            .AnyAsync(s => s.Active && s.BasePrice > 0 && (s.CreatedAt > seeded || s.UpdatedAt > seeded), ct);
         var hasTemplate = await db.Services.AsNoTracking().AnyAsync(s => s.Active && s.TaskTemplateJson != "[]", ct);
         var watermarkReviewed = await db.ActivityLogs.AsNoTracking().AnyAsync(a => a.Action == "settings.watermark_updated", ct);
         var hasClient = await db.Clients.AsNoTracking().AnyAsync(c => c.ArchivedAt == null, ct);
         var dismissedAt = await db.DashboardStates.AsNoTracking().Select(s => s.SetupDismissedAt).FirstOrDefaultAsync(ct);
 
         var items = SetupChecklist.Build(new SetupFacts(
-            !string.IsNullOrWhiteSpace(settings.DisplayName),
+            !string.IsNullOrWhiteSpace(settings.DisplayName)
+                && settings.DisplayName.Trim() != SettingsEntity.SeedDisplayName
+                && (!string.IsNullOrWhiteSpace(settings.ContactPhone) || !string.IsNullOrWhiteSpace(settings.ContactEmail)),
             !string.IsNullOrWhiteSpace(settings.BankBin) && !string.IsNullOrWhiteSpace(settings.BankAccountNo)
                 && !string.IsNullOrWhiteSpace(settings.BankAccountName),
             hasPricedService, hasTemplate, watermarkReviewed, hasClient));

@@ -24,9 +24,31 @@ public class DashboardSetupTests(AppFactory factory) : IntegrationTestBase(facto
         s0.GetProperty("total").GetInt32().Should().Be(6);
         s0.GetProperty("dismissed").GetBoolean().Should().BeFalse();
         s0.GetProperty("complete").GetBoolean().Should().BeFalse();
-        Done(s0, "SERVICE").Should().BeTrue();   // InitialCreate seeds 4 priced services
+        // InitialCreate seeds a placeholder studio name and 4 sample-priced services: neither counts as done
+        Done(s0, "STUDIO").Should().BeFalse();
+        Done(s0, "SERVICE").Should().BeFalse();
         Done(s0, "TASK_TEMPLATE").Should().BeFalse();
         Done(s0, "CLIENT").Should().BeFalse();
+
+        var settings = await Client.GetFromJsonAsync<JsonElement>("/api/admin/settings");
+        var put0 = await Client.PutAsJsonAsync("/api/admin/settings", new
+        {
+            displayName = "Studio Của Tôi", contactEmail = "me@example.com", contactPhone = (string?)null, logoFileId = (Guid?)null,
+            bankBin = (string?)null, bankAccountNo = (string?)null, bankAccountName = (string?)null,
+            rowVersion = settings.GetProperty("rowVersion").GetInt64(),
+        });
+        put0.EnsureSuccessStatusCode();
+        var services = await Client.GetFromJsonAsync<JsonElement>("/api/admin/services");
+        var first = (services.ValueKind == JsonValueKind.Array ? services : services.GetProperty("items")).EnumerateArray().First();
+        var put1 = await Client.PutAsJsonAsync($"/api/admin/services/{first.GetProperty("id").GetGuid()}", new
+        {
+            name = first.GetProperty("name").GetString(), description = (string?)null, basePrice = 2_500_000L,
+            defaultIncludedRounds = 2, extraRoundPrice = 500_000L, active = true, taskTemplate = (string[]?)null,
+        });
+        put1.EnsureSuccessStatusCode();
+        var s00 = await Client.GetFromJsonAsync<JsonElement>("/api/admin/dashboard/setup");
+        Done(s00, "STUDIO").Should().BeTrue();
+        Done(s00, "SERVICE").Should().BeTrue();
 
         using (var scope = Factory.Services.CreateScope())
         {

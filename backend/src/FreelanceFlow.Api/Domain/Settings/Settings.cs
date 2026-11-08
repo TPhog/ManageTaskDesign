@@ -5,6 +5,9 @@ namespace FreelanceFlow.Api.Domain.Settings;
 public class Settings
 {
     public short Id { get; set; } = 1;
+    /// <summary>InitialCreate seeds this placeholder as display_name; the setup checklist treats it as "not filled in".</summary>
+    public const string SeedDisplayName = "FreelanceFlow Studio";
+
     public string DisplayName { get; set; } = "";
     public string? ContactEmail { get; set; }
     public string? ContactPhone { get; set; }
