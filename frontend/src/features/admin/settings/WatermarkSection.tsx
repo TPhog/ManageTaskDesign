@@ -52,6 +52,11 @@ export function WatermarkSection() {
             <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} className="h-4 w-4 accent-primary" />
             Bật watermark cho ảnh gửi khách
           </label>
+          {!enabled && (
+            <p role="alert" className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Khách sẽ nhận ảnh gốc độ phân giải đầy đủ, không watermark
+            </p>
+          )}
           <div className="space-y-2">
             <Label htmlFor="watermark-text">Nội dung</Label>
             <Input

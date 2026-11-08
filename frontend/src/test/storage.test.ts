@@ -1,5 +1,5 @@
 import {
-  CLEANUP_SUGGESTION, formatPercent, ownerLabel, readStorageParams, selectedBytes, storageBanner, toStorageQuery, usageBarClass,
+  CLEANUP_SUGGESTION, clampPage, formatPercent, ownerLabel, readStorageParams, selectedBytes, storageBanner, toStorageQuery, usageBarClass,
 } from '@/features/admin/settings/storage'
 import type { StorageImage, StorageUsage } from '@/lib/imageTypes'
 
@@ -51,5 +51,14 @@ describe('helpers', () => {
     expect(readStorageParams(new URLSearchParams('?sort=bogus&page=-3'))).toEqual({
       projectId: undefined, completedOnly: false, olderThanMonths: 0, sort: 'size', page: 1,
     })
+  })
+})
+
+describe('clampPage', () => {
+  it('moves past-the-end pages back to the last valid page', () => {
+    expect(clampPage(3, 2)).toBe(2)
+    expect(clampPage(2, 2)).toBe(2)
+    expect(clampPage(1, 1)).toBe(1)
+    expect(clampPage(4, 0)).toBe(1)
   })
 })

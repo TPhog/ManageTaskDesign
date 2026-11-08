@@ -42,6 +42,7 @@ export function imageErrorMessage(err: unknown, audience: 'designer' | 'client' 
       : 'Hiện chưa nhận thêm ảnh — bạn gửi yêu cầu không kèm ảnh hoặc nhắn trực tiếp cho designer nhé.'
   }
   if (e.code === 'FILE_TOO_LARGE' || e.code === 'PAYLOAD_TOO_LARGE' || e.status === 413) {
+    if (e.code === 'FILE_TOO_LARGE' && e.detail) return e.detail
     return `Ảnh vượt ${MAX_IMAGE_MB} MB — vui lòng chọn ảnh nhỏ hơn.`
   }
   if (e.code === 'UNSUPPORTED_FILE_TYPE' || e.status === 415) return 'Chỉ nhận ảnh JPEG, PNG hoặc WebP.'

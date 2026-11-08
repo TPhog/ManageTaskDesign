@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, ImageOff, Sparkles, Trash2 } from 'lucide-react'
@@ -17,7 +17,7 @@ import type { LightboxImage, StorageImageParams } from '@/lib/imageTypes'
 import { qk } from '@/lib/queryKeys'
 import type { PagedResult, ProjectListItem } from '@/lib/types'
 import { StorageUsageBar } from './StorageUsageBar'
-import { CLEANUP_SUGGESTION, ownerLabel, readStorageParams, selectedBytes, toStorageQuery } from './storage'
+import { CLEANUP_SUGGESTION, clampPage, ownerLabel, readStorageParams, selectedBytes, toStorageQuery } from './storage'
 import { useBulkDeleteImages, useStorageImages, useStorageUsage } from './useStorage'
 
 const selectClass =
@@ -45,6 +45,11 @@ export default function StoragePage() {
     [items],
   )
   const pageCount = list.data ? Math.max(1, Math.ceil(list.data.total / list.data.pageSize)) : 1
+  useEffect(() => {
+    if (list.data && params.page > pageCount) {
+      setSearch(new URLSearchParams(toStorageQuery({ ...params, page: clampPage(params.page, pageCount) })), { replace: true })
+    }
+  }, [list.data, params, pageCount, setSearch])
   const allOnPage = items.length > 0 && items.every(i => selected.has(i.id))
 
   function update(next: StorageImageParams) {

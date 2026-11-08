@@ -74,7 +74,7 @@ export function ProgressUpdateCard({ projectId }: { projectId: string }) {
           disabled={post.isPending || files.length >= MAX_ADMIN_IMAGES}
           onFiles={addFiles}
           label="Đính kèm ảnh (tuỳ chọn)"
-          hint={`Khách xem bản có watermark · tối đa ${MAX_ADMIN_IMAGES} ảnh`}
+          hint={`Khách xem bản xem trước · tối đa ${MAX_ADMIN_IMAGES} ảnh`}
         />
         {files.length > 0 && (
           <ul className="flex flex-wrap gap-1.5" aria-label="Ảnh sẽ gửi">

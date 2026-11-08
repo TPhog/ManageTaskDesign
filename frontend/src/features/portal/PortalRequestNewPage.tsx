@@ -145,7 +145,8 @@ export default function PortalRequestNewPage() {
               {...register('content')}
             />
             <p id="request-content-hint" className="text-xs text-muted-foreground">
-              Mỗi ý một dòng giúp nhà thiết kế xử lý nhanh hơn. Góp ý cho một hạng mục được tính là 1 lần sửa của hạng mục đó.            </p>
+              Mỗi ý một dòng giúp nhà thiết kế xử lý nhanh hơn. Góp ý cho một hạng mục được tính là 1 lần sửa của hạng mục đó.
+            </p>
             {errors.content && (
               <p id="request-content-error" className="text-sm text-destructive">{errors.content.message}</p>
             )}

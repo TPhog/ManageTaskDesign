@@ -8,6 +8,11 @@ export const CLEANUP_SUGGESTION: StorageImageParams = { completedOnly: true, old
 
 const SORTS = ['size', 'oldest', 'newest'] as const
 
+/** Last valid page when the current one fell past the end (e.g. after bulk-deleting the last page). */
+export function clampPage(page: number, pageCount: number): number {
+  return Math.min(Math.max(1, page), Math.max(1, pageCount))
+}
+
 export function formatPercent(percent: number): string {
   return `${percent.toFixed(1).replace('.', ',')}%`
 }

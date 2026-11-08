@@ -37,6 +37,7 @@ describe('imageErrorMessage', () => {
 
   it('maps size and type errors, then field errors', () => {
     expect(imageErrorMessage({ status: 413, code: 'FILE_TOO_LARGE' })).toBe('Ảnh vượt 20 MB — vui lòng chọn ảnh nhỏ hơn.')
+    expect(imageErrorMessage({ status: 413, code: 'FILE_TOO_LARGE', detail: 'Ảnh vượt 50 megapixel.' })).toBe('Ảnh vượt 50 megapixel.')
     expect(imageErrorMessage({ status: 415, code: 'UNSUPPORTED_FILE_TYPE' })).toBe('Chỉ nhận ảnh JPEG, PNG hoặc WebP.')
     expect(imageErrorMessage({ status: 400, errors: { files: ['Tối đa 10 ảnh mỗi lần gửi'] } })).toBe('Tối đa 10 ảnh mỗi lần gửi')
     expect(imageErrorMessage(new Error('x'))).toBe('Không tải được ảnh. Vui lòng thử lại.')

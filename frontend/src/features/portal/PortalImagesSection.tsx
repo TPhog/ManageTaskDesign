@@ -31,7 +31,7 @@ export function PortalImagesSection({ projectId }: { projectId: string }) {
               <ImageGrid images={g.images} onOpen={index => setViewer({ images: g.images, index })} />
             </div>
           ))}
-          <p className="text-xs text-muted-foreground">Ảnh xem trước có watermark. Bản gốc được gửi khi bàn giao.</p>
+          <p className="text-xs text-muted-foreground">Đây là ảnh xem trước. Bản gốc được gửi khi bàn giao.</p>
         </div>
       )}
       <ImageLightbox
