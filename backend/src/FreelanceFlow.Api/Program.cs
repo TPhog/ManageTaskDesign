@@ -11,6 +11,7 @@ using FreelanceFlow.Api.Features.Services;
 using FreelanceFlow.Api.Features.Settings;
 using FreelanceFlow.Api.Infrastructure;
 using FreelanceFlow.Api.Infrastructure.Security;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -135,8 +136,29 @@ builder.Services.AddRateLimiter(opt =>
     opt.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
 
+// Behind Caddy (deploy/Caddyfile): trust one X-Forwarded-For / X-Forwarded-Proto hop so rate limits
+// partition on the real client IP and SecurePolicy.SameAsRequest sees https. KnownNetworks/KnownProxies
+// are cleared, which is safe ONLY because docker-compose.yml publishes no port for `api` (only `web`
+// is reachable from outside; `api` is on the internal compose network). If `api` ever gets a published
+// port, pin the compose subnet in KnownNetworks instead.
+builder.Services.Configure<ForwardedHeadersOptions>(opt =>
+{
+    opt.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    opt.ForwardLimit = 1;
+    opt.KnownNetworks.Clear();
+    opt.KnownProxies.Clear();
+});
+
 // App
 var app = builder.Build();
+
+// A relative portal link and a skipped CSRF Origin check are unacceptable outside dev/tests
+if (!app.Environment.IsDevelopment() && !app.Environment.IsEnvironment("Testing"))
+{
+    var publicBaseUrl = builder.Configuration["App:PublicBaseUrl"];
+    if (!Uri.TryCreate(publicBaseUrl, UriKind.Absolute, out var baseUri) || baseUri.Scheme != Uri.UriSchemeHttps)
+        throw new InvalidOperationException("App:PublicBaseUrl must be set to an absolute https URL outside Development.");
+}
 
 // Auto-migrate on startup
 using (var scope = app.Services.CreateScope())
@@ -166,6 +188,7 @@ if (!string.IsNullOrEmpty(seedCfg.DesignerUsername) && !string.IsNullOrEmpty(see
     }
 }
 
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
 app.UseRateLimiter();

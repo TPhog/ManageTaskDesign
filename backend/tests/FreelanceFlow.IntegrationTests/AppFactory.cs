@@ -27,6 +27,7 @@ public sealed class AppFactory : WebApplicationFactory<Program>, IAsyncLifetime
         // UseSetting (host configuration) instead of ConfigureAppConfiguration: Program.cs reads the
         // connection string and RateLimit:LoginPerMinute before Build(), when later-added config
         // sources are not yet visible - that silently pointed the tests at the dev database.
+        builder.UseEnvironment("Testing"); // skips the prod-only PublicBaseUrl startup check
         builder.UseSetting("ConnectionStrings:DefaultConnection", _db.GetConnectionString());
         builder.UseSetting("Seed:DesignerUsername", TestUsername);
         builder.UseSetting("Seed:DesignerPassword", TestPassword);
