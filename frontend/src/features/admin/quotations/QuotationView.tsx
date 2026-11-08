@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Check, CopyPlus, X } from 'lucide-react'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Check, CopyPlus, MessageSquareText, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { MoneyText } from '@/components/MoneyText'
@@ -13,6 +13,7 @@ import type { QuotationDetail } from '@/lib/quotationTypes'
 import { AcceptDialog, PaymentDialog, RejectDialog } from './QuotationActionDialogs'
 import { kindLabel, paymentActions, quotationErrorMessage, type PaymentAction } from './quotationUtils'
 import { useQuotationCommand } from './useQuotations'
+import { QuotationMessageDialog } from './QuotationMessageDialog'
 
 const panelClass = 'rounded-xl border bg-card p-5 shadow-card'
 
@@ -31,6 +32,16 @@ export function QuotationView({ quotation: q }: { quotation: QuotationDetail }) 
   const command = useQuotationCommand(q.id)
   const [dialog, setDialog] = useState<'accept' | 'reject' | null>(null)
   const [payment, setPayment] = useState<PaymentAction | null>(null)
+  const location = useLocation()
+  const [message, setMessage] = useState<'sent' | 'manual' | null>(null)
+
+  // docs/08 §2.3 bước 6: the editor lands here with { justSent: true } after "Gửi"; clear it so a reload does not reopen
+  useEffect(() => {
+    if ((location.state as { justSent?: boolean } | null)?.justSent) {
+      setMessage('sent')
+      navigate('.', { replace: true, state: null })
+    }
+  }, [location.state, navigate])
 
   const s = q.snapshot
   if (!s) return null // DB CHECK: every non-DRAFT quotation has a snapshot
@@ -102,6 +113,10 @@ export function QuotationView({ quotation: q }: { quotation: QuotationDetail }) 
                 <Button variant="outline" onClick={() => setDialog('reject')}>
                   <X aria-hidden="true" />
                   Từ chối
+                </Button>
+                <Button variant="outline" onClick={() => setMessage('manual')}>
+                  <MessageSquareText aria-hidden="true" />
+                  Tin nhắn mẫu
                 </Button>
               </>
             )}
@@ -219,6 +234,12 @@ export function QuotationView({ quotation: q }: { quotation: QuotationDetail }) 
       <AcceptDialog quotation={q} open={dialog === 'accept'} onClose={() => setDialog(null)} />
       <RejectDialog quotation={q} open={dialog === 'reject'} onClose={() => setDialog(null)} />
       <PaymentDialog quotation={q} action={payment} onClose={() => setPayment(null)} />
+      <QuotationMessageDialog
+        quotation={q}
+        open={message !== null}
+        onOpenChange={open => { if (!open) setMessage(null) }}
+        justSent={message === 'sent'}
+      />
     </div>
   )
 }

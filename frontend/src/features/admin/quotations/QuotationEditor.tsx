@@ -135,6 +135,7 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
       adopt(saved)   // keep new rows' ids even if the send below fails
       const sent = await command.mutateAsync({ action: 'send', body: { rowVersion: saved.rowVersion } })
       toast.success(`Đã gửi báo giá ${sent.number}`)
+      navigate('.', { replace: true, state: { justSent: true } })   // QuotationView opens the message dialog (docs/08 §2.3)
     } catch (err) {
       toast.error(quotationErrorMessage(err as ApiError, 'Không thể gửi báo giá'))
     } finally {

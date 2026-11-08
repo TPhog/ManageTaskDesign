@@ -35,6 +35,11 @@ async function sendFromEditor(page: Page) {
   await page.getByRole('button', { name: 'Gửi báo giá' }).click()
   await page.getByRole('dialog', { name: 'Gửi báo giá?' }).getByRole('button', { name: 'Gửi', exact: true }).click()
   await expectToast(page, /Đã gửi báo giá [A-Z]+-\d{4}-\d{4}/)
+  // the message dialog opens after sending (docs/08 §2.3 step 6); close it so it does not cover later clicks
+  const sent = page.getByRole('dialog', { name: 'Đã gửi báo giá' })
+  await expect(sent).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(sent).toHaveCount(0)
 }
 
 test.describe('Quotations', () => {
