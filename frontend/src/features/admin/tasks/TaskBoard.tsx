@@ -191,7 +191,7 @@ function SortableCard({ task, today, onOpen, onMoveTo }: CardProps) {
             {...attributes}
             aria-roledescription="thẻ kéo thả"
             aria-label={`Kéo thẻ ${task.title}`}
-            className="-my-2.5 -ml-2.5 inline-flex h-11 w-11 shrink-0 cursor-grab touch-none items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:my-0 sm:-ml-1 sm:mt-0.5 sm:h-5 sm:w-5"
+            className="-my-2.5 -ml-2.5 inline-flex h-11 w-11 shrink-0 cursor-grab touch-none items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:pointer-fine:my-0 sm:pointer-fine:-ml-1 sm:pointer-fine:mt-0.5 sm:pointer-fine:h-5 sm:pointer-fine:w-5"
           >
             <GripVertical className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -199,7 +199,7 @@ function SortableCard({ task, today, onOpen, onMoveTo }: CardProps) {
         menu={
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="-my-2.5 -mr-2.5 h-11 w-11 shrink-0 sm:my-0 sm:-mr-1 sm:-mt-1 sm:h-7 sm:w-7" aria-label={`Tuỳ chọn ${task.title}`}>
+              <Button variant="ghost" size="icon" className="-my-2.5 -mr-2.5 h-11 w-11 shrink-0 sm:pointer-fine:my-0 sm:pointer-fine:-mr-1 sm:pointer-fine:-mt-1 sm:pointer-fine:h-7 sm:pointer-fine:w-7" aria-label={`Tuỳ chọn ${task.title}`}>
                 <MoreHorizontal aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>

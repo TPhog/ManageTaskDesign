@@ -10,6 +10,8 @@ interface DateInputProps {
   value: string
   onChange: (iso: string) => void
   invalid?: boolean
+  /** fires true while the typed text is not a valid date, false otherwise — lets a form block submit */
+  onInvalid?: (invalid: boolean) => void
   describedBy?: string
   disabled?: boolean
   className?: string
@@ -19,7 +21,7 @@ interface DateInputProps {
  * QA D-05: a day-first dd/mm/yyyy text input that does not depend on the browser locale.
  * The calendar button opens the native picker of a hidden <input type="date">.
  */
-export function DateInput({ id, value, onChange, invalid, describedBy, disabled, className }: DateInputProps) {
+export function DateInput({ id, value, onChange, invalid, onInvalid, describedBy, disabled, className }: DateInputProps) {
   const [text, setText] = useState(() => isoToVn(value))
   const [bad, setBad] = useState(false)
   const picker = useRef<HTMLInputElement>(null)
@@ -35,13 +37,17 @@ export function DateInput({ id, value, onChange, invalid, describedBy, disabled,
     setText(raw)
     if (raw.trim() === '') {
       setBad(false)
+      onInvalid?.(false)
       if (value !== '') onChange('')
       return
     }
     const iso = vnToIso(raw)
     if (iso) {
       setBad(false)
+      onInvalid?.(false)
       if (iso !== value) onChange(iso)
+    } else {
+      onInvalid?.(true)
     }
   }
 
@@ -49,7 +55,12 @@ export function DateInput({ id, value, onChange, invalid, describedBy, disabled,
     if (text.trim() === '') return
     const iso = vnToIso(text)
     if (iso) setText(isoToVn(iso))
-    else setBad(true)
+    else {
+      // keep the old date, never save half-typed text
+      setText(isoToVn(value))
+      setBad(true)
+      onInvalid?.(false)
+    }
   }
 
   function openPicker() {
@@ -62,7 +73,7 @@ export function DateInput({ id, value, onChange, invalid, describedBy, disabled,
     }
   }
 
-  const hint = bad ? 'Ngày không hợp lệ — nhập theo dạng dd/mm/yyyy' : value ? weekdayLabel(value) : ''
+  const hint = bad ? 'Ngày không hợp lệ — giữ ngày cũ' : value ? weekdayLabel(value) : ''
   const described = [describedBy, hint ? hintId : undefined].filter(Boolean).join(' ') || undefined
 
   return (
@@ -80,14 +91,14 @@ export function DateInput({ id, value, onChange, invalid, describedBy, disabled,
           aria-describedby={described}
           onChange={e => handleText(e.target.value)}
           onBlur={handleBlur}
-          className="pr-11"
+          className="pr-12"
         />
         <button
           type="button"
           onClick={openPicker}
           disabled={disabled}
           aria-label="Chọn ngày từ lịch"
-          className="absolute right-0 top-0 inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="absolute right-0 top-0 inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <CalendarDays className="h-4 w-4" aria-hidden="true" />
         </button>

@@ -4,13 +4,14 @@ import { api } from './api'
 import type { ClientListItem, PagedResult, ProjectListItem } from './types'
 import { useDebouncedValue } from './useDebouncedValue'
 
-/** QA D-07: active clients for a picker — newest first, searched on the server by name/company/phone. */
-export function useClientOptions(search: string, enabled = true) {
+/** QA D-07: active clients for a picker (pass includeArchived for list filters, which must reach archived clients too) — newest first, searched on the server by name/company/phone. */
+export function useClientOptions(search: string, enabled = true, includeArchived = false) {
   const q = useDebouncedValue(search.trim())
-  const params = new URLSearchParams({ status: 'ACTIVE', sort: 'createdAt:desc', pageSize: '20' })
+  const params = new URLSearchParams({ sort: 'createdAt:desc', pageSize: '20' })
+  if (!includeArchived) params.set('status', 'ACTIVE')
   if (q) params.set('q', q)
   const query = useQuery({
-    queryKey: ['clients', 'picker', q],
+    queryKey: ['clients', 'picker', includeArchived, q],
     queryFn: () => api.get<PagedResult<ClientListItem>>(`/admin/clients?${params}`),
     enabled,
   })

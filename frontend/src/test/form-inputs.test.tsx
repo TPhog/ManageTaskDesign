@@ -42,13 +42,29 @@ describe('DateInput', () => {
     expect(input).toHaveValue('08/11/2026')
   })
 
-  it('flags an impossible date and does not emit it', async () => {
-    render(<DateHarness />)
+  it('flags an impossible date, keeps the old value and restores its text on blur', async () => {
+    render(<DateHarness initial="2026-11-08" />)
     const input = screen.getByLabelText('Ngày')
-    await userEvent.type(input, '31/02/2026')
+    await userEvent.tripleClick(input)
+    await userEvent.paste('31/11/2026')
     await userEvent.tab()
-    expect(screen.getByTestId('iso')).toBeEmptyDOMElement()
-    expect(screen.getByText('Ngày không hợp lệ — nhập theo dạng dd/mm/yyyy')).toBeInTheDocument()
+    expect(screen.getByTestId('iso')).toHaveTextContent('2026-11-08')
+    expect(input).toHaveValue('08/11/2026')
+    expect(screen.getByText('Ngày không hợp lệ — giữ ngày cũ')).toBeInTheDocument()
+  })
+
+  it('reports invalid text through onInvalid until it is fixed', async () => {
+    const calls: boolean[] = []
+    function H() {
+      const [v, setV] = useState('')
+      return <><label htmlFor="d2">Ngày</label><DateInput id="d2" value={v} onChange={setV} onInvalid={b => calls.push(b)} /></>
+    }
+    render(<H />)
+    const input = screen.getByLabelText('Ngày')
+    await userEvent.type(input, '31/1')
+    expect(calls.at(-1)).toBe(true)
+    await userEvent.type(input, '/2026')
+    expect(calls.at(-1)).toBe(false)
   })
 })
 

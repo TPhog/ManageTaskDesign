@@ -40,7 +40,7 @@ export default function RequestsPage() {
   const [clientSearch, setClientSearch] = useState('')
   const [page, setPage] = useState(1)
   const q = useDebouncedValue(qInput.trim())
-  const clients = useClientOptions(clientSearch)
+  const clients = useClientOptions(clientSearch, true, true)
   const { data, isLoading, error, refetch } = useRequests(status, {
     q: q || undefined,
     clientId: clientId || undefined,

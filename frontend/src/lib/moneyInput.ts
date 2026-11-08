@@ -1,6 +1,6 @@
-/** Digits only → whole đồng (BR-02); anything else is ignored, '' → 0. */
+/** Digits only (a trailing ,decimal part is dropped) → whole đồng (BR-02); anything else is ignored, '' → 0. */
 export function parseMoneyInput(text: string): number {
-  const digits = text.replace(/\D/g, '')
+  const digits = text.replace(/,\d*\s*$/, '').replace(/\D/g, '')
   return digits === '' ? 0 : Math.min(Number(digits), Number.MAX_SAFE_INTEGER)
 }
 

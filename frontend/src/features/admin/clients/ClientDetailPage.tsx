@@ -159,6 +159,13 @@ export default function ClientDetailPage() {
             ))}
           </ul>
         )}
+        {projects && projects.total > projects.items.length && (
+          <div className="border-t p-4 text-sm">
+            <Link to={`/admin/projects?clientId=${id}`} className="font-medium text-primary hover:underline">
+              Xem tất cả {projects.total} dự án
+            </Link>
+          </div>
+        )}
       </section>
 
       <section aria-labelledby="client-quotations" className="rounded-xl border bg-card shadow-card">

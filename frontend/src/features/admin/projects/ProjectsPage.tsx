@@ -52,7 +52,7 @@ export default function ProjectsPage() {
   const [page, setPage] = useState(1)
   const [createOpen, setCreateOpen] = useState(false)
   const q = useDebouncedValue(qInput.trim())
-  const clients = useClientOptions(clientSearch)
+  const clients = useClientOptions(clientSearch, true, true)
 
   // A clientId from the URL has no label yet
   const { data: linkedClient } = useQuery({

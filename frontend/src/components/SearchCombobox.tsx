@@ -56,7 +56,7 @@ export function SearchCombobox(p: SearchComboboxProps) {
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          aria-label={p.ariaLabel}
+          aria-label={p.ariaLabel ? `${p.ariaLabel}: ${selected || p.placeholder}` : undefined}
           aria-invalid={p.invalid || undefined}
           aria-describedby={p.describedBy}
           disabled={p.disabled}

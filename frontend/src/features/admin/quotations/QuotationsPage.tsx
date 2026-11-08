@@ -54,7 +54,7 @@ export default function QuotationsPage() {
   })
   const [clientLabel, setClientLabel] = useState('')
   const [clientSearch, setClientSearch] = useState('')
-  const clients = useClientOptions(clientSearch)
+  const clients = useClientOptions(clientSearch, true, true)
 
   const items = data?.items ?? []
   const pages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1

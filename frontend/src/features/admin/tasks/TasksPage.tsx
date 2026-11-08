@@ -41,7 +41,7 @@ export default function TasksPage() {
   const [clientSearch, setClientSearch] = useState('')
   const [page, setPage] = useState(1)
   const q = useDebouncedValue(qInput.trim())
-  const clients = useClientOptions(clientSearch)
+  const clients = useClientOptions(clientSearch, true, true)
 
   // due/status live in the URL so a filtered view can be linked to directly (e.g. /admin/tasks?due=overdue)
   const current = quickFilters.find(f => f.value === searchParams.get('due')) ?? quickFilters[3]
