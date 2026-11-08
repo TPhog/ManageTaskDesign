@@ -26,9 +26,16 @@ internal static class QuotationReads
     public static IResult Locked() =>
         Results.Conflict(new { code = "QUOTATION_LOCKED", detail = "Báo giá đã gửi bị khóa — tạo version mới để sửa" });
 
-    /// <summary>The DB lock trigger raises check_violation (23514) when a non-DRAFT row is modified.</summary>
+    /// <summary>
+    /// The DB lock triggers raise check_violation (23514) with a "quotation_locked"/"quotation_items_locked" message
+    /// when a non-DRAFT row is modified. Ordinary CHECK constraints share the SQLSTATE but carry a constraint name.
+    /// </summary>
     public static bool IsLockViolation(DbUpdateException e) =>
-        e.InnerException is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.CheckViolation };
+        e.InnerException is Npgsql.PostgresException
+        {
+            SqlState: Npgsql.PostgresErrorCodes.CheckViolation, ConstraintName: null,
+        } pg
+        && (pg.MessageText.StartsWith("quotation_locked") || pg.MessageText.StartsWith("quotation_items_locked"));
 
     public static IResult BusinessRule(string detail) =>
         Results.Json(new { code = "BUSINESS_RULE", detail }, statusCode: StatusCodes.Status422UnprocessableEntity);
