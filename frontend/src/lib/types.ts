@@ -78,3 +78,25 @@ export interface ClientListItem {
   status: 'ACTIVE' | 'INACTIVE'
   projectCount: number
 }
+
+export interface ClientDetail {
+  id: string
+  name: string
+  company: string | null
+  phone: string | null
+  email: string | null
+  contactChannel: string | null
+  status: 'ACTIVE' | 'INACTIVE'
+  portalEnabled: boolean
+  hasPortalLink: boolean
+  portalTokenVersion: number
+  portalTokenCreatedAt: string | null
+  archivedAt: string | null
+  projectCount: number
+}
+
+/** POST /admin/clients/{id}/portal-link — the URL is returned only this once (07-security §4.1). */
+export interface PortalLinkResult {
+  url: string
+  createdAt: string
+}

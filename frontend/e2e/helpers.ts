@@ -32,7 +32,7 @@ export async function csrfToken(page: Page) {
   return cookie ? decodeURIComponent(cookie.value) : ''
 }
 
-async function apiPost(request: APIRequestContext, page: Page, url: string, data: unknown) {
+export async function apiPost(request: APIRequestContext, page: Page, url: string, data: unknown) {
   // CsrfMiddleware requires Origin == App:PublicBaseUrl plus the double-submit token;
   // APIRequestContext sends neither on its own. page must already be on an app URL.
   const res = await request.post(url, {
@@ -54,4 +54,9 @@ export async function ensureClient(page: Page): Promise<string> {
 export async function createProject(page: Page, name = `E2E Project ${Date.now()}`): Promise<string> {
   const clientId = await ensureClient(page)
   return (await apiPost(page.request, page, '/api/admin/projects', { clientId, name, designType: 'LOGO' })).id
+}
+
+/** Create a client with a unique name through the API; returns its id. */
+export async function createClient(page: Page, name = `E2E Client ${Date.now()}`): Promise<string> {
+  return (await apiPost(page.request, page, '/api/admin/clients', { name })).id
 }

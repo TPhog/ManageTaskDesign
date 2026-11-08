@@ -24,7 +24,7 @@ test.describe('Clients', () => {
     await page.getByRole('button', { name: 'Tạo khách' }).click()
 
     await expectToast(page, 'Đã tạo khách hàng')
-    await expect(page.getByRole('cell', { name: clientName })).toBeVisible()
+    await expect(page.getByRole('cell', { name: clientName, exact: true })).toBeVisible()
   })
 
   test('requires a client name', async ({ page }) => {

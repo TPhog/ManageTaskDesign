@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, Users, SearchX } from 'lucide-react'
+import { Link2, Plus, Search, Users, SearchX } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { StatusBadge } from '@/components/StatusBadge'
 import { api, emptyToNull } from '@/lib/api'
 import type { PagedResult, ClientListItem } from '@/lib/types'
+import { PortalLinkDialog } from './PortalLinkDialog'
 
 const clientSchema = z.object({
   name: z.string().min(1, 'Vui lòng nhập tên khách'),
@@ -33,6 +34,7 @@ export default function ClientsPage() {
   const [q, setQ] = useState('')
   const [status, setStatus] = useState('')
   const [sheetOpen, setSheetOpen] = useState(false)
+  const [portalClient, setPortalClient] = useState<{ id: string; name: string } | null>(null)
 
   const params = new URLSearchParams()
   if (q) params.set('q', q)
@@ -135,6 +137,7 @@ export default function ClientsPage() {
                   <th scope="col" className="hidden px-4 py-3 lg:table-cell">SĐT</th>
                   <th scope="col" className="px-4 py-3">Trạng thái</th>
                   <th scope="col" className="px-4 py-3 text-right">Dự án</th>
+                  <th scope="col" className="px-4 py-3 text-right">Portal</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -154,6 +157,19 @@ export default function ClientsPage() {
                       <StatusBadge status={c.status} />
                     </td>
                     <td className="px-4 py-3.5 text-right tabular-nums text-muted-foreground">{c.projectCount}</td>
+                    <td className="px-2 py-2 text-right">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={`Link portal của ${c.name}`}
+                        onClick={() => setPortalClient({ id: c.id, name: c.name })}
+                      >
+                        <Link2 aria-hidden="true" />
+                        <span className={c.portalEnabled ? 'text-emerald-700' : 'text-muted-foreground'}>
+                          {c.portalEnabled ? 'Đang bật' : 'Chưa bật'}
+                        </span>
+                      </Button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -221,6 +237,8 @@ export default function ClientsPage() {
           </form>
         </SheetContent>
       </Sheet>
+
+      <PortalLinkDialog client={portalClient} onClose={() => setPortalClient(null)} />
     </div>
   )
 }
