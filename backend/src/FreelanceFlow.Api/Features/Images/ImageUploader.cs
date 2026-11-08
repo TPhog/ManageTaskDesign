@@ -20,7 +20,7 @@ public sealed record ImageTarget(Guid ProjectId, string OwnerType, Guid OwnerId,
 /// </summary>
 public sealed class ImageUploader(
     AppDbContext db, IFileStorage storage, StorageAlertService storageAlerts, IOptions<AppSettings> app, IClock clock,
-    ILogger<ImageUploader> logger)
+    ImageProcessingGate gate, ILogger<ImageUploader> logger)
 {
     private const string WebpContentType = "image/webp";
     private readonly List<string> _written = [];
@@ -46,7 +46,7 @@ public sealed class ImageUploader(
         foreach (var file in files)
         {
             var bytes = await ReadAllAsync(file, ct);
-            var processed = ImageProcessor.Process(bytes, watermark);
+            var processed = await gate.RunAsync(() => ImageProcessor.Process(bytes, watermark), ct);
             var image = ProjectFile.CreateImage(target.ProjectId, target.OwnerType, target.OwnerId, target.RequestId,
                 target.UploadedBy, target.VisibleToClient, file.FileName, processed.Width, processed.Height,
                 processed.Original.LongLength, processed.Preview.LongLength, processed.Thumb.LongLength,

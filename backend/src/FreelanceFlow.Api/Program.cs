@@ -64,6 +64,9 @@ builder.Services.AddHostedService<NotificationDispatcher>();
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddScoped<StorageAlertService>();
 builder.Services.AddScoped<ImageUploader>();
+builder.Services.AddSingleton(new FreelanceFlow.Api.Infrastructure.Images.ImageProcessingGate(
+    builder.Configuration.GetValue("Storage:MaxConcurrentImageProcessing",
+        FreelanceFlow.Api.Infrastructure.Images.ImageProcessingGate.DefaultPermits)));
 // Upload endpoints raise their own request size (RequestSizeLimit); multipart parsing must allow the same
 builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = ImageLimits.MaxAdminBodyBytes);
 if (builder.Configuration.GetValue("Storage:ReconcileIntervalHours", 24) > 0)

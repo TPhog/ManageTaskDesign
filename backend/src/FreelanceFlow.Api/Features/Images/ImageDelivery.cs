@@ -15,16 +15,18 @@ public static class ImageDelivery
         ProjectFile image, string variant, IFileStorage storage, HttpContext http, CancellationToken ct)
     {
         var etag = new EntityTagHeaderValue($"\"{image.Id:N}-{variant}\"");
-        http.Response.Headers.CacheControl = "private, max-age=600";
+        const string cacheControl = "private, max-age=600";
         http.Response.Headers.XContentTypeOptions = "nosniff";
         if (http.Request.GetTypedHeaders().IfNoneMatch.Any(t => t.Compare(etag, useStrongComparison: false)))
         {
+            http.Response.Headers.CacheControl = cacheControl;
             http.Response.Headers.ETag = etag.ToString();
             return Results.StatusCode(StatusCodes.Status304NotModified);
         }
 
         var stream = await storage.OpenReadAsync(image.VariantKey(variant), ct);
-        if (stream is null) return Results.NotFound();
+        if (stream is null) return Results.NotFound();   // not cacheable: the object may be restored
+        http.Response.Headers.CacheControl = cacheControl;
         http.Response.Headers.ContentDisposition = "inline";
         return Results.Stream(stream, "image/webp", lastModified: image.CreatedAt, entityTag: etag);
     }

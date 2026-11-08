@@ -59,4 +59,17 @@ public class StorageListTests(AppFactory factory) : ImageTestBase(factory)
         (await Client.GetFromJsonAsync<JsonElement>($"/api/admin/storage/images?projectId={done}"))
             .GetProperty("total").GetInt32().Should().Be(0);
     }
+
+    [Theory]
+    [InlineData(int.MaxValue)]
+    [InlineData(-5)]
+    [InlineData(0)]
+    public async Task Extreme_page_numbers_are_clamped_instead_of_overflowing(int page)
+    {
+        await LoginAsync();
+        var resp = await Client.GetAsync($"/api/admin/storage/images?page={page}&pageSize=100");
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("page").GetInt32().Should().BeInRange(1, 100_000);
+    }
 }

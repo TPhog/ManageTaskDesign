@@ -41,46 +41,25 @@ public sealed class StorageAlertService(
     public async Task EvaluateAsync(CancellationToken ct = default)
     {
         var used = await UsedBytesAsync(ct);
-        var alerts = await db.StorageAlerts.ToListAsync(ct);
+        var alerts = await db.StorageAlerts.AsNoTracking().ToListAsync(ct);
         var active = alerts.Where(a => a.ClearedAt == null).Select(a => a.Threshold).ToHashSet();
         var changes = StorageThresholds.Evaluate(used, Quota, active);
         if (changes.Count == 0) return;
 
         var now = clock.UtcNow;
         var percent = StorageThresholds.Percent(used, Quota);
+        // Each change is claimed atomically (first insert = PK, re-arm / clear = conditional UPDATE): only the
+        // evaluation that wins writes the activity and notifies, so concurrent evaluations never double-alert.
+        var claimedChanges = new List<ThresholdChange>();
         foreach (var change in changes)
         {
             var row = alerts.FirstOrDefault(a => a.Threshold == change.Threshold);
-            if (change.Raised)
-            {
-                if (row is null)
-                {
-                    row = new StorageAlert { Threshold = change.Threshold };
-                    db.StorageAlerts.Add(row);
-                }
-                row.NotifiedAt = now;
-                row.ClearedAt = null;
-            }
-            else if (row is not null)
-            {
-                row.ClearedAt = now;
-            }
-            activity.Write("storage", StorageAlert.ActivityEntityId, "storage.threshold", actorType: "SYSTEM",
-                data: new { threshold = change.Threshold, raised = change.Raised, usedBytes = used, quotaBytes = Quota, percent });
+            if (!change.Raised && row is null) continue;
+            if (await TryClaimAsync(change, row, used, percent, now, ct)) claimedChanges.Add(change);
+            else logger.LogInformation("Storage threshold {Threshold} was handled by a concurrent evaluation; skipped", change.Threshold);
         }
 
-        try
-        {
-            await db.SaveChangesAsync(ct);
-        }
-        catch (DbUpdateException)
-        {
-            // a concurrent evaluation recorded the same threshold first; it also sent the alert
-            logger.LogInformation("Storage threshold evaluation lost a race; skipped");
-            return;
-        }
-
-        foreach (var change in changes)
+        foreach (var change in claimedChanges)
         {
             if (!change.Raised)
             {
@@ -97,6 +76,40 @@ public sealed class StorageAlertService(
             {
                 logger.LogWarning("Could not enqueue the storage notification ({ExceptionType})", ex.GetType().Name);
             }
+        }
+    }
+
+    private async Task<bool> TryClaimAsync(
+        ThresholdChange change, StorageAlert? row, long used, double percent, DateTimeOffset now, CancellationToken ct)
+    {
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        try
+        {
+            if (change.Raised && row is null)
+            {
+                db.StorageAlerts.Add(new StorageAlert { Threshold = change.Threshold, NotifiedAt = now });   // PK collision = lost race
+            }
+            else
+            {
+                var t = change.Threshold;
+                var affected = change.Raised
+                    ? await db.StorageAlerts.Where(a => a.Threshold == t && a.ClearedAt != null)
+                        .ExecuteUpdateAsync(s => s.SetProperty(a => a.ClearedAt, (DateTimeOffset?)null).SetProperty(a => a.NotifiedAt, now), ct)
+                    : await db.StorageAlerts.Where(a => a.Threshold == t && a.ClearedAt == null)
+                        .ExecuteUpdateAsync(s => s.SetProperty(a => a.ClearedAt, (DateTimeOffset?)now), ct);
+                if (affected != 1) return false;
+            }
+            activity.Write("storage", StorageAlert.ActivityEntityId, "storage.threshold", actorType: "SYSTEM",
+                data: new { threshold = change.Threshold, raised = change.Raised, usedBytes = used, quotaBytes = Quota, percent });
+            await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
+            return true;
+        }
+        catch (DbUpdateException)
+        {
+            foreach (var entry in db.ChangeTracker.Entries().Where(e => e.State == EntityState.Added).ToList())
+                entry.State = EntityState.Detached;
+            return false;
         }
     }
 

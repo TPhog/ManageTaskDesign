@@ -26,7 +26,7 @@ public static class StorageEndpoints
         if (olderThanMonths is < 0 or > 120) errors["olderThanMonths"] = ["Từ 0 đến 120 tháng"];
         if (!Sorts.Contains(sort)) errors["sort"] = ["size | oldest | newest"];
         if (errors.Count > 0) return Results.ValidationProblem(errors);
-        page = Math.Max(1, page);
+        page = Math.Clamp(page, 1, 100_000);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
         var query = from f in db.Files.AsNoTracking()
