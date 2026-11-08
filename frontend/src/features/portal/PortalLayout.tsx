@@ -1,18 +1,20 @@
 import { useState } from 'react'
 import { Link, Outlet } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link2Off, Loader2, LogOut, Mail, Phone } from 'lucide-react'
+import { toast } from 'sonner'
+import { Link2Off, Loader2, LogOut, Mail, Phone, WifiOff } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { api } from '@/lib/api'
 import { qk } from '@/lib/queryKeys'
 import type { PortalMe } from '@/lib/portalTypes'
 import { PortalMessage } from './PortalMessage'
+import { isSessionExpired, logoutCompleted } from './errors'
 
 export default function PortalLayout() {
   const qc = useQueryClient()
   const [loggedOut, setLoggedOut] = useState(false)
 
-  const { data: me, isLoading, error } = useQuery({
+  const { data: me, isLoading, error, refetch } = useQuery({
     queryKey: qk.portal.me,
     queryFn: () => api.get<PortalMe>('/portal/me'),
     retry: false,
@@ -20,7 +22,14 @@ export default function PortalLayout() {
   })
 
   async function logout() {
-    await api.post('/portal/logout', {}).catch(() => undefined)
+    try {
+      await api.post('/portal/logout', {})
+    } catch (err) {
+      if (!logoutCompleted(err)) {
+        toast.error('Không thoát được, vui lòng thử lại.')
+        return
+      }
+    }
     qc.removeQueries({ queryKey: ['portal'] })
     setLoggedOut(true)
   }
@@ -35,6 +44,17 @@ export default function PortalLayout() {
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
         Đang tải…
       </div>
+    )
+  }
+
+  if (error && !isSessionExpired(error)) {
+    return (
+      <PortalMessage
+        icon={WifiOff}
+        title="Không tải được trang"
+        description="Có lỗi khi tải dữ liệu. Vui lòng kiểm tra kết nối và thử lại."
+        action={<Button onClick={() => void refetch()}>Thử lại</Button>}
+      />
     )
   }
 

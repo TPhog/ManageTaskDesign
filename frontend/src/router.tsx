@@ -37,6 +37,10 @@ export const router = createBrowserRouter([
     element: <Navigate to="/admin" replace />,
   },
   {
+    path: '/p',
+    element: <PortalTokenPage />,
+  },
+  {
     path: '/p/:token',
     element: <PortalTokenPage />,
   },

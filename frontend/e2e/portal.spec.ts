@@ -1,7 +1,7 @@
 import { test, expect, type Browser, type Page } from '@playwright/test'
 import { createClient, createDeliverable, createProjectForClient, expectToast, moveDeliverable } from './helpers'
 
-// POST /api/portal/session is limited to 10/min per IP: this file uses 6 — don't rerun it within a minute.
+// POST /api/portal/session is limited to 10/min per IP: this file uses 7 — don't rerun it within a minute.
 
 /** Designer side: open the client's portal-link dialog and create a link; returns the raw URL. */
 async function createLinkInUi(page: Page, clientName: string): Promise<string> {
@@ -105,5 +105,18 @@ test.describe('Client portal', () => {
     const fresh = await openAsClient(browser, newLink)
     await expect(fresh.page.getByRole('heading', { name: 'Dự án của bạn' })).toBeVisible()
     await fresh.context.close()
+  })
+
+  test('client can sign out of the portal', async ({ page, browser }) => {
+    await page.goto('/admin')
+    const clientName = `Portal Logout E2E ${Date.now()}`
+    await createClient(page, clientName)
+    const link = await createLinkInUi(page, clientName)
+
+    const client = await openAsClient(browser, link)
+    await expect(client.page.getByRole('heading', { name: 'Dự án của bạn' })).toBeVisible()
+    await client.page.getByRole('button', { name: 'Thoát' }).click()
+    await expect(client.page.getByText('Bạn đã thoát')).toBeVisible()
+    await client.context.close()
   })
 })

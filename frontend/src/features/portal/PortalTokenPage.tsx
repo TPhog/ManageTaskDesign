@@ -3,23 +3,38 @@ import { useParams } from 'react-router-dom'
 import { Link2Off, Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { PortalMessage } from './PortalMessage'
+import { sessionFailureKind, type PortalSessionFailure } from './errors'
 
 /** /p/:token — exchanges the magic-link token for a portal session (07-security §4.2). */
 export default function PortalTokenPage() {
   const { token = '' } = useParams<{ token: string }>()
-  const [failed, setFailed] = useState(false)
+  const [failed, setFailed] = useState<PortalSessionFailure | null>(token ? null : 'INVALID')
   const started = useRef(false)
 
   useEffect(() => {
-    if (started.current) return // StrictMode runs effects twice in dev; exchange the token once
+    if (!token || started.current) return // StrictMode runs effects twice in dev; exchange the token once
     started.current = true
     api.post('/portal/session', { token })
       // Full navigation instead of history.replaceState: it drops the token from the address bar and
       // history AND leaves this page's `Referrer-Policy: no-referrer`, under which the browser sends
       // `Origin: null` on POSTs — CsrfMiddleware would reject every later portal POST.
       .then(() => window.location.replace('/portal'))
-      .catch(() => setFailed(true))
+      .catch(err => {
+        // Drop the token from the address bar/history (07-security §4.2) — no navigation, the error stays on screen.
+        window.history.replaceState(null, '', '/p')
+        setFailed(sessionFailureKind(err))
+      })
   }, [token])
+
+  if (failed === 'RATE_LIMITED') {
+    return (
+      <PortalMessage
+        icon={Link2Off}
+        title="Bạn thử lại sau 1 phút nhé"
+        description="Có quá nhiều lần thử mở link. Chờ một lát rồi mở lại link designer đã gửi."
+      />
+    )
+  }
 
   if (failed) {
     return (
