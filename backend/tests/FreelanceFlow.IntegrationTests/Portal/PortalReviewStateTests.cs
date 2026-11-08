@@ -84,6 +84,9 @@ public class PortalReviewStateTests(AppFactory factory) : PortalTestBase(factory
         var itemId = round.GetProperty("items")[0].GetProperty("id").GetGuid();
 
         (await ReadAsync(s)).Deliverable.GetProperty("reviewState").GetString().Should().Be("CHANGES_IN_PROGRESS");
+        var blocked = await ApproveAsync(s);
+        blocked.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await blocked.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("CHANGE_REQUEST_OPEN");
 
         foreach (var to in new[] { "IN_PROGRESS", "DONE" })
         {

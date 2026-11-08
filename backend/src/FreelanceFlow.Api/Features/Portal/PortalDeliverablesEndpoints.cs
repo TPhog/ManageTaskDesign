@@ -35,23 +35,19 @@ public static class PortalDeliverablesEndpoints
         var owner = await (from d in db.Deliverables.AsNoTracking()
                            join p in PortalScope.OwnProjects(db, principal) on d.ProjectId equals p.Id
                            where d.Id == id
-                           select new { ProjectId = p.Id, ProjectName = p.Name, d.Name, d.Status, d.ClientDecision })
+                           select new { ProjectId = p.Id, ProjectName = p.Name, d.Name })
             .FirstOrDefaultAsync();
         if (owner is null) return Results.NotFound();
 
-        // Plan 12 BR-48: no approval while the client's own change request is still being worked on
-        var hasOpenChange = await PortalReview.OpenChangeDeliverableIds(db, owner.ProjectId).AnyAsync(x => x == id);
-        if (ClientReviewStates.Of(owner.Status, owner.ClientDecision, hasOpenChange) == ClientReviewStates.ChangesInProgress)
-            return Results.Json(
-                new { code = "CHANGE_REQUEST_OPEN", detail = "Bạn đang có yêu cầu sửa cho sản phẩm này — chờ nhà thiết kế gửi bản mới rồi duyệt" },
-                statusCode: StatusCodes.Status409Conflict);
-
         // Conditional UPDATE (not load-modify-save): it cannot overwrite a concurrent designer status change, and of two
         // simultaneous approvals only one matches the WHERE — so one activity entry and one alert.
+        // Plan 12 BR-48: the open-change rule is part of the same WHERE, so a change request created concurrently
+        // cannot slip between a check and the update.
         await using var tx = await db.Database.BeginTransactionAsync();
         var now = clock.UtcNow;
+        var openChange = PortalReview.OpenChangeDeliverableIds(db, owner.ProjectId);
         var rows = await db.Deliverables
-            .Where(d => d.Id == id && d.Status == "IN_REVIEW" && d.ClientDecision == null)
+            .Where(d => d.Id == id && d.Status == "IN_REVIEW" && d.ClientDecision == null && !openChange.Contains(d.Id))
             .ExecuteUpdateAsync(u => u
                 .SetProperty(d => d.ClientDecision, ClientDecisions.Approved)
                 .SetProperty(d => d.ClientDecisionAt, now));
@@ -62,6 +58,12 @@ public static class PortalDeliverablesEndpoints
                 .Select(d => new PortalDeliverableDecisionDto(d.Id, d.Status, d.ClientDecision, d.ClientDecisionAt))
                 .FirstOrDefaultAsync();
             if (current is null) return Results.NotFound();
+            // no approval while the client's own change request is still being worked on
+            var hasOpenChange = await openChange.AnyAsync(x => x == id);
+            if (ClientReviewStates.Of(current.Status, current.ClientDecision, hasOpenChange) == ClientReviewStates.ChangesInProgress)
+                return Results.Json(
+                    new { code = "CHANGE_REQUEST_OPEN", detail = "Bạn đang có yêu cầu sửa cho sản phẩm này — chờ nhà thiết kế gửi bản mới rồi duyệt" },
+                    statusCode: StatusCodes.Status409Conflict);
             if (current.Status == "IN_REVIEW" && current.ClientDecision == ClientDecisions.Approved)
                 return Results.Ok(current);   // already approved: idempotent, nothing new to log or announce
             return Results.Json(
