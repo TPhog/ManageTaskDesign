@@ -26,3 +26,6 @@ dist/
 
 # Superpowers
 .superpowers/
+
+# Local image storage in Development (Storage:Local:RootPath = ./data/files under the API content root)
+backend/src/FreelanceFlow.Api/data/

@@ -1,6 +1,7 @@
 using DotNet.Testcontainers.Builders;
 using System.Collections.Concurrent;
 using FreelanceFlow.Api.Infrastructure.Notifications;
+using FreelanceFlow.Api.Infrastructure.Storage;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
@@ -68,6 +69,9 @@ public sealed class AppFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// <summary>Connection string of the Testcontainers database (valid after InitializeAsync).</summary>
     public string DatabaseConnectionString => _db.GetConnectionString();
 
+    /// <summary>LocalFileStorage root of this factory (a fresh temp folder, deleted on dispose).</summary>
+    public string FilesRoot { get; } = Path.Combine(Path.GetTempPath(), "ff-it-files", Guid.NewGuid().ToString("N"));
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         // UseSetting (host configuration) instead of ConfigureAppConfiguration: Program.cs reads the
@@ -81,6 +85,7 @@ public sealed class AppFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("RateLimit:LoginPerMinute", "1000");
         builder.UseSetting("RateLimit:PortalSessionPerMinute", "1000");
         builder.UseSetting("Notifications:Discord:WebhookUrl", ""); // never hit the network
+        builder.UseSetting("Storage:ReconcileIntervalHours", "0"); // no background reconciliation in tests
 
         // Real queue + dispatcher, but the sender only records
         builder.ConfigureTestServices(services =>
@@ -89,6 +94,8 @@ public sealed class AppFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.AddSingleton(Notifications);
             services.AddSingleton<INotificationSender>(Notifications);
             services.ConfigureDbContext<FreelanceFlow.Api.Data.AppDbContext>(opt => opt.AddInterceptors(BeforeSave));
+            // never the real /data/files: each factory writes into its own temp folder
+            services.PostConfigure<StorageOptions>(o => o.Local.RootPath = FilesRoot);
         });
     }
 
@@ -103,5 +110,6 @@ public sealed class AppFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         await _db.StopAsync();
         await base.DisposeAsync();
+        if (Directory.Exists(FilesRoot)) Directory.Delete(FilesRoot, recursive: true);
     }
 }

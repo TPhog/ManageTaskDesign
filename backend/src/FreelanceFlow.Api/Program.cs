@@ -16,6 +16,7 @@ using FreelanceFlow.Api.Features.Tasks;
 using FreelanceFlow.Api.Infrastructure;
 using FreelanceFlow.Api.Infrastructure.Notifications;
 using FreelanceFlow.Api.Infrastructure.Security;
+using FreelanceFlow.Api.Infrastructure.Storage;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -53,6 +54,9 @@ builder.Services.AddSingleton<INotificationSender>(sp =>
         : ActivatorUtilities.CreateInstance<DiscordWebhookSender>(sp,
             sp.GetRequiredService<IHttpClientFactory>().CreateClient("discord-webhook")));
 builder.Services.AddHostedService<NotificationDispatcher>();
+
+// Image storage (plan 08): local folder Storage:Local:RootPath with quota Storage:QuotaBytes
+builder.Services.AddFileStorage(builder.Configuration);
 
 // DbContext
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
