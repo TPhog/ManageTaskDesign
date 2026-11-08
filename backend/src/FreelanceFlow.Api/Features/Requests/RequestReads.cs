@@ -1,5 +1,7 @@
 using FreelanceFlow.Api.Data;
+using FreelanceFlow.Api.Domain.Files;
 using FreelanceFlow.Api.Domain.Revisions;
+using FreelanceFlow.Api.Features.Images;
 using FreelanceFlow.Api.Features.Revisions;
 using Microsoft.EntityFrameworkCore;
 
@@ -32,9 +34,12 @@ internal static class RequestReads
         var attachments = (await db.Files.AsNoTracking()
                 .Where(f => f.RequestId != null && ids.Contains(f.RequestId.Value) && f.DeletedAt == null)
                 .OrderBy(f => f.CreatedAt)
-                .Select(f => new { RequestId = f.RequestId!.Value, f.Id, f.OriginalName, f.ContentType })
+                .Select(f => new { RequestId = f.RequestId!.Value, f.Id, f.OriginalName, f.ContentType, IsImage = f.OwnerType != null })
                 .ToListAsync())
-            .ToLookup(f => f.RequestId, f => new RequestAttachmentDto(f.Id, f.OriginalName, f.ContentType));
+            .ToLookup(f => f.RequestId, f => new RequestAttachmentDto(f.Id, f.OriginalName, f.ContentType,
+                f.IsImage ? ImageDtos.AdminUrl(f.Id, ImageVariants.Thumb) : null,
+                f.IsImage ? ImageDtos.AdminUrl(f.Id, ImageVariants.Preview) : null,
+                f.IsImage ? ImageDtos.AdminUrl(f.Id, ImageVariants.Original) : null));
 
         var byId = rows.ToDictionary(x => x.Request.Id);
         return ids.Where(byId.ContainsKey).Select(id =>

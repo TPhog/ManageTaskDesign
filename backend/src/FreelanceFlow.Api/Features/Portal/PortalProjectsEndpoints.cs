@@ -1,5 +1,6 @@
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
+using FreelanceFlow.Api.Domain.Files;
 using FreelanceFlow.Api.Domain.Revisions;
 using FreelanceFlow.Api.Domain.Tasks;
 using FreelanceFlow.Api.Infrastructure.Security;
@@ -189,13 +190,38 @@ public static class PortalProjectsEndpoints
             .Where(a => a.ProjectId == id && a.VisibleToClient && a.ClientMessage != null);
 
         var total = await query.CountAsync();
-        var items = await query
+        var rows = await query
             .OrderByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(a => new PortalTimelineItemDto(a.OccurredAt, a.ClientMessage!,
-                a.Action == "project.progress_update" ? "MESSAGE" : "EVENT"))
+            .Select(a => new
+            {
+                a.OccurredAt,
+                Message = a.ClientMessage!,
+                Kind = a.Action == "project.progress_update" ? "MESSAGE" : "EVENT",
+                a.EntityType,
+                a.EntityId,
+            })
             .ToListAsync();
+
+        // Plan 08: images of progress updates (files.owner_id = the update's activity entity id)
+        var updateIds = rows.Where(r => r.EntityType == "progress_update").Select(r => r.EntityId).ToList();
+        var byUpdate = new Dictionary<Guid, List<PortalImageDto>>();
+        if (updateIds.Count > 0)
+        {
+            var images = await PortalImages.VisibleTo(db, principal)
+                .Where(f => f.ProjectId == id && f.OwnerType == ImageOwnerTypes.ProgressUpdate && updateIds.Contains(f.OwnerId!.Value))
+                .OrderBy(f => f.CreatedAt).ThenBy(f => f.Id)
+                .Select(f => new { OwnerId = f.OwnerId!.Value, f.Id, f.Width, f.Height, f.CreatedAt })
+                .ToListAsync();
+            byUpdate = images.GroupBy(x => x.OwnerId).ToDictionary(g => g.Key, g => g
+                .Select(x => PortalImages.ToDto(x.Id, ImageOwnerTypes.ProgressUpdate, null, null, x.Width, x.Height, x.CreatedAt))
+                .ToList());
+        }
+
+        var items = rows.Select(r => new PortalTimelineItemDto(r.OccurredAt, r.Message, r.Kind,
+                r.EntityType == "progress_update" && byUpdate.TryGetValue(r.EntityId, out var list) ? list : []))
+            .ToList();
 
         return Results.Ok(new PortalPagedDto<PortalTimelineItemDto>(items, page, pageSize, total));
     }

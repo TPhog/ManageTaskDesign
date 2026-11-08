@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using FreelanceFlow.Api.Data;
+using FreelanceFlow.Api.Features.Images;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -65,7 +66,7 @@ public class PortalRequestsTests(AppFactory factory) : PortalTestBase(factory)
     }
 
     [Fact]
-    public async Task Blank_content_foreign_deliverable_files_or_json_body_are_400()
+    public async Task Blank_content_foreign_deliverable_or_json_body_are_400()
     {
         var (portal, _, projectId) = await ArrangeAsync();
         var (otherClient, _) = await CreateClientWithPortalLinkAsync();
@@ -82,10 +83,6 @@ public class PortalRequestsTests(AppFactory factory) : PortalTestBase(factory)
         await Expect400(RequestForm("   "), "content");
         await Expect400(RequestForm(new string('a', 5001)), "content");
         await Expect400(RequestForm("Sửa logo", foreign), "deliverableId");
-        var withFile = RequestForm("Sửa logo");
-        withFile.Add(new ByteArrayContent([0x89, 0x50, 0x4E, 0x47]) { Headers = { ContentType = new MediaTypeHeaderValue("image/png") } },
-            "files", "logo.png");
-        await Expect400(withFile, "files");   // attachments arrive with M3 (plan 08)
         await Expect400(JsonContent.Create(new { content = "Sửa logo" }), "content");
         (await portal.GetFromJsonAsync<JsonElement>("/api/portal/requests")).GetArrayLength().Should().Be(0);
     }
@@ -117,11 +114,13 @@ public class PortalRequestsTests(AppFactory factory) : PortalTestBase(factory)
     }
 
     [Fact]
-    public async Task Body_over_64KB_is_413_not_500()
+    public async Task Body_over_the_portal_upload_limit_is_413_not_500()
     {
         var (portal, _, projectId) = await ArrangeAsync();
+        var form = RequestForm("Sửa logo");
+        form.Add(new ByteArrayContent(new byte[ImageLimits.MaxPortalRequestBodyBytes]), "files", "qua-lon.png");
 
-        var resp = await SendAsync(portal, projectId, new string('a', 70 * 1024));
+        var resp = await portal.PostAsync($"/api/portal/projects/{projectId}/requests", form);
 
         resp.StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge, await resp.Content.ReadAsStringAsync());
     }

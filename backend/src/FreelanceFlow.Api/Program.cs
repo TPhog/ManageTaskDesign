@@ -254,6 +254,7 @@ app.MapPortalProjectsEndpoints();
 app.MapPortalQuotationsEndpoints();
 app.MapPortalRequestsEndpoints();
 app.MapPortalDeliverablesEndpoints();
+app.MapPortalImagesEndpoints();
 
 app.MapGet("/health", async (AppDbContext db) =>
 {

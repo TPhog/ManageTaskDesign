@@ -124,7 +124,7 @@ public class PortalProjectsTests(AppFactory factory) : PortalTestBase(factory)
         items.Select(i => i.GetProperty("message").GetString())
             .Should().Equal("Logo: Chờ duyệt", "Dự án chuyển sang: Đang thực hiện");
         items.Should().AllSatisfy(i =>
-            i.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo("occurredAt", "message", "kind"));
+            i.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo("occurredAt", "message", "kind", "images"));
     }
 
     [Fact]

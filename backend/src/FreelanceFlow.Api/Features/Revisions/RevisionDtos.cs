@@ -1,3 +1,5 @@
+using FreelanceFlow.Api.Features.Images;
+
 namespace FreelanceFlow.Api.Features.Revisions;
 
 // ---------- requests (docs/05 §3.7–3.8) ----------
@@ -50,7 +52,8 @@ public sealed record DeliverableRevisionsDto(
 
 public sealed record ProjectRevisionsDto(Guid ProjectId, IReadOnlyList<DeliverableRevisionsDto> Deliverables, IReadOnlyList<RoundDto> ProjectRounds);
 
-public sealed record RequestAttachmentDto(Guid Id, string OriginalName, string ContentType);
+public sealed record RequestAttachmentDto(
+    Guid Id, string OriginalName, string ContentType, string? ThumbUrl, string? PreviewUrl, string? OriginalUrl);
 
 public sealed record RequestDto(
     Guid Id, Guid ProjectId, string ProjectName, Guid ClientId, string ClientName,
@@ -62,4 +65,4 @@ public sealed record RequestDetailDto(RequestDto Request, IReadOnlyList<RoundDto
 
 public sealed record NewRequestCountDto(int Count);
 
-public sealed record ProgressUpdateDto(DateTimeOffset OccurredAt, string Message);
+public sealed record ProgressUpdateDto(Guid Id, DateTimeOffset OccurredAt, string Message, IReadOnlyList<ImageDto> Images);

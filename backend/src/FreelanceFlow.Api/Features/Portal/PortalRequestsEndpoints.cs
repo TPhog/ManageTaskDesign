@@ -1,8 +1,11 @@
 using FreelanceFlow.Api.Common;
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
+using FreelanceFlow.Api.Domain.Files;
 using FreelanceFlow.Api.Domain.Requests;
+using FreelanceFlow.Api.Features.Images;
 using FreelanceFlow.Api.Features.Revisions;
+using FreelanceFlow.Api.Features.Storage;
 using FreelanceFlow.Api.Infrastructure;
 using FreelanceFlow.Api.Infrastructure.Notifications;
 using FreelanceFlow.Api.Infrastructure.Security;
@@ -16,10 +19,10 @@ namespace FreelanceFlow.Api.Features.Portal;
 public static class PortalRequestsEndpoints
 {
     /// <summary>
-    /// Text-only until images arrive (plan 08). An over-limit body is answered 413 (Payload Too Large),
+    /// Text + up to 5 images (plan 08). An over-limit body is answered 413 (Payload Too Large),
     /// whether detected via Content-Length or while streaming the form.
     /// </summary>
-    private const int MaxBodyBytes = 64 * 1024;
+    private const long MaxBodyBytes = ImageLimits.MaxPortalRequestBodyBytes;
 
     public static void MapPortalRequestsEndpoints(this IEndpointRouteBuilder app)
     {
@@ -50,7 +53,7 @@ public static class PortalRequestsEndpoints
     }
 
     /// <summary>
-    /// REQ-01, BR-21/53/54. Multipart per docs/05 §4; text only until M3 (plan 08), so a file part is refused.
+    /// REQ-01, BR-21/53/54. Multipart per docs/05 §4; up to 5 images, optimised like designer uploads but never watermarked (plan 08).
     /// The body is never logged (07-security).
     /// </summary>
     private static async Task<IResult> SendRequest(
@@ -59,6 +62,8 @@ public static class PortalRequestsEndpoints
         [FromServices] PortalPrincipal principal,
         AppDbContext db,
         ActivityWriter activity,
+        ImageUploader uploader,
+        StorageAlertService storageAlerts,
         IClock clock,
         INotifier notifier,
         IOptions<AppSettings> appSettings,
@@ -106,8 +111,8 @@ public static class PortalRequestsEndpoints
             else
                 errors["deliverableId"] = ["Hạng mục không thuộc dự án này"];
         }
-        if (form.Files.Count > 0)
-            errors["files"] = ["Chưa hỗ trợ đính kèm ảnh — vui lòng chỉ gửi nội dung"];
+        foreach (var (field, messages) in ImageLimits.ValidateCount(form.Files.Count, ImageLimits.MaxFilesPerPortalRequest, required: false))
+            errors[field] = messages;
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
         // BR-54: portal requests of this client since 00:00 VN (designer-recorded requests do not count)
@@ -135,9 +140,34 @@ public static class PortalRequestsEndpoints
         activity.Write("request", request.Id, "request.created",
             clientId: principal.ClientId, projectId: id, actorType: "CLIENT",
             data: new { source = request.Source, createdBy = request.CreatedBy, deliverableId = request.DeliverableId });
-        await db.SaveChangesAsync();
+        IReadOnlyList<ProjectFile> images = [];
+        try
+        {
+            if (form.Files.Count > 0)
+            {
+                // the request and its photos commit together; a refused photo creates no request (spec §7)
+                images = await uploader.StageAsync(form.Files,
+                    new ImageTarget(id, ImageOwnerTypes.ClientRequest, request.Id, request.Id, "CLIENT", VisibleToClient: false),
+                    http.HttpContext.RequestAborted);
+                activity.Write("request", request.Id, "image.uploaded",
+                    clientId: principal.ClientId, projectId: id, actorType: "CLIENT",
+                    data: new { count = images.Count, bytes = images.Sum(i => i.SizeBytes), ownerType = ImageOwnerTypes.ClientRequest });
+            }
+            await db.SaveChangesAsync();
+        }
+        catch (DomainException ex)
+        {
+            await uploader.DiscardAsync();
+            return ImageResults.FromDomain(ex);
+        }
+        catch
+        {
+            await uploader.DiscardAsync();
+            throw;
+        }
+        if (images.Count > 0) await storageAlerts.EvaluateSafelyAsync();
 
-        await NotifyDesignerAsync(db, notifier, appSettings.Value, logger, request, project.Name, principal.ClientId);
+        await NotifyDesignerAsync(db, notifier, appSettings.Value, logger, request, project.Name, principal.ClientId, images.Count);
 
         var dto = (await ToDtosAsync(db, [(request, project.Name)])).Single();
         return Results.Json(dto, statusCode: StatusCodes.Status201Created);
@@ -146,7 +176,7 @@ public static class PortalRequestsEndpoints
     /// <summary>Discord alert for the designer; runs after commit and must never fail the request.</summary>
     private static async Task NotifyDesignerAsync(
         AppDbContext db, INotifier notifier, AppSettings app, ILogger logger,
-        ClientRequest request, string projectName, Guid clientId)
+        ClientRequest request, string projectName, Guid clientId, int imageCount = 0)
     {
         try
         {
@@ -161,6 +191,7 @@ public static class PortalRequestsEndpoints
                 var deliverable = await db.Deliverables.AsNoTracking().Where(d => d.Id == did).Select(d => d.Name).FirstOrDefaultAsync();
                 if (deliverable is not null) fields.Add(new("Hạng mục", deliverable));
             }
+            if (imageCount > 0) fields.Add(new("Ảnh đính kèm", imageCount.ToString()));
             var oneLine = string.Join(' ', request.Content.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
             var excerpt = oneLine.Length > 200 ? oneLine[..200] + "…" : oneLine;
             var url = Uri.TryCreate(app.PublicBaseUrl, UriKind.Absolute, out var baseUri)
@@ -192,9 +223,11 @@ public static class PortalRequestsEndpoints
                 .Where(f => f.RequestId != null && ids.Contains(f.RequestId.Value) && f.DeletedAt == null
                             && (f.VisibleToClient || f.UploadedBy == "CLIENT"))
                 .OrderBy(f => f.CreatedAt)
-                .Select(f => new { RequestId = f.RequestId!.Value, f.Id, f.OriginalName, f.ContentType })
+                .Select(f => new { RequestId = f.RequestId!.Value, f.Id, f.OriginalName, f.ContentType, IsImage = f.OwnerType != null })
                 .ToListAsync())
-            .ToLookup(f => f.RequestId, f => new PortalRequestAttachmentDto(f.Id, f.OriginalName, f.ContentType));
+            .ToLookup(f => f.RequestId, f => new PortalRequestAttachmentDto(f.Id, f.OriginalName, f.ContentType,
+                f.IsImage ? ImageDtos.PortalUrl(f.Id, ImageVariants.Thumb) : null,
+                f.IsImage ? ImageDtos.PortalUrl(f.Id, ImageVariants.Preview) : null));
 
         return rows.Select(x => new PortalRequestDto(
             x.Request.Id,

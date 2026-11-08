@@ -54,7 +54,19 @@ public sealed record PortalProjectDetailDto(
     PortalBriefDto? Brief);
 
 /// <summary>Kind: "MESSAGE" = the designer's progress update, "EVENT" = an automatic status line (QA C-12).</summary>
-public sealed record PortalTimelineItemDto(DateTimeOffset OccurredAt, string Message, string Kind);
+/// <summary>Plan 08: preview/thumb only — no original, file name, owner id or task title (TSK-05).</summary>
+public sealed record PortalImageDto(
+    Guid Id,
+    string Source,
+    Guid? DeliverableId,
+    string? DeliverableName,
+    int Width,
+    int Height,
+    DateTimeOffset CreatedAt,
+    string ThumbUrl,
+    string PreviewUrl);
+
+public sealed record PortalTimelineItemDto(DateTimeOffset OccurredAt, string Message, string Kind, IReadOnlyList<PortalImageDto> Images);
 
 /// <summary>GET /api/portal/studio — public: lets signed-out / expired / bad-link pages show how to reach the studio.</summary>
 public sealed record PortalStudioDto(string DisplayName, string? ContactPhone, string? ContactEmail);
@@ -98,7 +110,7 @@ public sealed record PortalQuotationDetailDto(
 
 // ---------- requests (docs/05 §4, REQ-01/06) ----------
 
-public sealed record PortalRequestAttachmentDto(Guid Id, string OriginalName, string ContentType);
+public sealed record PortalRequestAttachmentDto(Guid Id, string OriginalName, string ContentType, string? ThumbUrl, string? PreviewUrl);
 
 public sealed record PortalRequestDto(
     Guid Id,

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using FreelanceFlow.IntegrationTests.Images;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -25,11 +26,13 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
         ["GET /api/portal/quotations/{id:guid}/versions/{version:int}"] = "/api/portal/quotations/{quotationA}/versions/1",
         ["GET /api/portal/quotations/{id:guid}/qr/{purpose}.png"] = "/api/portal/quotations/{quotationA}/qr/deposit.png",
         ["GET /api/portal/requests"] = "/api/portal/requests?projectId={projectA}",
+        ["GET /api/portal/projects/{id:guid}/images"] = "/api/portal/projects/{projectA}/images",
+        ["GET /api/portal/images/{id:guid}/{variant}"] = "/api/portal/images/{imageA}/thumb", // M3: never "original"
         ["POST /api/portal/projects/{id:guid}/requests"] = null, // Client_B_cannot_send_a_request_to_a_project_of_A
         ["POST /api/portal/deliverables/{id:guid}/approve"] = null, // PortalDeliverableApprovalTests.Client_B_gets_404_approving_a_deliverable_of_A
     };
 
-    private static readonly string[] ResourcePlaceholders = ["{projectA}", "{quotationA}"];
+    private static readonly string[] ResourcePlaceholders = ["{projectA}", "{quotationA}", "{imageA}"];
 
     public static IEnumerable<object[]> GetUrls() =>
         RouteTable.Values.OfType<string>().Select(u => new object[] { u });
@@ -132,11 +135,12 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
 
     private static string Fill(string template, Scenario s) => template
         .Replace("{projectA}", s.ProjectA.ToString())
-        .Replace("{quotationA}", s.QuotationA.ToString());
+        .Replace("{quotationA}", s.QuotationA.ToString())
+        .Replace("{imageA}", s.ImageA.ToString());
 
     private sealed record Scenario(
         HttpClient PortalA, HttpClient PortalB, Guid ProjectA, string ProjectAName, string DeliverableAName, Guid ProjectB,
-        Guid QuotationA);
+        Guid QuotationA, Guid ImageA);
 
     private async Task<Scenario> ArrangeAsync()
     {
@@ -154,6 +158,12 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
         await ChangeProjectStatusAsync(projectA, new { to = "IN_PROGRESS", confirmWarnings = true }); // A gets a timeline entry
         (await Client.PostAsJsonAsync($"/api/admin/projects/{projectA}/progress-updates",
             new { message = $"Tiến độ {projectAName}" })).EnsureSuccessStatusCode(); // M5: designer progress update on A's timeline
+        var taskResp = await Client.PostAsJsonAsync($"/api/admin/projects/{projectA}/tasks", new { title = "SECRET-INTERNAL-TASK" });
+        taskResp.EnsureSuccessStatusCode();
+        var taskA = (await taskResp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var upload = await Client.PostAsync($"/api/admin/tasks/{taskA}/images", TestImages.Form(TestImages.Png(32, 24)));
+        upload.StatusCode.Should().Be(HttpStatusCode.Created, await upload.Content.ReadAsStringAsync());
+        var imageA = (await upload.Content.ReadFromJsonAsync<JsonElement>())[0].GetProperty("id").GetGuid(); // M3: client-visible task image of A
         var quotationA = await CreateSentQuotationAsync(projectA); // M7b: snapshot carries projectAName; internal note SECRET-INTERNAL-QUOTE
         var projectB = await CreateProjectAsync(clientB, "ISOLATION-B-" + Guid.NewGuid().ToString("N"));
 
@@ -162,6 +172,6 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
         (await portalA.PostAsync($"/api/portal/projects/{projectA}/requests", RequestForm($"Yêu cầu {projectAName}")))
             .EnsureSuccessStatusCode(); // M7b: A's request list carries projectAName
 
-        return new Scenario(portalA, portalB, projectA, projectAName, deliverableAName, projectB, quotationA);
+        return new Scenario(portalA, portalB, projectA, projectAName, deliverableAName, projectB, quotationA, imageA);
     }
 }
