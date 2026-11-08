@@ -1,4 +1,5 @@
-import type { DashboardSchedule } from '@/lib/dashboardTypes'
+import type { DashboardSchedule, HealthRisk, MoneyPeriod, ReceivableItem } from '@/lib/dashboardTypes'
+import { paymentReminderMessage } from '@/lib/messageTemplates'
 import type { FlowProjectActions } from '@/lib/flowTypes'
 
 /** 'yyyy-MM' → 'T6/2026' */
@@ -82,4 +83,59 @@ export function removeTaskFromSchedule(s: DashboardSchedule, taskId: string): Da
 
 export function scheduleIsEmpty(s: DashboardSchedule): boolean {
   return s.overdue.total === 0 && s.overdue.items.length === 0 && s.days.every(d => d.tasks.length === 0 && d.deadlines.length === 0 && d.hiddenTasks === 0)
+}
+
+export const RISK_LABEL: Record<HealthRisk, string> = {
+  LATE: 'Trễ hạn',
+  DEPOSIT_UNPAID: 'Chưa nhận cọc',
+  BALANCE_DUE: 'Còn nợ',
+  OPEN_REQUESTS: 'Có yêu cầu mới',
+  TASKS_OVERDUE: 'Task quá hạn',
+  QUOTA_EXCEEDED: 'Hết lượt sửa',
+}
+
+/** Risks that mean money or the deadline is at stake render red; the rest amber. */
+export const SEVERE_RISKS: readonly HealthRisk[] = ['LATE', 'DEPOSIT_UNPAID', 'BALANCE_DUE']
+
+export function deadlineLabel(days: number | null): string {
+  if (days === null) return 'Chưa có hạn'
+  if (days < 0) return `Trễ ${-days} ngày`
+  if (days === 0) return 'Hôm nay'
+  if (days === 1) return 'Ngày mai'
+  return `Còn ${days} ngày`
+}
+
+export function deltaLabel(delta: number | null): string {
+  if (delta === null) return 'Chưa có kỳ trước để so sánh'
+  const abs = Math.abs(delta).toFixed(1).replace('.', ',')
+  const sign = delta > 0 ? '+' : delta < 0 ? '−' : ''
+  return `${sign}${abs}% so với cùng kỳ trước`
+}
+
+export function agingLabel(days: number): string {
+  return days <= 0 ? 'Hôm nay' : `${days} ngày`
+}
+
+export const AGING_BUCKET_LABEL: Record<ReceivableItem['agingBucket'], string> = {
+  '0-7': 'Dưới 8 ngày',
+  '8-30': '8 đến 30 ngày',
+  '31+': 'Quá 30 ngày',
+}
+
+export const PERIOD_LABEL: Record<MoneyPeriod, string> = {
+  month: 'Tháng này',
+  quarter: 'Quý này',
+  year: 'Năm nay',
+}
+
+/** Same wording as the quotation page's "Copy nhắc thanh toán". */
+export function receivableReminder(item: ReceivableItem): string {
+  return paymentReminderMessage(item)
+}
+
+/** Day before the exclusive end of a window, as 'yyyy-MM-dd' (for "01/05/2030 – 15/05/2030" captions). */
+export function lastDayOf(endExclusive: string): string {
+  const [y, m, d] = parseYmd(endExclusive)
+  const prev = new Date(y, m - 1, d - 1)
+  return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}-${String(prev.getDate()).padStart(2, '0')}`
 }

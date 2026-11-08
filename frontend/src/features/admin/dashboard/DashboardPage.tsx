@@ -10,9 +10,13 @@ import type { MonthTotal } from '@/lib/dashboardTypes'
 import { formatDate, formatVnd } from '@/lib/format'
 import { barPercent, dashboardLinks, monthLabel } from './dashboardUtils'
 import { panelClass, Section } from './DashboardSection'
+import { ClientActivityBlock } from './ClientActivityBlock'
 import { FlowTodoBlock } from './FlowTodoBlock'
+import { MoneyInsightsBlock } from './MoneyInsightsBlock'
+import { ProjectHealthBlock } from './ProjectHealthBlock'
 import { ScheduleBlock } from './ScheduleBlock'
 import { SetupChecklistCard } from './SetupChecklistCard'
+import { StorageWidget } from './StorageWidget'
 import { useDashboard } from './useDashboard'
 
 /** One metric; the whole tile links to the filtered list (docs/08 §2.2). */
@@ -38,9 +42,9 @@ function AcceptedChart({ data }: { data: MonthTotal[] }) {
     <figure data-testid="dsh-chart" className="space-y-2">
       <figcaption className="text-sm font-medium text-foreground">Giá trị đã chốt 6 tháng gần nhất</figcaption>
       <div className="flex h-36 items-end gap-2 border-b" aria-hidden="true">
-        {data.map(d => (
+        {data.map((d, i) => (
           <div key={d.month} className="group relative flex h-full flex-1 flex-col justify-end">
-            <span className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-xs text-background opacity-0 shadow transition-opacity group-hover:opacity-100">
+            <span className={`pointer-events-none absolute top-0 z-10 -translate-y-full whitespace-nowrap ${i >= data.length - 2 ? 'right-0' : 'left-1/2 -translate-x-1/2'} rounded-md bg-foreground px-2 py-1 text-xs text-background opacity-0 shadow transition-opacity group-hover:opacity-100`}>
               {monthLabel(d.month)}: {formatVnd(d.total)}
             </span>
             <div className="mx-auto w-full max-w-10 rounded-t-[4px] bg-primary" style={{ height: `${barPercent(d.total, max)}%` }} />
@@ -71,7 +75,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Tổng quan" description="Việc cần làm theo từng dự án, dự án sắp đến hạn và tiền đang chờ thu." />
+      <PageHeader title="Tổng quan" description="Lịch tuần này, sức khỏe dự án, tiền thu và hoạt động của khách." />
 
       {isLoading ? (
         <div className="space-y-6">
@@ -136,6 +140,14 @@ export default function DashboardPage() {
               </div>
               <AcceptedChart data={data.acceptedByMonth} />
             </Section>
+          </div>
+
+          <ProjectHealthBlock />
+          <MoneyInsightsBlock />
+
+          <div className="grid gap-6 lg:grid-cols-2">
+            <ClientActivityBlock />
+            <StorageWidget />
           </div>
         </div>
       )}

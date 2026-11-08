@@ -1,8 +1,8 @@
 import {
   DASHBOARD_FLOW_LIMIT, barPercent, dashboardLinks, dayHeading, monthLabel, projectsNeedingAction, removeTaskFromSchedule,
-  scheduleIsEmpty,
+  scheduleIsEmpty, deadlineLabel, deltaLabel, receivableReminder,
 } from '@/features/admin/dashboard/dashboardUtils'
-import type { DashboardSchedule, ScheduleTask } from '@/lib/dashboardTypes'
+import type { DashboardSchedule, ReceivableItem, ScheduleTask } from '@/lib/dashboardTypes'
 import type { FlowAction, FlowActionKind, FlowProjectActions, FlowWarning } from '@/lib/flowTypes'
 
 const act = (kind: FlowActionKind, primary = false): FlowAction =>
@@ -111,5 +111,26 @@ describe('scheduleIsEmpty', () => {
     expect(scheduleIsEmpty(schedule())).toBe(false)
     const empty: DashboardSchedule = { ...schedule(), overdue: { total: 0, items: [] }, days: schedule().days.map(d => ({ ...d, tasks: [] })) }
     expect(scheduleIsEmpty(empty)).toBe(true)
+  })
+})
+
+describe('deadlineLabel', () => {
+  it.each([[null, 'Chưa có hạn'], [-3, 'Trễ 3 ngày'], [0, 'Hôm nay'], [1, 'Ngày mai'], [5, 'Còn 5 ngày']])('%s -> %s', (days, label) =>
+    expect(deadlineLabel(days)).toBe(label))
+})
+
+describe('deltaLabel', () => {
+  it('formats sign and one decimal in Vietnamese and explains a missing base', () => {
+    expect(deltaLabel(50)).toBe('+50,0% so với cùng kỳ trước')
+    expect(deltaLabel(-66.7)).toBe('−66,7% so với cùng kỳ trước')
+    expect(deltaLabel(null)).toBe('Chưa có kỳ trước để so sánh')
+  })
+})
+
+describe('receivableReminder', () => {
+  it('asks for the deposit while nothing is paid and for the remainder after the deposit', () => {
+    const base = { clientName: 'Chị Lan', projectName: 'Logo ABC', number: 'BG-2030-0003', version: 1, depositPercent: 50, depositAmount: 5_000_000, outstanding: 10_000_000 }
+    expect(receivableReminder({ ...base, paymentStatus: 'UNPAID' } as ReceivableItem)).toContain('tiền cọc')
+    expect(receivableReminder({ ...base, paymentStatus: 'DEPOSIT_PAID', outstanding: 5_000_000 } as ReceivableItem)).toContain('số tiền còn lại')
   })
 })
