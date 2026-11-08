@@ -41,6 +41,8 @@ public class SettingsConfiguration : IEntityTypeConfiguration<Settings>
         b.Property(x => x.WatermarkOpacity).HasColumnName("watermark_opacity").HasDefaultValue(18);
         b.Property(x => x.DigestEnabled).HasColumnName("digest_enabled").HasDefaultValue(true);
         b.Property(x => x.DigestHourVn).HasColumnName("digest_hour_vn").HasDefaultValue(8);
+        b.Property(x => x.PortalResponseTime).HasColumnName("portal_response_time").HasMaxLength(60)
+            .IsRequired().HasDefaultValue(FreelanceFlow.Api.Domain.Settings.Settings.DefaultPortalResponseTime);
 
         b.HasOne(x => x.Bank).WithMany().HasForeignKey(x => x.BankBin).HasPrincipalKey(bk => bk.Bin);
         b.HasOne<ProjectFile>().WithMany().HasForeignKey(x => x.LogoFileId);

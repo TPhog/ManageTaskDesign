@@ -36,6 +36,10 @@ public class QuotationConfiguration : IEntityTypeConfiguration<Quotation>
                 "payment_status = 'UNPAID' OR status = 'ACCEPTED'");
             t.HasCheckConstraint("ck_quotations_deposit_paid",
                 "payment_status <> 'DEPOSIT_PAID' OR deposit_percent > 0");
+            t.HasCheckConstraint("ck_quotations_payment_notice_purpose",
+                "client_payment_notice_purpose IS NULL OR client_payment_notice_purpose IN ('deposit','full','remaining')");
+            t.HasCheckConstraint("ck_quotations_payment_notice_at",
+                "(client_payment_notice_purpose IS NULL) = (client_payment_notice_at IS NULL)");
         });
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id");
@@ -69,6 +73,10 @@ public class QuotationConfiguration : IEntityTypeConfiguration<Quotation>
         b.Property(x => x.PaymentStatus).HasColumnName("payment_status").HasDefaultValue("UNPAID");
         b.Property(x => x.DepositPaidAt).HasColumnName("deposit_paid_at");
         b.Property(x => x.PaidAt).HasColumnName("paid_at");
+        b.Property(x => x.ClientAcceptedAt).HasColumnName("client_accepted_at");
+        b.Property(x => x.ClientPaymentNoticePurpose).HasColumnName("client_payment_notice_purpose").HasMaxLength(20);
+        b.Property(x => x.ClientPaymentNoticeAt).HasColumnName("client_payment_notice_at");
+        b.Property(x => x.ClientPaymentNoticeNote).HasColumnName("client_payment_notice_note").HasMaxLength(500);
         b.Property(x => x.CreatedAt).HasColumnName("created_at");
         b.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 

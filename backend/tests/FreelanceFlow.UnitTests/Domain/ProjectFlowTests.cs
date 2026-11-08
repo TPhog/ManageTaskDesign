@@ -286,4 +286,45 @@ public class ProjectFlowTests
     [InlineData("PAID", 0)]
     public void Outstanding_follows_br_73(string payment, long expected) =>
         ProjectFlow.Outstanding(Q("ACCEPTED", payment: payment)).Should().Be(expected);
+
+    [Fact]
+    public void Client_acceptance_replaces_record_acceptance_with_a_confirmation_first()
+    {
+        var sent = Q("SENT") with { ClientAcceptedAt = DateTimeOffset.UnixEpoch };
+
+        var s = Eval(Facts("QUOTED", true, [D("NOT_STARTED")], [sent]));
+
+        s.Stage.Should().Be("QUOTE");
+        Kinds(s).Should().Equal("CONFIRM_CLIENT_ACCEPTANCE", "COPY_QUOTATION_MESSAGE");
+        s.Actions[0].Label.Should().Be("Khách đã đồng ý báo giá BG-2026-0001 (v1) — xác nhận");
+        s.Actions[0].Target.QuotationId.Should().Be(sent.Id);
+        OnlyFirstIsPrimary(s);
+    }
+
+    [Fact]
+    public void Pending_payment_notice_is_the_first_action_until_the_designer_marks_it()
+    {
+        var accepted = Q("ACCEPTED") with { PaymentNoticePurpose = "deposit" };
+
+        var execute = Eval(Facts("IN_PROGRESS", true, [D("IN_PROGRESS")], [accepted]));
+        var marked = Eval(Facts("IN_PROGRESS", true, [D("IN_PROGRESS")], [accepted with { PaymentStatus = "DEPOSIT_PAID" }]));
+        var completed = Eval(Facts("COMPLETED", true, [D("DELIVERED")],
+            [Q("ACCEPTED", payment: "DEPOSIT_PAID") with { PaymentNoticePurpose = "remaining" }]));
+
+        execute.Actions[0].Kind.Should().Be("CONFIRM_CLIENT_PAYMENT");
+        execute.Actions[0].Label.Should().Be("Khách báo đã chuyển cọc 1.000.000 ₫ cho BG-2026-0001 (v1) — kiểm tra & xác nhận");
+        OnlyFirstIsPrimary(execute);
+        Kinds(marked).Should().NotContain("CONFIRM_CLIENT_PAYMENT");
+        completed.Actions[0].Label.Should().Be("Khách báo đã chuyển phần còn lại 1.000.000 ₫ cho BG-2026-0001 (v1) — kiểm tra & xác nhận");
+    }
+
+    [Fact]
+    public void Deliverable_in_review_with_open_revision_items_warns_the_designer()
+    {
+        var s = Eval(Facts("IN_PROGRESS", true, [D("IN_REVIEW", openRevisions: 2)], [Q("ACCEPTED", payment: "PAID")]));
+
+        s.Stage.Should().Be("REVIEW");
+        s.Warnings.Should().Contain(new FlowWarning("REVIEW_WITH_OPEN_REVISIONS",
+            "Logo đang chờ khách duyệt nhưng còn 2 mục sửa chưa xong — khách chưa duyệt được trên portal", "warning"));
+    }
 }

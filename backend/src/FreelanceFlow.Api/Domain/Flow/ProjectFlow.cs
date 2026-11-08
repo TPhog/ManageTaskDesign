@@ -1,4 +1,5 @@
 using System.Globalization;
+using FreelanceFlow.Api.Domain.Quotations;
 using FreelanceFlow.Api.Domain.Revisions;
 
 namespace FreelanceFlow.Api.Domain.Flow;
@@ -44,6 +45,8 @@ public static class FlowActionKinds
     public const string CreateAdditionalQuotation = "CREATE_ADDITIONAL_QUOTATION";
     public const string CompleteProject = "COMPLETE_PROJECT";
     public const string CopyPaymentReminder = "COPY_PAYMENT_REMINDER";
+    public const string ConfirmClientAcceptance = "CONFIRM_CLIENT_ACCEPTANCE";
+    public const string ConfirmClientPayment = "CONFIRM_CLIENT_PAYMENT";
 }
 
 public static class FlowWarningKinds
@@ -56,6 +59,7 @@ public static class FlowWarningKinds
     public const string QuotaExceeded = "QUOTA_EXCEEDED";
     public const string BalanceDue = "BALANCE_DUE";
     public const string DeliveredWithOpenRevisions = "DELIVERED_WITH_OPEN_REVISIONS";
+    public const string ReviewWithOpenRevisions = "REVIEW_WITH_OPEN_REVISIONS";
 }
 
 /// <summary>A deliverable as the flow sees it (TaskTotal/TaskDone from TaskProgress, UsedRounds from RevisionQuota).</summary>
@@ -66,7 +70,8 @@ public sealed record FlowDeliverable(
 /// <summary>A non-SUPERSEDED quotation of the project.</summary>
 public sealed record FlowQuotation(
     Guid Id, string Kind, string Status, string? Number, int Version, DateOnly? ExpiryDate,
-    string PaymentStatus, int DepositPercent, long Total, long DepositAmount, DateTimeOffset CreatedAt);
+    string PaymentStatus, int DepositPercent, long Total, long DepositAmount, DateTimeOffset CreatedAt,
+    DateTimeOffset? ClientAcceptedAt = null, string? PaymentNoticePurpose = null);
 
 /// <summary>Everything Evaluate needs, loaded by Features/Projects/ProjectFlowReads. NewRequestIds: oldest first.</summary>
 public sealed record FlowFacts(
@@ -116,6 +121,7 @@ public static class ProjectFlow
 
         if (facts.ProjectStatus == "COMPLETED")
         {
+            ClientStatementActions(b, facts);
             DeliveredWithOpenRevisions(b, active);
             Balance(b, facts);
             return b.State(FlowStages.Close, Steps(-1, markCurrent: false));
@@ -124,6 +130,7 @@ public static class ProjectFlow
         var stage = FlowStages.Ordered[firstOpen];
         if (stage is FlowStages.Execute or FlowStages.Review or FlowStages.Close)
             DeliveredWithOpenRevisions(b, active);
+        ClientStatementActions(b, facts);
         switch (stage)
         {
             case FlowStages.Prepare: Prepare(b, facts, active, initial); break;
@@ -163,7 +170,8 @@ public static class ProjectFlow
             b.Act(FlowActionKinds.SendQuotation, "Gửi báo giá", new FlowTarget(QuotationId: draft.Id));
         if (sent != null)
         {
-            b.Act(FlowActionKinds.RecordAcceptance, "Ghi nhận khách chấp nhận báo giá", new FlowTarget(QuotationId: sent.Id));
+            if (sent.ClientAcceptedAt is null)
+                b.Act(FlowActionKinds.RecordAcceptance, "Ghi nhận khách chấp nhận báo giá", new FlowTarget(QuotationId: sent.Id));
             b.Act(FlowActionKinds.CopyQuotationMessage, "Sao chép tin nhắn báo giá", new FlowTarget(QuotationId: sent.Id));
             if (sent.ExpiryDate is { } expiry)
             {
@@ -187,6 +195,7 @@ public static class ProjectFlow
         foreach (var d in active.Where(d => d.Status == "IN_PROGRESS" && d.TaskTotal > 0 && d.TaskDone == d.TaskTotal))
             b.Act(FlowActionKinds.SubmitReview, $"Gửi duyệt: {d.Name}", new FlowTarget(DeliverableId: d.Id));
         RevisionFollowUps(b, f, active);
+        ReviewBlockedByRevisions(b, active);
 
         var unpaid = initial.Where(q => q.Status == "ACCEPTED" && q.PaymentStatus == "UNPAID")
             .OrderBy(q => q.CreatedAt).FirstOrDefault();
@@ -212,6 +221,7 @@ public static class ProjectFlow
         foreach (var d in approved)
             b.Act(FlowActionKinds.Deliver, $"Bàn giao: {d.Name}", new FlowTarget(DeliverableId: d.Id));
         RevisionFollowUps(b, f, active);
+        ReviewBlockedByRevisions(b, active);
         QuotaWarnings(b, active);
         if (approved.Count > 0) Balance(b, f);   // F4: money still due when handing over
     }
@@ -231,6 +241,36 @@ public static class ProjectFlow
                 new FlowTarget(RequestId: f.NewRequestIds[0]));
         if (f.UnquotedChargeableItems > 0)
             b.Act(FlowActionKinds.CreateAdditionalQuotation, $"Tạo báo giá phát sinh ({f.UnquotedChargeableItems} mục tính phí)");
+    }
+
+    /// <summary>Plan 12 BR-76/77: what the client stated on the portal waits for the designer's confirmation — first, so it is primary.</summary>
+    private static void ClientStatementActions(Builder b, FlowFacts f)
+    {
+        foreach (var q in f.Quotations.Where(q => q.Status == "SENT" && q.ClientAcceptedAt != null).OrderBy(q => q.CreatedAt))
+            b.Act(FlowActionKinds.ConfirmClientAcceptance, $"Khách đã đồng ý báo giá {Ref(q)} — xác nhận",
+                new FlowTarget(QuotationId: q.Id));
+        foreach (var q in f.Quotations.Where(q => ClientStatements.IsPending(q.Status, q.PaymentStatus, q.PaymentNoticePurpose))
+                     .OrderBy(q => q.CreatedAt))
+        {
+            var amount = RevisionQuota.Vnd(ClientStatements.Amount(q.PaymentNoticePurpose!, q.Total, q.DepositAmount));
+            var what = q.PaymentNoticePurpose switch
+            {
+                QrPurposes.Deposit => $"cọc {amount}",
+                QrPurposes.Remaining => $"phần còn lại {amount}",
+                _ => $"đủ {amount}",
+            };
+            b.Act(FlowActionKinds.ConfirmClientPayment, $"Khách báo đã chuyển {what} cho {Ref(q)} — kiểm tra & xác nhận",
+                new FlowTarget(QuotationId: q.Id));
+        }
+    }
+
+    /// <summary>Plan 12 BR-48: the portal blocks "Duyệt" while revision items of the deliverable are still open.</summary>
+    private static void ReviewBlockedByRevisions(Builder b, List<FlowDeliverable> active)
+    {
+        foreach (var d in active.Where(d => d.Status == "IN_REVIEW" && d.OpenRevisionItems > 0))
+            b.Warn(FlowWarningKinds.ReviewWithOpenRevisions,
+                $"{d.Name} đang chờ khách duyệt nhưng còn {d.OpenRevisionItems} mục sửa chưa xong — khách chưa duyệt được trên portal",
+                FlowSeverities.Warning);
     }
 
     /// <summary>D-11: a DELIVERED deliverable that still has TODO / IN_PROGRESS revision items should go back to IN_PROGRESS.</summary>

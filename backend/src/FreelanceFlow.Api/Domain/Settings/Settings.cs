@@ -65,5 +65,21 @@ public class Settings
         UpdatedAt = now;
     }
 
+    // Plan 12 (CF-13): shown to the client after a request — "Nhà thiết kế thường phản hồi {PortalResponseTime}"
+    public const string DefaultPortalResponseTime = "trong 24 giờ";
+    public const int MaxPortalResponseTime = 60;
+
+    public string PortalResponseTime { get; set; } = DefaultPortalResponseTime;
+
+    /// <summary>null = keep; blank = back to the default.</summary>
+    public void SetPortalResponseTime(string? text)
+    {
+        if (text is null) return;
+        var trimmed = text.Trim();
+        if (trimmed.Length > MaxPortalResponseTime)
+            throw new DomainException("VALIDATION_FAILED", $"Thời gian phản hồi tối đa {MaxPortalResponseTime} ký tự");
+        PortalResponseTime = trimmed.Length == 0 ? DefaultPortalResponseTime : trimmed;
+    }
+
     public Bank? Bank { get; set; }
 }

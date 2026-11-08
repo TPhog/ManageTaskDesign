@@ -35,6 +35,11 @@ public class Quotation : IAuditable
     public string PaymentStatus { get; set; } = "UNPAID";
     public DateOnly? DepositPaidAt { get; set; }
     public DateOnly? PaidAt { get; set; }
+    // Plan 12 BR-76/77: what the client said on the portal — never a status
+    public DateTimeOffset? ClientAcceptedAt { get; set; }
+    public string? ClientPaymentNoticePurpose { get; set; }
+    public DateTimeOffset? ClientPaymentNoticeAt { get; set; }
+    public string? ClientPaymentNoticeNote { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 
@@ -251,6 +256,45 @@ public class Quotation : IAuditable
         PaymentStatuses.DepositPaid => Total - DepositAmount,
         _ => Total,
     };
+
+    // ---------- Client statements from the portal (Plan 12, BR-76/77; BR-01: recorded, the designer confirms) ----------
+
+    /// <summary>"Đồng ý báo giá". Returns false when already recorded (idempotent).</summary>
+    public bool RecordClientAcceptance(DateOnly today, DateTimeOffset now)
+    {
+        if (Status != QuotationStatuses.Sent)
+            throw new DomainException("INVALID_TRANSITION", "Báo giá không còn chờ bạn đồng ý");
+        if (EffectiveStatus(today) == QuotationStatuses.Expired)
+            throw new DomainException("QUOTATION_EXPIRED", "Báo giá đã hết hạn — vui lòng liên hệ nhà thiết kế để gửi lại");
+        if (ClientAcceptedAt is not null) return false;
+        ClientAcceptedAt = now;
+        return true;
+    }
+
+    public bool ClientAcceptancePending() => Status == QuotationStatuses.Sent && ClientAcceptedAt is not null;
+
+    /// <summary>"Tôi đã chuyển khoản" for one BR-75 option. Same purpose still pending → false; another purpose replaces it.</summary>
+    public bool RecordClientPaymentNotice(string purpose, string? note, DateOnly today, DateTimeOffset now)
+    {
+        if (!ClientStatements.Purposes.Contains(purpose)) throw Invalid("Khoản thanh toán không hợp lệ");
+        var text = string.IsNullOrWhiteSpace(note) ? null : note.Trim();
+        if (text is { Length: > ClientStatements.MaxNote }) throw Invalid($"Ghi chú tối đa {ClientStatements.MaxNote} ký tự");
+        if (PaymentOptions(today).All(o => o.Purpose != purpose))
+            throw new DomainException("PAYMENT_NOT_APPLICABLE", "Khoản này hiện không cần chuyển");
+        if (ClientPaymentNoticePurpose == purpose && PaymentNoticePending()) return false;
+        ClientPaymentNoticePurpose = purpose;
+        ClientPaymentNoticeAt = now;
+        ClientPaymentNoticeNote = text;
+        return true;
+    }
+
+    public bool PaymentNoticePending() => ClientStatements.IsPending(Status, PaymentStatus, ClientPaymentNoticePurpose);
+
+    public ClientPaymentNotice? PaymentNotice() =>
+        ClientPaymentNoticePurpose is { } purpose && ClientPaymentNoticeAt is { } at
+            ? new ClientPaymentNotice(purpose, ClientStatements.Amount(purpose, Total, DepositAmount), at,
+                ClientPaymentNoticeNote, PaymentNoticePending())
+            : null;
 
     // ---------- Read-time state (§8.1, BR-75) ----------
 

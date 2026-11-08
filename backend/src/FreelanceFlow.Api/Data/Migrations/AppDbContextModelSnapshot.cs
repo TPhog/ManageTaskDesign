@@ -727,6 +727,24 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("accepted_note");
 
+                    b.Property<DateTimeOffset?>("ClientAcceptedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("client_accepted_at");
+
+                    b.Property<DateTimeOffset?>("ClientPaymentNoticeAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("client_payment_notice_at");
+
+                    b.Property<string>("ClientPaymentNoticeNote")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("client_payment_notice_note");
+
+                    b.Property<string>("ClientPaymentNoticePurpose")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("client_payment_notice_purpose");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -921,6 +939,10 @@ namespace FreelanceFlow.Api.Data.Migrations
                             t.HasCheckConstraint("ck_quotations_kind", "kind IN ('INITIAL','ADDITIONAL')");
 
                             t.HasCheckConstraint("ck_quotations_payment_accepted", "payment_status = 'UNPAID' OR status = 'ACCEPTED'");
+
+                            t.HasCheckConstraint("ck_quotations_payment_notice_at", "(client_payment_notice_purpose IS NULL) = (client_payment_notice_at IS NULL)");
+
+                            t.HasCheckConstraint("ck_quotations_payment_notice_purpose", "client_payment_notice_purpose IS NULL OR client_payment_notice_purpose IN ('deposit','full','remaining')");
 
                             t.HasCheckConstraint("ck_quotations_payment_status", "payment_status IN ('UNPAID','DEPOSIT_PAID','PAID')");
 
@@ -1386,6 +1408,14 @@ namespace FreelanceFlow.Api.Data.Migrations
                     b.Property<Guid?>("LogoFileId")
                         .HasColumnType("uuid")
                         .HasColumnName("logo_file_id");
+
+                    b.Property<string>("PortalResponseTime")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)")
+                        .HasDefaultValue("trong 24 giờ")
+                        .HasColumnName("portal_response_time");
 
                     b.Property<string>("QuotationPrefix")
                         .IsRequired()
