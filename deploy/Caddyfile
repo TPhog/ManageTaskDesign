@@ -12,6 +12,8 @@ https://{$DOMAIN} {
   }
   # Magic-link landing is an SPA route: serve index.html, never send the token on as Referer
   handle /p/* {
+    # The path carries the magic-link token: keep it out of the access log (07-security §4.3)
+    log_skip
     header Referrer-Policy no-referrer
     root * /srv
     rewrite * /index.html
