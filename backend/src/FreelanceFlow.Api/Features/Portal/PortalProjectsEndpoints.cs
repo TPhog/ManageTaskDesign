@@ -1,6 +1,7 @@
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Projects;
+using FreelanceFlow.Api.Domain.Revisions;
 using FreelanceFlow.Api.Infrastructure.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -69,18 +70,8 @@ public static class PortalProjectsEndpoints
             .Select(d => new { d.Id, d.Name, d.Quantity, d.Status, d.IncludedRounds, d.DueDate })
             .ToListAsync();
 
-        // used_rounds: same rule as the admin project detail (distinct rounds with ≥1 IN_QUOTA item not CANCELLED)
-        var usedRoundsMap = await db.RevisionRounds
-            .Where(r => r.ProjectId == id && r.DeliverableId != null)
-            .GroupBy(r => r.DeliverableId)
-            .Select(g => new
-            {
-                DeliverableId = g.Key!.Value,
-                UsedRounds = g.Count(r =>
-                    db.RevisionItems.Any(i => i.RoundId == r.Id &&
-                                              i.Billing == "IN_QUOTA" &&
-                                              i.WorkStatus != "CANCELLED")),
-            })
+        // used_rounds (docs/04 §4.1): the same single query as the admin side
+        var usedRoundsMap = await RevisionQuota.UsedRounds(db.RevisionRounds.Where(r => r.ProjectId == id), db.RevisionItems)
             .ToDictionaryAsync(x => x.DeliverableId, x => x.UsedRounds);
 
         var deliverableDtos = deliverables.Select(d =>

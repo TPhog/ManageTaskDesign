@@ -1,6 +1,7 @@
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Projects;
+using FreelanceFlow.Api.Domain.Revisions;
 using FreelanceFlow.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -156,14 +157,11 @@ public static class DeliverablesEndpoints
         return Results.Ok(ToDto(deliverable, usedRounds));
     }
 
-    private static async Task<int> ComputeUsedRounds(AppDbContext db, Guid deliverableId)
-    {
-        return await db.RevisionRounds
-            .CountAsync(r => r.DeliverableId == deliverableId &&
-                              db.RevisionItems.Any(i => i.RoundId == r.Id &&
-                                                        i.Billing == "IN_QUOTA" &&
-                                                        i.WorkStatus != "CANCELLED"));
-    }
+    // used_rounds (docs/04 §4.1): the single query lives in Domain/Revisions
+    private static Task<int> ComputeUsedRounds(AppDbContext db, Guid deliverableId) =>
+        RevisionQuota.UsedRounds(db.RevisionRounds.Where(r => r.DeliverableId == deliverableId), db.RevisionItems)
+            .Select(x => x.UsedRounds)
+            .FirstOrDefaultAsync();
 
     private static object ToDto(Deliverable d, int usedRounds) => new
     {
