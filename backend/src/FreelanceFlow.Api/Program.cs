@@ -150,6 +150,7 @@ builder.Services.AddAuthorization(opt =>
 // tests raise both via config
 var loginPermitLimit = builder.Configuration.GetValue("RateLimit:LoginPerMinute", 5);
 var portalSessionPermitLimit = builder.Configuration.GetValue("RateLimit:PortalSessionPerMinute", 10);
+var portalStudioPermitLimit = builder.Configuration.GetValue("RateLimit:PortalStudioPerMinute", 60);
 builder.Services.AddRateLimiter(opt =>
 {
     opt.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
@@ -165,6 +166,14 @@ builder.Services.AddRateLimiter(opt =>
         factory: _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = portalSessionPermitLimit,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
+    opt.AddPolicy("portal-studio", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = portalStudioPermitLimit,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0,
         }));

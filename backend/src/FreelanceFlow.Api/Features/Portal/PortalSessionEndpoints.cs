@@ -27,7 +27,8 @@ public static class PortalSessionEndpoints
 
         // Public on purpose: the studio's own contact (also printed on every quotation), never client data.
         app.MapGet("/api/portal/studio", Studio)
-           .AllowAnonymous();
+           .AllowAnonymous()
+           .RequireRateLimiting("portal-studio");
     }
 
     // 07-security §4.2. Request body (the token) must never be logged.

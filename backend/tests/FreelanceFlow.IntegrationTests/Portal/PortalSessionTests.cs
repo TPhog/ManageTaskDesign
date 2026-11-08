@@ -32,6 +32,18 @@ public class PortalSessionTests(AppFactory factory) : PortalTestBase(factory)
     }
 
     [Fact]
+    public async Task Studio_contact_is_rate_limited_per_ip()
+    {
+        using var limited = Factory.WithWebHostBuilder(b => b.UseSetting("RateLimit:PortalStudioPerMinute", "3"));
+        var bare = limited.CreateClient();
+
+        for (var i = 0; i < 3; i++)
+            (await bare.GetAsync("/api/portal/studio")).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        (await bare.GetAsync("/api/portal/studio")).StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+    }
+
+    [Fact]
     public async Task Unknown_or_malformed_token_returns_generic_401_without_cookie()
     {
         foreach (var token in new[] { new string('A', 43), "not-a-token", "" })
