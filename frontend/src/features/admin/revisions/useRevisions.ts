@@ -33,10 +33,21 @@ function useOnRevisionsChanged() {
   }
 }
 
-export function useRequests(status: RequestStatus) {
+export interface RequestListFilters {
+  q?: string
+  clientId?: string
+  page?: number
+  pageSize?: number
+}
+
+export function useRequests(status: RequestStatus, filters: RequestListFilters = {}) {
+  const search = new URLSearchParams({ status, page: String(filters.page ?? 1), pageSize: String(filters.pageSize ?? 20) })
+  if (filters.q) search.set('q', filters.q)
+  if (filters.clientId) search.set('clientId', filters.clientId)
   return useQuery({
-    queryKey: qk.requests.list(status),
-    queryFn: () => api.get<PagedResult<ClientRequest>>(`/admin/requests?status=${status}&pageSize=100`),
+    queryKey: [...qk.requests.list(status), filters],
+    queryFn: () => api.get<PagedResult<ClientRequest>>(`/admin/requests?${search}`),
+    placeholderData: keepPreviousData,
   })
 }
 

@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -15,12 +15,17 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DateInput } from '@/components/DateInput'
+import { SearchCombobox } from '@/components/SearchCombobox'
 import { api, type ApiError } from '@/lib/api'
 import type { Deliverable } from '@/lib/types'
 
 // Radix Select reserves '' for "no value"
 const NO_SERVICE = '_none'
+
+/** Case- and accent-insensitive match for the local service search ("thiet ke" finds "Thiết kế Logo"). */
+const fold = (s: string) =>
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase()
 
 const schema = z.object({
   name: z.string().min(1, 'Vui lòng nhập tên').max(200),
@@ -95,6 +100,12 @@ export function DeliverableDialog({ projectId, open, onClose, editing }: Props) 
     if (!getValues('name')) setValue('name', svc.name)
   }
 
+  const [serviceSearch, setServiceSearch] = useState('')
+  const serviceOptions = services
+    .filter(s => fold(s.name).includes(fold(serviceSearch.trim())))
+    .map(s => ({ value: s.id, label: s.name }))
+  const serviceId = watch('serviceId')
+
   const mutation = useMutation({
     mutationFn: (v: FormValues) => {
       const dueDate = v.dueDate || null
@@ -146,15 +157,23 @@ export function DeliverableDialog({ projectId, open, onClose, editing }: Props) 
           {!editing && (
             <div className="space-y-2">
               <Label htmlFor="deliverable-service">Dịch vụ mẫu</Label>
-              <Select value={watch('serviceId')} onValueChange={onServiceChange}>
-                <SelectTrigger id="deliverable-service">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NO_SERVICE}>Không dùng dịch vụ mẫu</SelectItem>
-                  {services.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <SearchCombobox
+                id="deliverable-service"
+                value={serviceId === NO_SERVICE ? '' : serviceId}
+                options={serviceOptions}
+                search={serviceSearch}
+                onSearchChange={setServiceSearch}
+                onSelect={o => onServiceChange(o?.value ?? NO_SERVICE)}
+                placeholder="Không dùng dịch vụ mẫu"
+                clearLabel="Không dùng dịch vụ mẫu"
+                searchPlaceholder="Tìm dịch vụ…"
+                emptyText="Không có dịch vụ khớp"
+              />
+              {serviceId === NO_SERVICE && (
+                <p className="text-xs text-muted-foreground">
+                  Không có dịch vụ mẫu thì dòng báo giá của hạng mục này là 0 ₫ — nhập đơn giá trong bản nháp báo giá.
+                </p>
+              )}
             </div>
           )}
 
@@ -186,7 +205,7 @@ export function DeliverableDialog({ projectId, open, onClose, editing }: Props) 
 
           <div className="space-y-2">
             <Label htmlFor="deliverable-dueDate">Hạn bàn giao</Label>
-            <Input id="deliverable-dueDate" type="date" {...register('dueDate')} />
+            <DateInput id="deliverable-dueDate" value={watch('dueDate') ?? ''} onChange={v => setValue('dueDate', v, { shouldDirty: true })} />
           </div>
 
           <DialogFooter className="gap-2 pt-2">

@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test'
 import { createProject, expectToast, selectOption } from './helpers'
+import { pickOption } from './comboboxHelpers'
 import { createQuotaDeliverable, createRequest } from './revisionHelpers'
 
 test.describe('Requests inbox', () => {
@@ -12,7 +13,7 @@ test.describe('Requests inbox', () => {
     await page.goto('/admin/requests')
     await page.getByRole('button', { name: 'Ghi nhận yêu cầu' }).click()
     const dialog = page.getByRole('dialog', { name: 'Ghi nhận yêu cầu' })
-    await selectOption(page, 'Dự án', projectName)
+    await pickOption(page, 'Dự án', projectName)
     await selectOption(page, 'Hạng mục (tuỳ chọn)', 'Logo E2E')
     await dialog.getByLabel('Nội dung yêu cầu').fill('Đổi màu chữ sang xanh navy')
     await dialog.getByRole('button', { name: 'Ghi nhận', exact: true }).click()

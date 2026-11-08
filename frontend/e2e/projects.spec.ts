@@ -35,7 +35,9 @@ test.describe('Projects — List & Gantt', () => {
     await page.getByRole('dialog').getByRole('button', { name: 'Tạo dự án' }).click()
 
     await expectToast(page, 'Đã tạo dự án')
-    await expect(page.getByRole('link', { name: projectName })).toBeVisible()
+    // QA D-21: the new project opens on its Deliverables tab
+    await expect(page).toHaveURL(/\/admin\/projects\/[0-9a-f-]{36}\?tab=deliverables$/)
+    await expect(page.getByRole('heading', { name: projectName, level: 1 })).toBeVisible()
   })
 
   test('rejects a deadline before the start date', async ({ page }) => {

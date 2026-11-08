@@ -3,7 +3,8 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   closestCorners,
   pointerWithin,
   useDroppable,
@@ -52,7 +53,9 @@ export function TaskBoard({ projectId, tasks, onOpen }: Props) {
   const [activeId, setActiveId] = useState<string | null>(null)
   const sensors = useSensors(
     // 5px threshold: a plain click on the card still opens the drawer
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    // QA D-15: on touch a long press (250 ms) picks the card up, so a swipe still scrolls the board
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
   const today = todayVn()
@@ -188,7 +191,7 @@ function SortableCard({ task, today, onOpen, onMoveTo }: CardProps) {
             {...attributes}
             aria-roledescription="thẻ kéo thả"
             aria-label={`Kéo thẻ ${task.title}`}
-            className="-ml-1 mt-0.5 cursor-grab rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="-my-2.5 -ml-2.5 inline-flex h-11 w-11 shrink-0 cursor-grab touch-none items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:my-0 sm:-ml-1 sm:mt-0.5 sm:h-5 sm:w-5"
           >
             <GripVertical className="h-4 w-4" aria-hidden="true" />
           </button>
@@ -196,7 +199,7 @@ function SortableCard({ task, today, onOpen, onMoveTo }: CardProps) {
         menu={
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="-mr-1 -mt-1 h-7 w-7 shrink-0" aria-label={`Tuỳ chọn ${task.title}`}>
+              <Button variant="ghost" size="icon" className="-my-2.5 -mr-2.5 h-11 w-11 shrink-0 sm:my-0 sm:-mr-1 sm:-mt-1 sm:h-7 sm:w-7" aria-label={`Tuỳ chọn ${task.title}`}>
                 <MoreHorizontal aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>

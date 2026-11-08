@@ -13,11 +13,13 @@ import {
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
+import { SearchCombobox } from '@/components/SearchCombobox'
 import { api, type ApiError } from '@/lib/api'
+import { useProjectOptions } from '@/lib/pickers'
 import { qk } from '@/lib/queryKeys'
 import { designerSources, requestSourceLabel } from '@/lib/revisionLabels'
 import type { DesignerRequestSource } from '@/lib/revisionTypes'
-import type { PagedResult, ProjectDetail, ProjectListItem } from '@/lib/types'
+import type { ProjectDetail } from '@/lib/types'
 import { errorText } from '@/features/admin/revisions/revisionUtils'
 import { useCreateRequest } from '@/features/admin/revisions/useRevisions'
 
@@ -47,21 +49,20 @@ export function CreateRequestDialog({ open, onClose, onCreated }: Props) {
 
 function CreateRequestForm({ onClose, onCreated }: Omit<Props, 'open'>) {
   const [projectId, setProjectId] = useState('')
+  const [projectLabel, setProjectLabel] = useState('')
+  const [projectSearch, setProjectSearch] = useState('')
   const [deliverableId, setDeliverableId] = useState(NO_DELIVERABLE)
   const [source, setSource] = useState<DesignerRequestSource>('ZALO')
   const [content, setContent] = useState('')
   const create = useCreateRequest()
+  // QA D-07/D-28: searchable by project or client name, newest first, not capped at 100
+  const projects = useProjectOptions(projectSearch)
 
-  const { data: projects } = useQuery({
-    queryKey: [...qk.projects.all, 'request-picker'],
-    queryFn: () => api.get<PagedResult<ProjectListItem>>('/admin/projects?pageSize=100'),
-  })
   const { data: project } = useQuery({
     queryKey: qk.projects.detail(projectId),
     queryFn: () => api.get<ProjectDetail>(`/admin/projects/${projectId}`),
     enabled: !!projectId,
   })
-  const choices = (projects?.items ?? []).filter(p => p.status !== 'CANCELLED')
   const deliverables = (project?.deliverables ?? []).filter(d => d.status !== 'CANCELLED')
 
   function submit(e: FormEvent) {
@@ -85,14 +86,23 @@ function CreateRequestForm({ onClose, onCreated }: Omit<Props, 'open'>) {
     <form onSubmit={submit} className="space-y-4 py-2" noValidate>
       <div className="space-y-2">
         <Label htmlFor="request-project">Dự án</Label>
-        <Select value={projectId} onValueChange={v => { setProjectId(v); setDeliverableId(NO_DELIVERABLE) }}>
-          <SelectTrigger id="request-project">
-            <SelectValue placeholder="Chọn dự án" />
-          </SelectTrigger>
-          <SelectContent>
-            {choices.map(p => <SelectItem key={p.id} value={p.id}>{p.name} — {p.client.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <SearchCombobox
+          id="request-project"
+          value={projectId}
+          selectedLabel={projectLabel}
+          options={projects.options}
+          loading={projects.loading}
+          search={projectSearch}
+          onSearchChange={setProjectSearch}
+          onSelect={o => {
+            setProjectId(o?.value ?? '')
+            setProjectLabel(o ? `${o.label}${o.hint ? ` — ${o.hint}` : ''}` : '')
+            setDeliverableId(NO_DELIVERABLE)
+          }}
+          placeholder="Chọn dự án"
+          searchPlaceholder="Tìm dự án hoặc khách…"
+          emptyText="Không có dự án khớp"
+        />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">

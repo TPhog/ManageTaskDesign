@@ -13,11 +13,14 @@ import type {
 } from '@/lib/types'
 
 function toQuery(params: TaskListParams): string {
-  // pageSize is capped at 100 by the API (docs/05 §1.3)
-  const search = new URLSearchParams({ pageSize: '100' })
+  // pageSize is capped at 100 by the API (docs/05 §1.3); the Kanban of one project loads 100
+  const search = new URLSearchParams({ pageSize: String(params.pageSize ?? 100) })
+  if (params.page) search.set('page', String(params.page))
   if (params.projectId) search.set('projectId', params.projectId)
   if (params.status) search.set('status', params.status)
   if (params.due) search.set('due', params.due)
+  if (params.q) search.set('q', params.q)
+  if (params.clientId) search.set('clientId', params.clientId)
   return search.toString()
 }
 
@@ -40,6 +43,15 @@ export function useTaskList(params: TaskListParams) {
   return useQuery({
     queryKey: qk.tasks.list(params),
     queryFn: () => api.get<PagedResult<TaskListItem>>(`/admin/tasks?${toQuery(params)}`),
+  })
+}
+
+/** QA D-18: how many tasks a quick filter holds, without loading them (pageSize=1). */
+export function useTaskCount(params: TaskListParams) {
+  return useQuery({
+    queryKey: [...qk.tasks.lists, 'count', params],
+    queryFn: () => api.get<PagedResult<TaskListItem>>(`/admin/tasks?${toQuery({ ...params, page: 1, pageSize: 1 })}`),
+    select: d => d.total,
   })
 }
 

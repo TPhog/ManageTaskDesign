@@ -193,14 +193,16 @@ test.describe('All tasks page', () => {
     await createTask(page, projectId, { title: overdue, dueDate: addDaysIso(today, -1) })
 
     await page.goto('/admin/tasks')
+    // the dev DB holds many tasks due today: narrow to this test's own tasks (QA D-06)
+    await page.getByRole('textbox', { name: 'Tìm công việc' }).fill(String(stamp))
     const filters = page.getByRole('group', { name: 'Lọc nhanh' })
 
-    await filters.getByRole('button', { name: 'Hôm nay', exact: true }).click()
+    await filters.getByRole('button', { name: /^Hôm nay/ }).click()
     await expect(page).toHaveURL(/due=today/)
     await expect(page.getByRole('row', { name: new RegExp(dueToday) })).toContainText('Hôm nay')
     await expect(page.getByRole('row', { name: new RegExp(overdue) })).toHaveCount(0)
 
-    await filters.getByRole('button', { name: 'Quá hạn', exact: true }).click()
+    await filters.getByRole('button', { name: /^Quá hạn/ }).click()
     await expect(page).toHaveURL(/due=overdue/)
     const overdueRow = page.getByRole('row', { name: new RegExp(overdue) })
     await expect(overdueRow).toContainText('Quá hạn')

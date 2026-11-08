@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Link } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useNavigate } from 'react-router-dom'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -16,8 +17,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { DateInput } from '@/components/DateInput'
+import { SearchCombobox } from '@/components/SearchCombobox'
 import { api, emptyToNull } from '@/lib/api'
-import type { ClientListItem } from '@/lib/types'
+import { useClientOptions } from '@/lib/pickers'
 
 const schema = z.object({
   clientId: z.string().min(1, 'Chọn khách hàng'),
@@ -51,13 +54,11 @@ interface Props {
 
 export function CreateProjectDialog({ open, onClose }: Props) {
   const qc = useQueryClient()
-
-  const { data: clientsData, isLoading: loadingClients } = useQuery({
-    queryKey: ['clients', 'active'],
-    queryFn: () => api.get<{ items: ClientListItem[] }>('/admin/clients?status=ACTIVE&pageSize=100'),
-    enabled: open,
-  })
-  const clients = clientsData?.items ?? []
+  const navigate = useNavigate()
+  const [clientSearch, setClientSearch] = useState('')
+  const [clientLabel, setClientLabel] = useState('')
+  // QA D-07: searchable, newest clients first, not capped at 100
+  const clients = useClientOptions(clientSearch, open)
 
   const {
     register,
@@ -68,17 +69,24 @@ export function CreateProjectDialog({ open, onClose }: Props) {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { clientId: '', designType: 'OTHER' },
+    defaultValues: { clientId: '', designType: 'OTHER', startDate: '', dueDate: '' },
   })
 
+  function close() {
+    reset()
+    setClientLabel('')
+    setClientSearch('')
+    onClose()
+  }
+
   const mutation = useMutation({
-    // date inputs yield '' when left blank; the API expects null for "no date"
-    mutationFn: (body: FormValues) => api.post('/admin/projects', emptyToNull(body)),
-    onSuccess: () => {
+    // blank dates are '' in the form; the API expects null for "no date"
+    mutationFn: (body: FormValues) => api.post<{ id: string }>('/admin/projects', emptyToNull(body)),
+    onSuccess: created => {
       qc.invalidateQueries({ queryKey: ['projects'] })
       toast.success('Đã tạo dự án')
-      reset()
-      onClose()
+      close()
+      navigate(`/admin/projects/${created.id}?tab=deliverables`) // QA D-21: continue with the deliverables
     },
     onError: () => toast.error('Không thể tạo dự án. Vui lòng thử lại.'),
   })
@@ -87,7 +95,7 @@ export function CreateProjectDialog({ open, onClose }: Props) {
     message ? <p id={id} className="text-sm text-destructive">{message}</p> : null
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
+    <Dialog open={open} onOpenChange={v => { if (!v) close() }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Tạo dự án mới</DialogTitle>
@@ -96,26 +104,28 @@ export function CreateProjectDialog({ open, onClose }: Props) {
         <form onSubmit={handleSubmit(d => mutation.mutate(d))} className="space-y-5 py-2" noValidate>
           <div className="space-y-2">
             <Label htmlFor="project-client">Khách hàng <span className="text-destructive">*</span></Label>
-            <Select value={watch('clientId')} onValueChange={v => setValue('clientId', v, { shouldValidate: true })}>
-              <SelectTrigger
-                id="project-client"
-                aria-invalid={!!errors.clientId}
-                aria-describedby={errors.clientId ? 'project-client-error' : undefined}
-              >
-                <SelectValue placeholder={loadingClients ? 'Đang tải…' : 'Chọn khách hàng'} />
-              </SelectTrigger>
-              <SelectContent>
-                {clients.map(c => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}{c.company ? ` — ${c.company}` : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {!loadingClients && clients.length === 0 && (
+            <SearchCombobox
+              id="project-client"
+              value={watch('clientId')}
+              selectedLabel={clientLabel}
+              options={clients.options}
+              loading={clients.loading}
+              search={clientSearch}
+              onSearchChange={setClientSearch}
+              onSelect={o => {
+                setValue('clientId', o?.value ?? '', { shouldValidate: true })
+                setClientLabel(o?.label ?? '')
+              }}
+              placeholder="Chọn khách hàng"
+              searchPlaceholder="Tìm tên, công ty, SĐT…"
+              emptyText="Không có khách khớp"
+              invalid={!!errors.clientId}
+              describedBy={errors.clientId ? 'project-client-error' : undefined}
+            />
+            {!clients.loading && clients.total === 0 && !clientSearch && (
               <p className="text-sm text-muted-foreground">
                 Chưa có khách đang hoạt động.{' '}
-                <Link to="/admin/clients" onClick={onClose} className="font-medium text-primary hover:underline">
+                <Link to="/admin/clients" onClick={close} className="font-medium text-primary hover:underline">
                   Thêm khách trước
                 </Link>
               </p>
@@ -155,23 +165,23 @@ export function CreateProjectDialog({ open, onClose }: Props) {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="project-start">Ngày bắt đầu</Label>
-              <Input id="project-start" type="date" {...register('startDate')} />
+              <DateInput id="project-start" value={watch('startDate') ?? ''} onChange={v => setValue('startDate', v, { shouldDirty: true })} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="project-due">Deadline</Label>
-              <Input
+              <DateInput
                 id="project-due"
-                type="date"
-                aria-invalid={!!errors.dueDate}
-                aria-describedby={errors.dueDate ? 'project-due-error' : undefined}
-                {...register('dueDate')}
+                value={watch('dueDate') ?? ''}
+                onChange={v => setValue('dueDate', v, { shouldDirty: true })}
+                invalid={!!errors.dueDate}
+                describedBy={errors.dueDate ? 'project-due-error' : undefined}
               />
               {fieldError('project-due-error', errors.dueDate?.message)}
             </div>
           </div>
 
           <DialogFooter className="gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose}>Huỷ</Button>
+            <Button type="button" variant="outline" onClick={close}>Huỷ</Button>
             <Button type="submit" disabled={mutation.isPending}>
               {mutation.isPending ? 'Đang tạo…' : 'Tạo dự án'}
             </Button>
