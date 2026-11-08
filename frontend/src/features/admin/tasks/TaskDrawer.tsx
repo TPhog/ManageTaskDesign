@@ -1,0 +1,217 @@
+import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import { useQuery } from '@tanstack/react-query'
+import { Trash2 } from 'lucide-react'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Skeleton } from '@/components/ui/skeleton'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { api } from '@/lib/api'
+import { qk } from '@/lib/queryKeys'
+import type { ProjectDetail, TaskDetail } from '@/lib/types'
+import { TaskChecklist } from './TaskChecklist'
+import { TASK_PRIORITIES, TASK_STATUSES, taskPriorityLabel, taskStatusLabel } from './taskUtils'
+import { useDeleteTask, useTask, useUpdateTask } from './useTasks'
+
+// Radix Select reserves '' for "no value"
+const NO_DELIVERABLE = '_none'
+
+const schema = z.object({
+  title: z.string().trim().min(1, 'Vui lòng nhập tiêu đề').max(200, 'Tối đa 200 ký tự'),
+  description: z.string(),
+  status: z.enum(['TODO', 'IN_PROGRESS', 'REVIEW', 'DONE', 'BLOCKED']),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
+  startDate: z.string(),
+  dueDate: z.string(),
+  deliverableId: z.string(),
+})
+type FormValues = z.infer<typeof schema>
+
+interface Props {
+  /** null = closed */
+  taskId: string | null
+  onClose: () => void
+}
+
+export function TaskDrawer({ taskId, onClose }: Props) {
+  const { data: task, isLoading, isError } = useTask(taskId)
+
+  return (
+    <Sheet open={!!taskId} onOpenChange={open => { if (!open) onClose() }}>
+      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
+        <SheetHeader className="pr-8">
+          <SheetTitle>Chi tiết công việc</SheetTitle>
+          <SheetDescription>
+            {task ? (
+              <Link to={`/admin/projects/${task.projectId}?tab=tasks`} className="hover:text-foreground hover:underline">
+                {task.projectName}
+              </Link>
+            ) : (
+              'Đang tải…'
+            )}
+          </SheetDescription>
+        </SheetHeader>
+
+        {isLoading ? (
+          <div className="mt-6 space-y-3">
+            <Skeleton className="h-10 w-full" />
+            <Skeleton className="h-24 w-full" />
+            <Skeleton className="h-10 w-2/3" />
+          </div>
+        ) : isError || !task ? (
+          <p className="mt-6 text-sm text-muted-foreground">Không tải được công việc — có thể nó đã bị xoá.</p>
+        ) : (
+          <div className="mt-6 space-y-8">
+            {/* remount after each save so the form shows the server's values */}
+            <TaskForm key={`${task.id}-${task.updatedAt}`} task={task} onDeleted={onClose} />
+            <TaskChecklist task={task} />
+          </div>
+        )}
+      </SheetContent>
+    </Sheet>
+  )
+}
+
+function TaskForm({ task, onDeleted }: { task: TaskDetail; onDeleted: () => void }) {
+  const update = useUpdateTask(task.id)
+  const remove = useDeleteTask()
+  const [confirmDelete, setConfirmDelete] = useState(false)
+
+  const { data: project } = useQuery({
+    queryKey: qk.projects.detail(task.projectId),
+    queryFn: () => api.get<ProjectDetail>(`/admin/projects/${task.projectId}`),
+  })
+  const deliverables = project?.deliverables ?? []
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { register, handleSubmit, watch, setValue, formState: { errors, isDirty } } = useForm<FormValues>({
+    resolver: zodResolver(schema) as any,
+    defaultValues: {
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      priority: task.priority,
+      startDate: task.startDate ?? '',
+      dueDate: task.dueDate ?? '',
+      deliverableId: task.deliverableId ?? NO_DELIVERABLE,
+    },
+  })
+
+  function onSubmit(v: FormValues) {
+    update.mutate({
+      title: v.title,
+      description: v.description,
+      status: v.status,
+      priority: v.priority,
+      startDate: v.startDate || null,
+      dueDate: v.dueDate || null,
+      deliverableId: v.deliverableId === NO_DELIVERABLE ? null : v.deliverableId,
+    })
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5" noValidate>
+      <div className="space-y-2">
+        <Label htmlFor="task-title">Tiêu đề</Label>
+        <Input
+          id="task-title"
+          aria-invalid={!!errors.title}
+          aria-describedby={errors.title ? 'task-title-error' : undefined}
+          {...register('title')}
+        />
+        {errors.title && <p id="task-title-error" className="text-sm text-destructive">{errors.title.message}</p>}
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="space-y-2">
+          <Label htmlFor="task-status">Trạng thái</Label>
+          <Select
+            value={watch('status')}
+            onValueChange={v => setValue('status', v as FormValues['status'], { shouldDirty: true })}
+          >
+            <SelectTrigger id="task-status"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {TASK_STATUSES.map(s => <SelectItem key={s} value={s}>{taskStatusLabel[s]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="task-priority">Ưu tiên</Label>
+          <Select
+            value={watch('priority')}
+            onValueChange={v => setValue('priority', v as FormValues['priority'], { shouldDirty: true })}
+          >
+            <SelectTrigger id="task-priority"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {TASK_PRIORITIES.map(p => <SelectItem key={p} value={p}>{taskPriorityLabel[p]}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="task-startDate">Ngày bắt đầu</Label>
+          <Input id="task-startDate" type="date" {...register('startDate')} />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="task-dueDate">Hạn hoàn thành</Label>
+          <Input id="task-dueDate" type="date" {...register('dueDate')} />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="task-deliverable">Hạng mục</Label>
+        <Select
+          value={watch('deliverableId')}
+          onValueChange={v => setValue('deliverableId', v, { shouldDirty: true })}
+        >
+          <SelectTrigger id="task-deliverable"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={NO_DELIVERABLE}>Không gắn hạng mục</SelectItem>
+            {deliverables.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="task-description">Mô tả</Label>
+        <Textarea id="task-description" rows={5} placeholder="Ghi chú, link tham khảo…" {...register('description')} />
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+        {confirmDelete ? (
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={remove.isPending}
+              onClick={() => remove.mutate(task.id, { onSuccess: onDeleted })}
+            >
+              Xác nhận xoá
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>Huỷ</Button>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="text-red-700 hover:bg-red-50 hover:text-red-700"
+            onClick={() => setConfirmDelete(true)}
+          >
+            <Trash2 aria-hidden="true" />
+            Xoá công việc
+          </Button>
+        )}
+        <Button type="submit" disabled={!isDirty || update.isPending}>
+          {update.isPending ? 'Đang lưu…' : 'Lưu thay đổi'}
+        </Button>
+      </div>
+    </form>
+  )
+}

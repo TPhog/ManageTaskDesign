@@ -78,3 +78,12 @@ export async function moveDeliverable(page: Page, deliverableId: string, ...stat
     await apiPost(page.request, page, `/api/admin/deliverables/${deliverableId}/status`, { to })
   }
 }
+
+/** Create a task in a project through the API; returns its id. */
+export async function createTask(
+  page: Page,
+  projectId: string,
+  body: { title: string; status?: string; dueDate?: string },
+): Promise<string> {
+  return (await apiPost(page.request, page, `/api/admin/projects/${projectId}/tasks`, body)).id
+}

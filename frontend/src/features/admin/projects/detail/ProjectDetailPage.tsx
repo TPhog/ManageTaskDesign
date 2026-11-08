@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, History, SearchX } from 'lucide-react'
 import { toast } from 'sonner'
@@ -17,6 +17,7 @@ import { formatDate } from '@/lib/format'
 import { api, type ApiError } from '@/lib/api'
 import { BriefTab } from './BriefTab'
 import { DeliverablesTab } from './DeliverablesTab'
+import { TasksTab } from './TasksTab'
 import type { ProjectDetail, ProjectStatus } from '@/lib/types'
 
 const designTypeLabel: Record<string, string> = {
@@ -61,6 +62,8 @@ function InfoItem({ label, value }: { label: string; value: string }) {
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
+  // ?tab=tasks deep-links into a tab (used by the all-tasks page)
+  const [searchParams] = useSearchParams()
 
   const { data: project, isLoading, error } = useQuery({
     queryKey: ['projects', id],
@@ -168,11 +171,12 @@ export default function ProjectDetailPage() {
       </div>
 
       {/* tabs */}
-      <Tabs defaultValue="overview">
+      <Tabs defaultValue={searchParams.get('tab') ?? 'overview'}>
         <TabsList className="h-auto w-full justify-start overflow-x-auto sm:w-auto">
           <TabsTrigger value="overview">Tổng quan</TabsTrigger>
           <TabsTrigger value="deliverables">Deliverables ({project.deliverables.length})</TabsTrigger>
           <TabsTrigger value="brief">Brief</TabsTrigger>
+          <TabsTrigger value="tasks">Công việc</TabsTrigger>
           <TabsTrigger value="activity">Lịch sử</TabsTrigger>
         </TabsList>
 
@@ -205,6 +209,10 @@ export default function ProjectDetailPage() {
             projectId={project.id}
             brief={project.brief}
           />
+        </TabsContent>
+
+        <TabsContent value="tasks" className="mt-4">
+          <TasksTab project={project} />
         </TabsContent>
 
         <TabsContent value="activity" className="mt-4">
