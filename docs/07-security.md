@@ -54,6 +54,13 @@ URL        = {PublicBaseUrl}/p/{token}
    `portal_token_version` khớp → nếu không: 401, xóa cookie.
 5. Sai token → `401` thông điệp chung "Liên kết không hợp lệ hoặc đã hết hạn", rate limit 10/phút/IP.
 
+### 4.2.1 Endpoint công khai `GET /api/portal/studio`
+
+- `AllowAnonymous` có chủ đích: trang đăng xuất / link hết hạn / link sai cần hiện cách liên hệ studio.
+- Chỉ trả **3 trường**: `displayName`, `contactPhone`, `contactEmail` — cùng dữ liệu đã in trên mọi báo giá;
+  tuyệt đối không thêm dữ liệu khách, ngân hàng hay cài đặt khác (có test khóa danh sách trường).
+- Rate limit cố định 60 request/phút/IP (`RateLimit:PortalStudioPerMinute`, nới ở Development) → `429`.
+
 ### 4.3 Header bảo vệ link
 
 - Trang `/p/*`: `Referrer-Policy: no-referrer`, không tải tài nguyên bên thứ ba (tránh rò token qua Referer).

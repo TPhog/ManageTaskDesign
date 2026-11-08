@@ -230,6 +230,30 @@ Liên kết revision ↔ báo giá qua các version (BR-47):
 }
 ```
 
+### 3.13 Endpoint bổ sung (Search, Flow, Images, Storage, Watermark, Notes)
+
+Tất cả dưới `/api/admin/*`, cookie `Designer`; POST/PUT/PATCH/DELETE cần CSRF header.
+
+| Method | Path | Ghi chú |
+|---|---|---|
+| GET | `/api/admin/search?q=` | Tìm nhanh header: `{ clients, projects, quotations }`, tối đa 5/nhóm; q 2–100 ký tự, không phân biệt hoa/thường/dấu; SĐT bỏ qua khoảng trắng, `.`, `-` |
+| GET | `/api/admin/projects/{id}/flow` | Các bước luồng dự án (ProjectFlow) và bước hiện tại |
+| GET | `/api/admin/flow/actions` | Danh sách việc cần làm tiếp theo trên mọi dự án |
+| GET | `/api/admin/projects/{id}/start-preview` | Cảnh báo trước khi bắt đầu (vd chưa có báo giá gốc được chấp nhận) |
+| POST | `/api/admin/projects/{id}/start` | DRAFT/QUOTED → IN_PROGRESS; cảnh báo không chặn |
+| POST | `/api/admin/deliverables/{id}/submit-review` · `confirm-approval` | Gửi khách duyệt / designer xác nhận duyệt thay khách |
+| POST | `/api/admin/projects/{projectId}/progress-updates` | Cập nhật tiến độ hiển thị cho khách |
+| GET/POST | `/api/admin/tasks/{id}/notes` | Ghi chú task |
+| PUT/DELETE | `/api/admin/tasks/{id}/notes/{noteId}` | |
+| POST/GET | `/api/admin/tasks/{taskId}/images` | Upload (multipart) / liệt kê ảnh của task; chặn upload khi dung lượng ≥ 90% |
+| GET | `/api/admin/projects/{projectId}/images` | Ảnh theo dự án |
+| PATCH/DELETE | `/api/admin/images/{id}` | Sửa metadata / xóa |
+| POST | `/api/admin/images/bulk-delete` | Xóa nhiều ảnh |
+| GET | `/api/admin/images/{id}/{variant}` | Stream ảnh theo biến thể |
+| GET | `/api/admin/storage/usage` | Dung lượng đã dùng / hạn mức |
+| GET | `/api/admin/storage/images` | Liệt kê ảnh theo dung lượng để dọn |
+| GET/PUT | `/api/admin/settings/watermark` | Cấu hình watermark ảnh (`enabled`, `text`, `opacityPercent`); policy `DesignerOnly` |
+
 ## 4. Portal API
 
 Mọi endpoint lấy `clientId` **từ session**, không nhận `clientId` từ client.
@@ -249,6 +273,10 @@ Mọi endpoint lấy `clientId` **từ session**, không nhận `clientId` từ 
 | GET | `/api/portal/quotations/{id}` | `snapshot` + `effectiveStatus` + `paymentStatus` + `qrOptions` + `versions: [{version, status}]` |
 | GET | `/api/portal/quotations/{id}/versions/{version}` | Xem bản SUPERSEDED (lịch sử) |
 | GET | `/api/portal/quotations/{id}/qr/{purpose}.png` | Tải ảnh QR |
+| GET | `/api/portal/studio` | **Public** (`AllowAnonymous`, không cần session): `{ displayName, contactPhone, contactEmail }` — cho trang hết hạn/link lỗi. Rate limit 60/phút/IP (`RateLimit:PortalStudioPerMinute`) |
+| GET | `/api/portal/projects/{id}/images` | Ảnh dự án được chia sẻ cho khách (scope theo `clientId`) |
+| GET | `/api/portal/images/{id}/{variant}` | Stream ảnh; ngoài scope → 404 |
+| POST | `/api/portal/deliverables/{id}/approve` | Khách duyệt hạng mục đang chờ duyệt; ngoài scope → 404 |
 | GET | `/api/portal/requests?projectId=` | `[{ id, createdAt, content, status, declineReason, attachments }]` |
 | POST | `/api/portal/projects/{id}/requests` | multipart `content`, `deliverableId?`, `files[]` (≤ 10, ≤ 20MB/file) — BR-53/54 |
 
