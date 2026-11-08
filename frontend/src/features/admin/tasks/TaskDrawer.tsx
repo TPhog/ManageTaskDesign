@@ -18,6 +18,7 @@ import { api } from '@/lib/api'
 import { qk } from '@/lib/queryKeys'
 import type { ProjectDetail, TaskDetail } from '@/lib/types'
 import { TaskChecklist } from './TaskChecklist'
+import { TaskImages } from './TaskImages'
 import { TaskNotes } from './TaskNotes'
 import { TASK_PRIORITIES, TASK_STATUSES, taskPriorityLabel, taskStatusLabel } from './taskUtils'
 import { useDirtyMap, useReportDirty } from './useDirtyMap'
@@ -96,6 +97,7 @@ export function TaskDrawer({ taskId, onClose }: Props) {
             {/* remount after each save so the form shows the server's values */}
             <TaskForm key={`${task.id}-${task.updatedAt}`} task={task} onDeleted={onClose} onDirtyChange={reportForm} />
             <TaskChecklist task={task} onDirtyChange={reportChecklist} />
+            <TaskImages taskId={task.id} />
             <TaskNotes taskId={task.id} onDirtyChange={reportNotes} />
           </div>
         )}

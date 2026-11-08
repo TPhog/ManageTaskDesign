@@ -55,7 +55,22 @@ export const qk = {
     progress: (projectId: string) => ['revisions', 'progress', projectId] as const,
   },
 
+  images: {
+    all:     ['images']                                                                 as const,
+    task:    (taskId: string) => ['images', 'task', taskId]                             as const,
+    project: (projectId: string, ownerType?: string) => ['images', 'project', projectId, ownerType ?? 'all'] as const,
+  },
+
+  storage: {
+    all:    ['storage']                                       as const,
+    usage:  ['storage', 'usage']                              as const,
+    images: (params: object) => ['storage', 'images', params] as const,
+  },
+
+  watermark: ['settings', 'watermark'] as const,
+
   portal: {
+    images:   (id: string) => ['portal', 'projects', id, 'images']    as const,
     me:       ['portal', 'me']                                         as const,
     studio:   ['portal', 'studio']                                     as const,
     projects: ['portal', 'projects']                                   as const,

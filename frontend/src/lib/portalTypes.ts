@@ -1,3 +1,4 @@
+import type { PortalImage } from './imageTypes'
 import type { DeliverableStatus, DesignType, ProjectStatus } from './types'
 import type {
   EffectiveStatus,
@@ -89,6 +90,8 @@ export interface PortalTimelineItem {
   message: string
   /** MESSAGE = the designer's progress update, EVENT = an automatic status line (QA C-12) */
   kind: 'MESSAGE' | 'EVENT'
+  /** progress-update photos (preview/thumb only); [] otherwise */
+  images: PortalImage[]
 }
 
 /** GET /api/portal/quotations — every figure comes from the snapshot (BR-39); never DRAFT or SUPERSEDED. */
@@ -136,6 +139,8 @@ export interface PortalRequestAttachment {
   id: string
   originalName: string
   contentType: string
+  thumbUrl: string | null
+  previewUrl: string | null
 }
 
 /** GET /api/portal/requests — the client's own requests, newest first */

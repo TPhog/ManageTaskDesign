@@ -1,7 +1,7 @@
 import { zaloUrl } from '@/features/portal/contact'
 import { groupTimeline, timeOfDay, vnDay } from '@/features/portal/timeline'
 
-const item = (occurredAt: string, message: string) => ({ occurredAt, message, kind: 'EVENT' as const })
+const item = (occurredAt: string, message: string) => ({ occurredAt, message, kind: 'EVENT' as const, images: [] })
 
 describe('groupTimeline (QA C-12)', () => {
   const now = new Date('2026-11-08T05:00:00Z') // 12:00 in Vietnam

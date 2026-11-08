@@ -9,6 +9,9 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { BillingChip } from '@/components/BillingChip'
 import { ReasonDialog } from '@/components/ReasonDialog'
 import { StatusBadge } from '@/components/StatusBadge'
+import { ImageGrid } from '@/components/ImageGrid'
+import { ImageLightbox } from '@/components/ImageLightbox'
+import type { LightboxImage } from '@/lib/imageTypes'
 import { api, type ApiError } from '@/lib/api'
 import { formatDate, formatDatetime } from '@/lib/format'
 import { qk } from '@/lib/queryKeys'
@@ -72,16 +75,7 @@ function RequestSheetBody({ requestId }: { requestId: string }) {
         {r.deliverableName && <span className="text-xs text-muted-foreground">Hạng mục khách chọn: {r.deliverableName}</span>}
       </div>
       <p className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm text-foreground">{r.content}</p>
-      {r.attachments.length > 0 && (
-        <ul className="space-y-1 text-sm">
-          {r.attachments.map(a => (
-            <li key={a.id} className="flex items-center gap-2 text-muted-foreground">
-              <FileText className="h-4 w-4" aria-hidden="true" />
-              {a.originalName}
-            </li>
-          ))}
-        </ul>
-      )}
+      <RequestAttachments attachments={r.attachments} />
       {r.status === 'NEW' && <TriagePanel detail={data} />}
       {r.status === 'DECLINED' && (
         <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">Lý do từ chối: {r.declineReason}</p>
@@ -204,5 +198,31 @@ function TriagedSummary({ detail }: { detail: RequestDetail }) {
         <Link to={`/admin/projects/${r.projectId}?tab=revisions`}>Mở tab Yêu cầu & Revision</Link>
       </Button>
     </section>
+  )
+}
+
+/** Client photos (plan 08): thumbnails, and the unwatermarked original in the viewer; legacy files stay a name list. */
+function RequestAttachments({ attachments }: { attachments: RequestDetail['request']['attachments'] }) {
+  const [open, setOpen] = useState<number | null>(null)
+  if (attachments.length === 0) return null
+  const images: LightboxImage[] = attachments
+    .filter(a => a.thumbUrl && a.originalUrl)
+    .map(a => ({ id: a.id, src: a.originalUrl!, thumbSrc: a.thumbUrl!, alt: a.originalName }))
+  const others = attachments.filter(a => !a.thumbUrl)
+  return (
+    <div className="space-y-2">
+      {images.length > 0 && <ImageGrid images={images} onOpen={setOpen} className="grid-cols-4" />}
+      {others.length > 0 && (
+        <ul className="space-y-1 text-sm">
+          {others.map(a => (
+            <li key={a.id} className="flex items-center gap-2 text-muted-foreground">
+              <FileText className="h-4 w-4" aria-hidden="true" />
+              {a.originalName}
+            </li>
+          ))}
+        </ul>
+      )}
+      <ImageLightbox images={images} index={open} onIndexChange={setOpen} />
+    </div>
   )
 }

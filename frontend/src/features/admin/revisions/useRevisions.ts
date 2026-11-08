@@ -1,6 +1,8 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '@/lib/api'
 import { qk } from '@/lib/queryKeys'
+import { toImageForm } from '@/lib/images'
+import type { ProgressUpdateResult } from '@/lib/imageTypes'
 import type { CreateQuotationResult } from '@/lib/quotationTypes'
 import type { PagedResult, TaskDetail } from '@/lib/types'
 import type {
@@ -204,8 +206,14 @@ export function useClientTimeline(projectId: string) {
 export function usePostProgressUpdate(projectId: string) {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (message: string) =>
-      api.post<{ occurredAt: string; message: string }>(`/admin/projects/${projectId}/progress-updates`, { message }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: qk.revisions.progress(projectId) }),
+    mutationFn: ({ message, files = [] }: { message: string; files?: File[] }) =>
+      files.length > 0
+        ? api.postForm<ProgressUpdateResult>(`/admin/projects/${projectId}/progress-updates`, toImageForm(files, { message }))
+        : api.post<ProgressUpdateResult>(`/admin/projects/${projectId}/progress-updates`, { message }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.revisions.progress(projectId) })
+      qc.invalidateQueries({ queryKey: qk.images.project(projectId, 'PROGRESS_UPDATE') })
+      qc.invalidateQueries({ queryKey: qk.storage.all })
+    },
   })
 }

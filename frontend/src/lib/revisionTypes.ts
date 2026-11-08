@@ -14,6 +14,10 @@ export interface RequestAttachment {
   id: string
   originalName: string
   contentType: string
+  /** null for legacy non-image files */
+  thumbUrl: string | null
+  previewUrl: string | null
+  originalUrl: string | null
 }
 
 export interface ClientRequest {
