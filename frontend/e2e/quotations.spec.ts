@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { apiPost, createProject, csrfToken, expectToast, moveDeliverable } from './helpers'
+import { apiPost, createProject, csrfToken, expectToast, moveDeliverable, selectOption } from './helpers'
 
 /** PUT with the CSRF double-submit token + Origin that CsrfMiddleware requires. */
 async function apiPut(page: Page, url: string, data: unknown) {
@@ -115,5 +115,29 @@ test.describe('Quotations', () => {
     await expect(page.getByRole('radiogroup', { name: 'Chọn khoản thanh toán' })).toHaveCount(0)   // no deposit → full only
     await expect(page.getByTestId('qr-amount')).toContainText('2.000.000')
     await expect(page.getByTestId('qr-memo')).toHaveText(/^[A-Z]+\d{8} TT$/)
+  })
+})
+
+test.describe('Quotations page', () => {
+  test('lists quotations across projects and filters by effective status', async ({ page }) => {
+    const stamp = Date.now()
+    await page.goto('/admin')
+    const projectId = await createProject(page, `E2E Danh sách BG ${stamp}`)
+    await apiPost(page.request, page, `/api/admin/projects/${projectId}/quotations`,
+      { kind: 'INITIAL', title: `BG danh sách ${stamp}`, fromDeliverables: false })
+
+    await page.getByRole('link', { name: 'Báo giá' }).first().click()
+    await expect(page).toHaveURL(/\/admin\/quotations$/)
+    await expect(page.getByRole('heading', { name: 'Báo giá', level: 1 })).toBeVisible()
+    const row = page.locator('tbody tr').filter({ hasText: `BG danh sách ${stamp}` })
+    await expect(row).toBeVisible()
+
+    await selectOption(page, 'Lọc trạng thái', 'Đã gửi')
+    await expect(row).toHaveCount(0)
+    await selectOption(page, 'Lọc trạng thái', 'Nháp')
+    await expect(row).toBeVisible()
+
+    await row.getByRole('link').first().click()
+    await expect(page.getByRole('heading', { name: 'Soạn báo giá' })).toBeVisible()
   })
 })
