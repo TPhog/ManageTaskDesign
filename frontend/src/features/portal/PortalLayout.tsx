@@ -103,7 +103,7 @@ export default function PortalLayout() {
           </Button>
         </div>
       </header>
-      <main className="mx-auto max-w-2xl px-4 pb-24 pt-5">
+      <main className="mx-auto max-w-2xl px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5">
         <Outlet />
       </main>
       <nav

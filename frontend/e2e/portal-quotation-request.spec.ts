@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test'
 import { apiPost, createClient, createDeliverable, createProjectForClient } from './helpers'
 import { configureBank, createService, issuePortalLink, openAsClient, sendQuotation } from './portalHelpers'
 
-// POST /api/portal/session is limited to 10/min per IP: this file opens 3 sessions (portal.spec opens 7) —
-// wait at least 65 s between runs of portal specs.
+// POST /api/portal/session is limited per IP (Development: 60/min via appsettings.Development.json; production
+// defaults are unchanged), so the portal specs can run back to back.
 
 test.describe('Client portal — quotations and requests', () => {
   test('client opens the magic link and sees the sent quotation with its VietQR', async ({ page, browser }) => {
@@ -103,6 +103,20 @@ test.describe('Client portal — quotations and requests', () => {
     await expect(inQuota).toContainText('Trong số lần sửa')
     await expect(inQuota).toContainText('Chờ làm')
     await expect(revisions.getByRole('listitem').filter({ hasText: 'Thêm tagline dưới logo' }).last()).toContainText('Tính phí')
+    await context.close()
+  })
+
+  test('unknown portal path shows the portal not-found page without admin links', async ({ page, browser }) => {
+    await page.goto('/admin')
+    const clientId = await createClient(page, `Portal 404 E2E ${Date.now()}`)
+    const link = await issuePortalLink(page, clientId)
+
+    const { context, page: portal } = await openAsClient(browser, link)
+    await expect(portal).toHaveURL(/\/portal$/)
+    await portal.goto('/portal/khong-co')
+    await expect(portal.getByText('Không tìm thấy trang')).toBeVisible()
+    await expect(portal.getByRole('link', { name: 'Về danh sách dự án' })).toHaveAttribute('href', '/portal')
+    await expect(portal.locator('a[href^="/admin"]')).toHaveCount(0)
     await context.close()
   })
 })

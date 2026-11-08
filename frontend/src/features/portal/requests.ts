@@ -38,8 +38,22 @@ export function requestErrorMessage(err: unknown): string {
   if (e.status === 429) {
     return `Hôm nay bạn đã gửi ${DAILY_REQUEST_LIMIT} yêu cầu — vui lòng gửi tiếp vào ngày mai hoặc nhắn trực tiếp cho designer.`
   }
-  if (e.status === 422) return e.detail ?? 'Dự án này không nhận yêu cầu mới.'
+  if (e.status === 401) return 'Phiên xem đã hết hạn — vui lòng mở lại link designer đã gửi.'
+  if (e.status === 403) return 'Vui lòng tải lại trang rồi gửi lại.'
+  if (e.status === 422) return unprocessableMessage(e.detail)
   if (e.status === 404) return 'Không tìm thấy dự án này.'
   const firstFieldError = e.errors ? Object.values(e.errors)[0]?.[0] : undefined
   return firstFieldError ?? 'Không gửi được yêu cầu. Vui lòng thử lại.'
+}
+
+const RULE_CODE = /\s*\(BR-\d+(?:\/\d+)*\)/g
+
+/** 422 detail may carry internal rule codes (BR-xx): map known cases to a fixed message, never leak the code. */
+function unprocessableMessage(detail?: string): string {
+  if (!detail) return 'Dự án này không nhận yêu cầu mới.'
+  if (/BR-21|BR-53/.test(detail)) return 'Dự án này đã hoàn thành hoặc đã huỷ nên không nhận yêu cầu mới.'
+  if (/BR-54/.test(detail)) {
+    return `Hôm nay bạn đã gửi ${DAILY_REQUEST_LIMIT} yêu cầu — vui lòng gửi tiếp vào ngày mai hoặc nhắn trực tiếp cho designer.`
+  }
+  return detail.replace(RULE_CODE, '').trim() || 'Dự án này không nhận yêu cầu mới.'
 }

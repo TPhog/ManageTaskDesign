@@ -53,3 +53,29 @@ describe('requestErrorMessage', () => {
     expect(requestErrorMessage(new Error('network'))).toBe('Không gửi được yêu cầu. Vui lòng thử lại.')
   })
 })
+
+describe('requestErrorMessage', () => {
+  it('maps session and CSRF failures', () => {
+    expect(requestErrorMessage({ status: 401 })).toBe('Phiên xem đã hết hạn — vui lòng mở lại link designer đã gửi.')
+    expect(requestErrorMessage({ status: 403 })).toBe('Vui lòng tải lại trang rồi gửi lại.')
+  })
+
+  it('uses fixed messages for known 422 cases and never shows rule codes', () => {
+    const closed = requestErrorMessage({ status: 422, detail: 'Dự án đã hoàn thành hoặc đã huỷ — không gửi yêu cầu mới được (BR-21)' })
+    expect(closed).toContain('hoàn thành')
+    expect(closed).not.toMatch(/BR-/)
+    const limit = requestErrorMessage({ status: 422, detail: 'Mỗi ngày bạn gửi được tối đa 20 yêu cầu (BR-54)' })
+    expect(limit).toContain('20 yêu cầu')
+    expect(limit).not.toMatch(/BR-/)
+  })
+
+  it('strips rule codes from unknown 422 details and falls back when empty', () => {
+    expect(requestErrorMessage({ status: 422, detail: 'Nội dung không hợp lệ (BR-99)' })).toBe('Nội dung không hợp lệ')
+    expect(requestErrorMessage({ status: 422 })).toBe('Dự án này không nhận yêu cầu mới.')
+  })
+
+  it('keeps 429 and 404 messages', () => {
+    expect(requestErrorMessage({ status: 429 })).toContain('20 yêu cầu')
+    expect(requestErrorMessage({ status: 404 })).toBe('Không tìm thấy dự án này.')
+  })
+})

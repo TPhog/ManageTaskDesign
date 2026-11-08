@@ -73,7 +73,7 @@ export default function PortalProjectPage() {
   const canRequest = acceptsRequests(project.status)
 
   return (
-    <div className={cn('space-y-4', canRequest && 'pb-16')}>
+    <div className={cn('space-y-4', canRequest && 'pb-20')}>
       <Link to="/portal" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         Tất cả dự án
@@ -230,7 +230,7 @@ export default function PortalProjectPage() {
       {canRequest && (
         <Link
           to={`/portal/requests/new?projectId=${project.id}`}
-          className={cn(buttonVariants(), 'fixed bottom-20 right-4 z-20 shadow-lg sm:right-[max(1rem,calc(50%-20rem))]')}
+          className={cn(buttonVariants(), 'fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-20 shadow-lg sm:right-[max(1rem,calc(50%-20rem))]')}
         >
           <MessageSquarePlus aria-hidden="true" />
           Gửi yêu cầu chỉnh sửa
