@@ -1,5 +1,6 @@
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Catalog;
+using FreelanceFlow.Api.Domain.Common;
 using Microsoft.EntityFrameworkCore;
 
 namespace FreelanceFlow.Api.Features.Services;
@@ -46,6 +47,7 @@ public static class ServicesEndpoints
             ExtraRoundPrice = body.ExtraRoundPrice,
             Active = true,
         };
+        if (TemplateError(service, body.TaskTemplate ?? []) is { } invalid) return invalid;
 
         db.Services.Add(service);
 
@@ -69,6 +71,9 @@ public static class ServicesEndpoints
         var service = await db.Services.FindAsync(id);
         if (service == null) return Results.NotFound();
 
+        // taskTemplate omitted/null = keep (the hide/show toggle sends only the other fields)
+        if (body.TaskTemplate is { } steps && TemplateError(service, steps) is { } invalid) return invalid;
+
         service.Name = body.Name;
         service.Description = body.Description ?? "";
         service.BasePrice = body.BasePrice;
@@ -88,21 +93,38 @@ public static class ServicesEndpoints
         return Results.Ok(ToDto(service));
     }
 
+    /// <summary>Plan 06b F3: the domain validates the template; 400 with errors.taskTemplate (docs/05 §1.2).</summary>
+    private static IResult? TemplateError(Service service, IEnumerable<string?> steps)
+    {
+        try
+        {
+            service.SetTaskTemplate(steps);
+            return null;
+        }
+        catch (DomainException ex)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["taskTemplate"] = [ex.Detail ?? ex.Code],
+            });
+        }
+    }
+
     private static ServiceDto ToDto(Service s) => new(
         s.Id, s.Name, s.Description, s.BasePrice,
         s.DefaultIncludedRounds, s.ExtraRoundPrice, s.Active,
-        s.CreatedAt, s.UpdatedAt);
+        s.CreatedAt, s.UpdatedAt, s.TaskTemplate());
 }
 
 record ServiceDto(
     Guid Id, string Name, string Description, long BasePrice,
     int DefaultIncludedRounds, long ExtraRoundPrice, bool Active,
-    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);
+    DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt, IReadOnlyList<string> TaskTemplate);
 
 record CreateServiceRequest(
     string Name, string? Description, long BasePrice,
-    int DefaultIncludedRounds, long ExtraRoundPrice);
+    int DefaultIncludedRounds, long ExtraRoundPrice, List<string?>? TaskTemplate);
 
 record UpdateServiceRequest(
     string Name, string? Description, long BasePrice,
-    int DefaultIncludedRounds, long ExtraRoundPrice, bool Active);
+    int DefaultIncludedRounds, long ExtraRoundPrice, bool Active, List<string?>? TaskTemplate);
