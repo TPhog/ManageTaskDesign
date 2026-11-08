@@ -1,6 +1,8 @@
 import {
-  DASHBOARD_FLOW_LIMIT, barPercent, dashboardLinks, monthLabel, projectsNeedingAction,
+  DASHBOARD_FLOW_LIMIT, barPercent, dashboardLinks, dayHeading, monthLabel, projectsNeedingAction, removeTaskFromSchedule,
+  scheduleIsEmpty,
 } from '@/features/admin/dashboard/dashboardUtils'
+import type { DashboardSchedule, ScheduleTask } from '@/lib/dashboardTypes'
 import type { FlowAction, FlowActionKind, FlowProjectActions, FlowWarning } from '@/lib/flowTypes'
 
 const act = (kind: FlowActionKind, primary = false): FlowAction =>
@@ -63,5 +65,51 @@ describe('projectsNeedingAction', () => {
     expect(projectsNeedingAction(many, 8)).toMatchObject({ hidden: 2 })
     expect(projectsNeedingAction(many, 8).items).toHaveLength(8)
     expect(projectsNeedingAction(many, Infinity)).toMatchObject({ hidden: 0 })
+  })
+})
+
+const task = (id: string, dueDate: string): ScheduleTask => ({
+  id, title: `Task ${id}`, status: 'TODO', priority: 'MEDIUM', dueDate, sortOrder: 1024,
+  projectId: 'p1', projectName: 'Logo ABC', clientName: 'Khách A',
+})
+const day = (date: string, tasks: ScheduleTask[] = []) => ({ date, tasks, hiddenTasks: 0, deadlines: [] })
+const schedule = (): DashboardSchedule => ({
+  today: '2030-05-15', undatedOpenTasks: 0,
+  overdue: { total: 2, items: [task('a', '2030-05-10'), task('b', '2030-05-14')] },
+  days: [day('2030-05-15', [task('c', '2030-05-15')]), day('2030-05-16'), day('2030-05-17'), day('2030-05-18'), day('2030-05-19'), day('2030-05-20'), day('2030-05-21')],
+})
+
+describe('dayHeading', () => {
+  it('names today and tomorrow, otherwise the weekday', () => {
+    expect(dayHeading('2030-05-15', '2030-05-15')).toBe('Hôm nay · 15/05')
+    expect(dayHeading('2030-05-16', '2030-05-15')).toBe('Ngày mai · 16/05')
+    expect(dayHeading('2030-05-17', '2030-05-15')).toBe('T6 · 17/05')
+  })
+  it('rolls tomorrow over a month end', () => {
+    expect(dayHeading('2030-06-01', '2030-05-31')).toBe('Ngày mai · 01/06')
+  })
+})
+
+describe('removeTaskFromSchedule', () => {
+  it('drops the task from the overdue bucket and decrements its total', () => {
+    const next = removeTaskFromSchedule(schedule(), 'a')
+    expect(next.overdue.items.map(t => t.id)).toEqual(['b'])
+    expect(next.overdue.total).toBe(1)
+  })
+  it('drops the task from its day without touching other days', () => {
+    const next = removeTaskFromSchedule(schedule(), 'c')
+    expect(next.days[0].tasks).toEqual([])
+    expect(next.days).toHaveLength(7)
+  })
+  it('returns an equal schedule for an unknown id', () => {
+    expect(removeTaskFromSchedule(schedule(), 'zzz')).toEqual(schedule())
+  })
+})
+
+describe('scheduleIsEmpty', () => {
+  it('is false while anything is scheduled and true when nothing is', () => {
+    expect(scheduleIsEmpty(schedule())).toBe(false)
+    const empty: DashboardSchedule = { ...schedule(), overdue: { total: 0, items: [] }, days: schedule().days.map(d => ({ ...d, tasks: [] })) }
+    expect(scheduleIsEmpty(empty)).toBe(true)
   })
 })

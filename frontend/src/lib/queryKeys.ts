@@ -5,6 +5,13 @@ export const qk = {
   banks:     ['banks']     as const,
   services:  ['services']  as const,
   dashboard: ['dashboard'] as const,
+  dashboardBlocks: {
+    schedule:  ['dashboard', 'schedule']                              as const,
+    health:    ['dashboard', 'project-health']                        as const,
+    money:     (period: string) => ['dashboard', 'money', period]     as const,
+    activity:  ['dashboard', 'client-activity']                       as const,
+    setup:     ['dashboard', 'setup']                                 as const,
+  },
   digest:    ['settings', 'digest'] as const,
   search:    (q: string) => ['search', q] as const,
 

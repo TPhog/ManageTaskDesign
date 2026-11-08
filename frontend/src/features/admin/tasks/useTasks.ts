@@ -111,7 +111,12 @@ export function useMoveTask() {
       if (task) qc.setQueryData(qk.tasks.detail(task.id), task)
     },
     // Refetch the lists either way so the cache never keeps a card in a position the server rejected
-    onSettled: () => Promise.all([qc.invalidateQueries({ queryKey: qk.tasks.lists }), qc.invalidateQueries({ queryKey: qk.projects.all })]),
+    onSettled: () =>
+      Promise.all([
+        qc.invalidateQueries({ queryKey: qk.tasks.lists }),
+        qc.invalidateQueries({ queryKey: qk.projects.all }),
+        qc.invalidateQueries({ queryKey: qk.dashboard }),
+      ]),
   })
 }
 

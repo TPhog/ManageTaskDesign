@@ -9,22 +9,11 @@ import { StatusBadge } from '@/components/StatusBadge'
 import type { MonthTotal } from '@/lib/dashboardTypes'
 import { formatDate, formatVnd } from '@/lib/format'
 import { barPercent, dashboardLinks, monthLabel } from './dashboardUtils'
+import { panelClass, Section } from './DashboardSection'
 import { FlowTodoBlock } from './FlowTodoBlock'
+import { ScheduleBlock } from './ScheduleBlock'
+import { SetupChecklistCard } from './SetupChecklistCard'
 import { useDashboard } from './useDashboard'
-
-const panelClass = 'rounded-xl border bg-card p-5 shadow-card'
-
-function Section({ title, icon: Icon, children }: { title: string; icon: typeof FolderKanban; children: ReactNode }) {
-  return (
-    <section aria-label={title} className={`${panelClass} space-y-4`}>
-      <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
-        <Icon className="h-[18px] w-[18px] text-primary" aria-hidden="true" />
-        {title}
-      </h2>
-      {children}
-    </section>
-  )
-}
 
 /** One metric; the whole tile links to the filtered list (docs/08 §2.2). */
 function StatTile({ to, label, value, testId }: { to: string; label: string; value: ReactNode; testId: string }) {
@@ -99,7 +88,9 @@ export default function DashboardPage() {
         </div>
       ) : (
         <div className="space-y-6">
+          <SetupChecklistCard />
           <FlowTodoBlock summary={data.actionRequired} />
+          <ScheduleBlock />
 
           <div className="grid gap-6 lg:grid-cols-2">
             <Section title="Dự án" icon={FolderKanban}>
