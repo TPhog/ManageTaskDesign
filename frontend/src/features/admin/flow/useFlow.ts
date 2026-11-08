@@ -4,7 +4,7 @@ import { api, type ApiError } from '@/lib/api'
 import { qk } from '@/lib/queryKeys'
 import type { DeliverableStatus } from '@/lib/types'
 import type { QuotationDetail } from '@/lib/quotationTypes'
-import type { FlowState, StartPreviewItem, StartProjectBody, StartProjectResult } from '@/lib/flowTypes'
+import type { FlowProjectActions, FlowState, StartPreviewItem, StartProjectBody, StartProjectResult } from '@/lib/flowTypes'
 import { paymentReminderMessage, quotationSentMessage } from '@/lib/messageTemplates'
 import { flowErrorText } from './flowUtils'
 
@@ -119,4 +119,13 @@ export function useCopyQuotationText() {
       toast.error('Không sao chép được — mở báo giá để sao chép thủ công')
     }
   }
+}
+
+/** Dashboard "Việc cần làm": stage, actions and warnings of every open project (GET /admin/flow/actions). */
+export function useFlowActions() {
+  return useQuery({
+    queryKey: qk.flow.actions,
+    queryFn: () => api.get<FlowProjectActions[]>('/admin/flow/actions'),
+    staleTime: 0,
+  })
 }

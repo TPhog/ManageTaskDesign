@@ -1,36 +1,18 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
-import { AlertTriangle, Copy, Info, QrCode } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { AlertTriangle, Info } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { cn } from '@/lib/utils'
 import type { ProjectDetail } from '@/lib/types'
-import type { FlowAction, FlowState } from '@/lib/flowTypes'
-import { actionHref } from '@/features/admin/flow/flowUtils'
-import {
-  useCompleteProject,
-  useConfirmApproval,
-  useCopyQuotationText,
-  useDeliverableStatus,
-  useSubmitReview,
-} from '@/features/admin/flow/useFlow'
+import type { FlowState } from '@/lib/flowTypes'
+import { FlowActionButton } from '@/features/admin/flow/FlowActionControls'
+import { flowActionKey, stepFromParam, type FlowDialogKind } from '@/features/admin/flow/flowUtils'
+import { useCompleteProject } from '@/features/admin/flow/useFlow'
+import { useFlowActionRunner } from '@/features/admin/flow/useFlowActionRunner'
 import { StartProjectDialog } from './StartProjectDialog'
 
 const panelClass = 'rounded-xl border bg-card p-5 shadow-card'
-
-const actionKey = (a: FlowAction) =>
-  `${a.kind}-${a.target.deliverableId ?? a.target.quotationId ?? a.target.requestId ?? ''}`
-
-const HANDLED_KINDS = new Set<string>([
-  'START_PROJECT',
-  'SUBMIT_REVIEW',
-  'CONFIRM_APPROVAL',
-  'DELIVER',
-  'COMPLETE_PROJECT',
-  'COPY_QUOTATION_MESSAGE',
-  'COPY_PAYMENT_REMINDER',
-])
 
 interface Props {
   project: ProjectDetail
@@ -43,12 +25,26 @@ interface Props {
 export function NextStepCard({ project, flow, isLoading, isError }: Props) {
   const [startOpen, setStartOpen] = useState(false)
   const [completeOpen, setCompleteOpen] = useState(false)
-  const submitReview = useSubmitReview()
-  const confirmApproval = useConfirmApproval()
-  const deliverableStatus = useDeliverableStatus()
   const complete = useCompleteProject(project.id)
-  const copyText = useCopyQuotationText()
-  const busy = submitReview.isPending || confirmApproval.isPending || deliverableStatus.isPending || complete.isPending
+  const openDialog = (kind: FlowDialogKind) => (kind === 'START_PROJECT' ? setStartOpen(true) : setCompleteOpen(true))
+  const runner = useFlowActionRunner(openDialog)
+  const busy = runner.busy || complete.isPending
+  const [searchParams, setSearchParams] = useSearchParams()
+  const step = stepFromParam(searchParams.get('step'))
+
+  // Dashboard "Việc cần làm" links dialog steps as ?step=…: open the dialog once if the flow still offers it, then drop the param
+  useEffect(() => {
+    if (!step || !flow) return
+    if (flow.actions.some(a => a.kind === step)) {
+      if (step === 'START_PROJECT') setStartOpen(true)
+      else setCompleteOpen(true)
+    }
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.delete('step')
+      return next
+    }, { replace: true })
+  }, [step, flow, setSearchParams])
 
   if (isLoading) {
     return (
@@ -63,64 +59,6 @@ export function NextStepCard({ project, flow, isLoading, isError }: Props) {
       <div className={panelClass}>
         <p className="text-sm text-muted-foreground">Không tải được bước tiếp theo.</p>
       </div>
-    )
-  }
-
-  function run(action: FlowAction) {
-    const deliverableId = action.target.deliverableId
-    switch (action.kind) {
-      case 'START_PROJECT':
-        setStartOpen(true)
-        break
-      case 'SUBMIT_REVIEW':
-        if (deliverableId) submitReview.mutate({ deliverableId })
-        break
-      case 'CONFIRM_APPROVAL':
-        if (deliverableId) confirmApproval.mutate(deliverableId)
-        break
-      case 'DELIVER':
-        if (deliverableId) deliverableStatus.mutate({ deliverableId, to: 'DELIVERED' })
-        break
-      case 'COMPLETE_PROJECT':
-        setCompleteOpen(true)
-        break
-      case 'COPY_QUOTATION_MESSAGE':
-      case 'COPY_PAYMENT_REMINDER':
-        if (action.target.quotationId) void copyText(action.kind, action.target.quotationId)
-        break
-      default:
-        break
-    }
-  }
-
-  function renderAction(action: FlowAction) {
-    const variant = action.primary ? 'default' : 'outline'
-    const size = action.primary ? 'default' : 'sm'
-    const href = actionHref(action.kind, project.id, action.target)
-    if (!href && !HANDLED_KINDS.has(action.kind)) return null // unknown kind: never a dead button
-    if (href) {
-      return (
-        <Button key={actionKey(action)} asChild variant={variant} size={size}>
-          <Link to={href}>{action.label}</Link>
-        </Button>
-      )
-    }
-    const isCopy = action.kind === 'COPY_QUOTATION_MESSAGE' || action.kind === 'COPY_PAYMENT_REMINDER'
-    return (
-      <span key={actionKey(action)} className="inline-flex items-center gap-1">
-        <Button type="button" variant={variant} size={size} disabled={busy} onClick={() => run(action)}>
-          {isCopy && <Copy aria-hidden="true" />}
-          {action.label}
-        </Button>
-        {isCopy && action.target.quotationId && (
-          <Button asChild variant="ghost" size="sm">
-            <Link to={`/admin/quotations/${action.target.quotationId}`}>
-              <QrCode aria-hidden="true" />
-              Xem QR
-            </Link>
-          </Button>
-        )}
-      </span>
     )
   }
 
@@ -158,8 +96,16 @@ export function NextStepCard({ project, flow, isLoading, isError }: Props) {
         </p>
       ) : (
         <>
-          <div className="mt-4">{renderAction(primary)}</div>
-          {others.length > 0 && <div className="mt-3 flex flex-wrap items-center gap-2">{others.map(renderAction)}</div>}
+          <div className="mt-4">
+            <FlowActionButton action={primary} projectId={project.id} busy={busy} onRun={runner.run} />
+          </div>
+          {others.length > 0 && (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {others.map(a => (
+                <FlowActionButton key={flowActionKey(a)} action={a} projectId={project.id} busy={busy} onRun={runner.run} />
+              ))}
+            </div>
+          )}
         </>
       )}
 
