@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Skeleton } from '@/components/ui/skeleton'
+import { DEFAULT_TERMS_TEMPLATE } from './termsTemplate'
 import { PageHeader } from '@/components/PageHeader'
 import { cn } from '@/lib/utils'
 
@@ -200,7 +201,12 @@ export default function SettingsPage() {
             <Field id="settings-contactEmail" label="Email liên hệ" error={errors.contactEmail?.message}>
               <Input id="settings-contactEmail" type="email" {...a11y('contactEmail')} {...register('contactEmail')} />
             </Field>
-            <Field id="settings-contactPhone" label="Số điện thoại" error={errors.contactPhone?.message}>
+            <Field
+              id="settings-contactPhone"
+              label="Số điện thoại"
+              hint="Khách thấy số này (nút Gọi / Nhắn Zalo) và email trên portal và báo giá — nên điền ít nhất một."
+              error={errors.contactPhone?.message}
+            >
               <Input id="settings-contactPhone" type="tel" inputMode="tel" {...a11y('contactPhone')} {...register('contactPhone')} />
             </Field>
           </div>
@@ -295,9 +301,24 @@ export default function SettingsPage() {
               <Input id="settings-defaultDepositPercent" type="number" min={0} max={100} {...a11y('defaultDepositPercent')} {...register('defaultDepositPercent')} />
             </Field>
           </div>
-          <Field id="settings-defaultTerms" label="Điều khoản mặc định" error={errors.defaultTerms?.message}>
+          <Field
+            id="settings-defaultTerms"
+            label="Điều khoản mặc định"
+            hint="Chép vào mỗi báo giá mới; sửa được trong từng bản nháp."
+            error={errors.defaultTerms?.message}
+          >
             <Textarea id="settings-defaultTerms" rows={4} {...register('defaultTerms')} />
           </Field>
+          {!watch('defaultTerms')?.trim() && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setValue('defaultTerms', DEFAULT_TERMS_TEMPLATE, { shouldDirty: true })}
+            >
+              Dùng điều khoản mẫu
+            </Button>
+          )}
         </Section>
 
         <div className="flex justify-end">

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Copy, MessageSquareText, TriangleAlert } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Copy, ExternalLink, MessageSquareText, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -12,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/StatusBadge'
 import { api, type ApiError } from '@/lib/api'
@@ -39,6 +41,14 @@ export function PortalLinkDialog({ client, onClose }: Props) {
     queryFn: () => api.get<ClientDetail>(`/admin/clients/${client!.id}`),
     enabled: client !== null,
   })
+
+  // C-04: the client sees this phone/email on the portal — warn before sending a link without any
+  const { data: settings } = useQuery({
+    queryKey: qk.settings,
+    queryFn: () => api.get<{ contactPhone: string | null; contactEmail: string | null }>('/admin/settings'),
+    enabled: client !== null,
+  })
+  const noContact = !!settings && !settings.contactPhone && !settings.contactEmail
 
   const refresh = () => qc.invalidateQueries({ queryKey: ['clients'] })
 
@@ -120,6 +130,16 @@ export function PortalLinkDialog({ client, onClose }: Props) {
                   <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   Link chỉ hiển thị một lần. Hãy copy và gửi cho khách ngay.
                 </p>
+                <div className="space-y-1.5">
+                  <Label htmlFor="portal-invite-preview">Tin nhắn mẫu (xem trước)</Label>
+                  <Textarea
+                    id="portal-invite-preview"
+                    readOnly
+                    rows={5}
+                    value={portalInviteMessage(client!.name, link)}
+                    className="text-xs"
+                  />
+                </div>
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" onClick={() => copy(link, 'Đã copy link')}>
                     <Copy aria-hidden="true" />
@@ -133,7 +153,12 @@ export function PortalLinkDialog({ client, onClose }: Props) {
                     <MessageSquareText aria-hidden="true" />
                     Copy tin nhắn mẫu
                   </Button>
+                  <Button size="sm" variant="ghost" onClick={() => window.open(link, '_blank', 'noopener,noreferrer')}>
+                    <ExternalLink aria-hidden="true" />
+                    Mở thử như khách
+                  </Button>
                 </div>
+                <p className="text-xs text-muted-foreground">“Mở thử” mở portal ở tab mới — trình duyệt này sẽ xem portal như khách.</p>
               </div>
             ) : state.status !== 'NONE' ? (
               <p className="text-xs text-muted-foreground">
@@ -143,6 +168,16 @@ export function PortalLinkDialog({ client, onClose }: Props) {
 
             {archived && (
               <p className="text-xs text-muted-foreground">Khách đã lưu trữ nên không thể tạo link mới.</p>
+            )}
+
+            {noContact && (
+              <p className="flex items-start gap-1.5 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+                <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                <span>
+                  Khách sẽ không thấy cách liên hệ bạn trên portal — thêm số điện thoại hoặc email trong{' '}
+                  <Link to="/admin/settings" className="font-medium underline" onClick={() => handleOpenChange(false)}>Cài đặt</Link>.
+                </span>
+              </p>
             )}
 
             {confirming && (

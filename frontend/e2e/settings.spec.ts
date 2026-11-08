@@ -43,6 +43,12 @@ test.describe('Settings', () => {
     await page.getByRole('button', { name: 'Đổi mật khẩu' }).click()
     await expect(page.getByText('Mật khẩu hiện tại không đúng')).toBeVisible()
   })
+
+  test('offers a terms template when the default terms are empty', async ({ page }) => {
+    await page.getByLabel('Điều khoản mặc định').fill('')
+    await page.getByRole('button', { name: 'Dùng điều khoản mẫu' }).click()
+    await expect(page.getByLabel('Điều khoản mặc định')).toHaveValue(/^1\. Báo giá có hiệu lực/)
+  })
 })
 
 test.describe('Services', () => {
