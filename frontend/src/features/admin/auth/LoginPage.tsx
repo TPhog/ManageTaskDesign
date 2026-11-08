@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useNavigate } from 'react-router-dom'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { authGate } from '@/lib/authGate'
@@ -25,6 +25,7 @@ const highlights = [
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const qc = useQueryClient()
 
   const me = useQuery({
     queryKey: ['me'],
@@ -45,7 +46,11 @@ export default function LoginPage() {
 
   const loginMutation = useMutation({
     mutationFn: (data: FormValues) => api.post('/auth/login', data),
-    onSuccess: () => navigate('/admin', { replace: true }),
+    onSuccess: (_res, vars) => {
+      // replace the cached 401 so the gate does not bounce back to login once
+      qc.setQueryData(['me'], { username: vars.username })
+      navigate('/admin', { replace: true })
+    },
     onError: (err: Error & { status?: number }) => {
       if (err.status === 429) {
         setError('root', { message: 'Đăng nhập quá nhiều lần. Vui lòng thử lại sau.' })

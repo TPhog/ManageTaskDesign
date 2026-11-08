@@ -16,6 +16,10 @@ describe('authGate', () => {
     expect(authGate({ status: 'error', error: err(401) })).toBe('signed-out')
   })
 
+  it('is checking while a cached error is being refetched', () => {
+    expect(authGate({ status: 'error', fetchStatus: 'fetching', error: err(401) })).toBe('checking')
+  })
+
   it('treats a 502 or network failure as unavailable, not signed out', () => {
     expect(authGate({ status: 'error', error: err(502) })).toBe('unavailable')
     expect(authGate({ status: 'error', error: new TypeError('Failed to fetch') })).toBe('unavailable')
