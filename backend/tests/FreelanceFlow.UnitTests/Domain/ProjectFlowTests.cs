@@ -8,8 +8,8 @@ public class ProjectFlowTests
     private static readonly DateOnly Today = new(2026, 11, 8);
 
     private static FlowDeliverable D(string status, string name = "Logo", int total = 0, int done = 0,
-        string? decision = null, int included = 2, int used = 0) =>
-        new(Guid.NewGuid(), name, status, total, done, decision, included, used);
+        string? decision = null, int included = 2, int used = 0, int openRevisions = 0) =>
+        new(Guid.NewGuid(), name, status, total, done, decision, included, used, openRevisions);
 
     private static FlowQuotation Q(string status, string kind = "INITIAL", string payment = "UNPAID",
         DateOnly? expiry = null, int depositPercent = 50, long total = 2_000_000, long deposit = 1_000_000,
@@ -30,6 +30,24 @@ public class ProjectFlowTests
 
     private static void OnlyFirstIsPrimary(FlowState s) =>
         s.Actions.Select(a => a.Primary).Should().Equal(s.Actions.Select((_, i) => i == 0));
+
+    [Fact]
+    public void Delivered_with_open_revisions_warns_in_execute_review_close_and_completed_but_not_without_open_items()
+    {
+        var paid = new[] { Q("ACCEPTED", payment: "PAID") };
+        var execute = Eval(Facts("IN_PROGRESS", true, [D("DELIVERED", openRevisions: 2), D("IN_PROGRESS")], paid));
+        var review = Eval(Facts("IN_PROGRESS", true, [D("DELIVERED", openRevisions: 1), D("IN_REVIEW")], paid));
+        var close = Eval(Facts("IN_PROGRESS", true, [D("DELIVERED", openRevisions: 1)], paid));
+        var completed = Eval(Facts("COMPLETED", true, [D("DELIVERED", openRevisions: 1)], paid));
+        var clean = Eval(Facts("IN_PROGRESS", true, [D("DELIVERED")], paid));
+
+        (execute.Stage, review.Stage, close.Stage).Should().Be(("EXECUTE", "REVIEW", "CLOSE"));
+        execute.Warnings.Should().Contain(new FlowWarning("DELIVERED_WITH_OPEN_REVISIONS",
+            "Logo đã bàn giao nhưng còn 2 mục sửa chưa xong — chuyển về Đang làm", "warning"));
+        foreach (var s in new[] { review, close, completed })
+            s.Warnings.Select(w => w.Kind).Should().Contain("DELIVERED_WITH_OPEN_REVISIONS");
+        clean.Warnings.Select(w => w.Kind).Should().NotContain("DELIVERED_WITH_OPEN_REVISIONS");
+    }
 
     [Fact]
     public void New_project_is_in_prepare_and_suggests_adding_a_deliverable_first()

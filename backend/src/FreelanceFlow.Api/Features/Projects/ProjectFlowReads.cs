@@ -78,20 +78,35 @@ internal static class ProjectFlowReads
                 select new { ProjectId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.ProjectId, x => x.Count);
 
+        // D-11: revision items still TODO / IN_PROGRESS, per deliverable
+        var openRevisions = await (
+                from i in db.RevisionItems.AsNoTracking()
+                join r in db.RevisionRounds on i.RoundId equals r.Id
+                where ids.Contains(r.ProjectId) && r.DeliverableId != null
+                      && (i.WorkStatus == RevisionWorkStatuses.Todo || i.WorkStatus == RevisionWorkStatuses.InProgress)
+                group i by r.DeliverableId into g
+                select new { DeliverableId = g.Key!.Value, Count = g.Count() })
+            .ToDictionaryAsync(x => x.DeliverableId, x => x.Count);
+
+        var deliverablesByProject = deliverables.ToLookup(d => d.ProjectId);
+        var quotationsByProject = quotations.ToLookup(q => q.ProjectId);
+        var requestsByProject = newRequests.ToLookup(r => r.ProjectId);
+
         return statuses.ToDictionary(p => p.Key, p => new FlowFacts(
             p.Value,
             briefConfirmed.Contains(p.Key),
-            deliverables.Where(d => d.ProjectId == p.Key).Select(d =>
+            deliverablesByProject[p.Key].Select(d =>
             {
                 var tasks = taskCounts.GetValueOrDefault(d.Id);
                 return new FlowDeliverable(d.Id, d.Name, d.Status, tasks?.Total ?? 0, tasks?.Done ?? 0,
-                    d.ClientDecision, d.IncludedRounds, usedRounds.GetValueOrDefault(d.Id));
+                    d.ClientDecision, d.IncludedRounds, usedRounds.GetValueOrDefault(d.Id),
+                    openRevisions.GetValueOrDefault(d.Id));
             }).ToList(),
-            quotations.Where(q => q.ProjectId == p.Key).Select(q => new FlowQuotation(
+            quotationsByProject[p.Key].Select(q => new FlowQuotation(
                 q.Id, q.Kind, q.Status, q.Number, q.Version, q.ExpiryDate, q.PaymentStatus,
                 q.DepositPercent, q.Total, q.DepositAmount, q.CreatedAt)).ToList(),
             overdue.GetValueOrDefault(p.Key),
-            newRequests.Where(r => r.ProjectId == p.Key).Select(r => r.Id).ToList(),
+            requestsByProject[p.Key].Select(r => r.Id).ToList(),
             unquoted.GetValueOrDefault(p.Key)));
     }
 }

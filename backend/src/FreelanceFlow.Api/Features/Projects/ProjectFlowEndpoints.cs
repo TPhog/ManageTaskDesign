@@ -83,16 +83,13 @@ public static class ProjectFlowEndpoints
     /// IN_PROGRESS, one TODO task per title. Warnings are returned, never blocking (F4). BR-01: the designer pressed it.
     /// </summary>
     private static async Task<IResult> StartProject(
-        Guid id, StartProjectRequest body, AppDbContext db, ActivityWriter activity, IClock clock)
+        Guid id, StartProjectRequest? body, AppDbContext db, ActivityWriter activity, IClock clock)
     {
         var project = await db.Projects.FirstOrDefaultAsync(p => p.Id == id);
         if (project is null) return Results.NotFound();
+        if (body is null)
+            return Results.BadRequest(new { code = "VALIDATION_FAILED", detail = "Thiếu nội dung yêu cầu" });
         db.Entry(project).Property<uint>("xmin").OriginalValue = body.RowVersion;
-
-        var deliverables = await db.Deliverables.Where(d => d.ProjectId == id).ToListAsync();
-        var entries = body.Tasks ?? [];
-        var errors = Validate(entries, deliverables);
-        if (errors.Count > 0) return Results.ValidationProblem(errors);
 
         var hasAcceptedInitial = await db.Quotations.AnyAsync(q =>
             q.ProjectId == id && q.Kind == QuotationKinds.Initial && q.Status == QuotationStatuses.Accepted);
@@ -100,12 +97,17 @@ public static class ProjectFlowEndpoints
         string[] warnings;
         try
         {
-            warnings = project.Start(hasAcceptedInitial);
+            warnings = project.Start(hasAcceptedInitial);   // before the entries: a started project is 409, not a 400
         }
         catch (DomainException ex)
         {
             return Results.Conflict(new { code = ex.Code, detail = ex.Detail });
         }
+
+        var deliverables = await db.Deliverables.Where(d => d.ProjectId == id).ToListAsync();
+        var entries = body.Tasks ?? [];
+        var errors = Validate(entries, deliverables);
+        if (errors.Count > 0) return Results.ValidationProblem(errors);
 
         var started = 0;
         foreach (var d in deliverables.Where(d => d.Status == "NOT_STARTED"))

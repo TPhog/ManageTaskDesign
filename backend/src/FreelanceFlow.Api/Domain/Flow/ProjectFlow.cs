@@ -55,11 +55,13 @@ public static class FlowWarningKinds
     public const string TasksOverdue = "TASKS_OVERDUE";
     public const string QuotaExceeded = "QUOTA_EXCEEDED";
     public const string BalanceDue = "BALANCE_DUE";
+    public const string DeliveredWithOpenRevisions = "DELIVERED_WITH_OPEN_REVISIONS";
 }
 
 /// <summary>A deliverable as the flow sees it (TaskTotal/TaskDone from TaskProgress, UsedRounds from RevisionQuota).</summary>
 public sealed record FlowDeliverable(
-    Guid Id, string Name, string Status, int TaskTotal, int TaskDone, string? ClientDecision, int IncludedRounds, int UsedRounds);
+    Guid Id, string Name, string Status, int TaskTotal, int TaskDone, string? ClientDecision, int IncludedRounds, int UsedRounds,
+    int OpenRevisionItems = 0);
 
 /// <summary>A non-SUPERSEDED quotation of the project.</summary>
 public sealed record FlowQuotation(
@@ -114,11 +116,14 @@ public static class ProjectFlow
 
         if (facts.ProjectStatus == "COMPLETED")
         {
+            DeliveredWithOpenRevisions(b, active);
             Balance(b, facts);
             return b.State(FlowStages.Close, Steps(-1, markCurrent: false));
         }
 
         var stage = FlowStages.Ordered[firstOpen];
+        if (stage is FlowStages.Execute or FlowStages.Review or FlowStages.Close)
+            DeliveredWithOpenRevisions(b, active);
         switch (stage)
         {
             case FlowStages.Prepare: Prepare(b, facts, active, initial); break;
@@ -226,6 +231,15 @@ public static class ProjectFlow
                 new FlowTarget(RequestId: f.NewRequestIds[0]));
         if (f.UnquotedChargeableItems > 0)
             b.Act(FlowActionKinds.CreateAdditionalQuotation, $"Tạo báo giá phát sinh ({f.UnquotedChargeableItems} mục tính phí)");
+    }
+
+    /// <summary>D-11: a DELIVERED deliverable that still has TODO / IN_PROGRESS revision items should go back to IN_PROGRESS.</summary>
+    private static void DeliveredWithOpenRevisions(Builder b, List<FlowDeliverable> active)
+    {
+        foreach (var d in active.Where(d => d.Status == "DELIVERED" && d.OpenRevisionItems > 0))
+            b.Warn(FlowWarningKinds.DeliveredWithOpenRevisions,
+                $"{d.Name} đã bàn giao nhưng còn {d.OpenRevisionItems} mục sửa chưa xong — chuyển về Đang làm",
+                FlowSeverities.Warning);
     }
 
     private static void QuotaWarnings(Builder b, List<FlowDeliverable> active)

@@ -242,6 +242,67 @@ public class ProjectFlowApiTests(AppFactory factory) : PortalTestBase(factory)
     }
 
     [Fact]
+    public async Task Start_of_a_started_project_with_stale_entries_is_still_an_invalid_transition()   // B6 order
+    {
+        await LoginAsync();
+        var projectId = await NewProjectAsync();
+        await CreateDeliverableAsync(projectId, "Logo");
+        (await StartAsync(projectId, Array.Empty<object>())).StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var again = await StartAsync(projectId, new[] { new { deliverableId = Guid.NewGuid(), titles = new[] { "x" } } });
+
+        again.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await again.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("INVALID_TRANSITION");
+    }
+
+    [Fact]
+    public async Task Start_without_a_body_is_a_validation_failed_400()   // B6
+    {
+        await LoginAsync();
+        var projectId = await NewProjectAsync();
+
+        var resp = await Client.PostAsync($"/api/admin/projects/{projectId}/start", null);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("VALIDATION_FAILED");
+    }
+
+    [Fact]
+    public async Task Flow_warns_about_a_delivered_deliverable_with_open_revision_items()   // B7 / D-11
+    {
+        await LoginAsync();
+        var projectId = await NewProjectAsync();
+        var logo = await CreateDeliverableAsync(projectId, "Logo");
+        await QuotedAsync(projectId);
+        (await StartAsync(projectId, Array.Empty<object>())).EnsureSuccessStatusCode();
+        await MoveDeliverableAsync(logo, "IN_REVIEW", "APPROVED", "DELIVERED");
+        var created = await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/requests",
+            new { content = "Sửa logo", source = "ZALO", deliverableId = logo });
+        var requestId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("request").GetProperty("id").GetGuid();
+        var rv = (await Client.GetFromJsonAsync<JsonElement>($"/api/admin/requests/{requestId}"))
+            .GetProperty("request").GetProperty("rowVersion").GetUInt32();
+        var triage = await Client.PostAsJsonAsync($"/api/admin/requests/{requestId}/triage", new
+        {
+            rounds = new[]
+            {
+                new
+                {
+                    deliverableId = (Guid?)logo, receivedAt = (string?)null,
+                    items = new[] { new { description = "Đổi màu", type = "MINOR", billing = (string?)"IN_QUOTA" } },
+                },
+            },
+            rowVersion = rv,
+        });
+        triage.StatusCode.Should().Be(HttpStatusCode.OK, await triage.Content.ReadAsStringAsync());
+
+        var warnings = (await FlowAsync(projectId)).GetProperty("warnings").EnumerateArray().ToList();
+
+        var w = warnings.Single(x => x.GetProperty("kind").GetString() == "DELIVERED_WITH_OPEN_REVISIONS");
+        w.GetProperty("severity").GetString().Should().Be("warning");
+        w.GetProperty("message").GetString().Should().Be("Logo đã bàn giao nhưng còn 1 mục sửa chưa xong — chuyển về Đang làm");
+    }
+
+    [Fact]
     public async Task Start_of_an_already_started_project_is_an_invalid_transition()
     {
         await LoginAsync();
