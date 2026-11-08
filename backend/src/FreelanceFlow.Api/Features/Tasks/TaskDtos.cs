@@ -40,7 +40,8 @@ public record TaskDetailDto(
     bool IsOverdue,
     IReadOnlyList<ChecklistItemDto> Checklist,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    Guid? RevisionItemId);   // REV-06: task created from a revision item
 
 public record CreateTaskRequest(
     string? Title,

@@ -303,11 +303,12 @@ public static class TasksEndpoints
                 .Select(i => new ChecklistItemDto(i.Id, i.Text, i.Done, i.SortOrder))
                 .ToList(),
             task.CreatedAt,
-            task.UpdatedAt);
+            task.UpdatedAt,
+            task.RevisionItemId);
     }
 
     // Appends to the bottom of the column
-    private static async Task<double> NextSortOrderAsync(AppDbContext db, Guid projectId, string status) =>
+    internal static async Task<double> NextSortOrderAsync(AppDbContext db, Guid projectId, string status) =>
         (await db.Tasks
             .Where(t => t.ProjectId == projectId && t.Status == status)
             .MaxAsync(t => (double?)t.SortOrder) ?? 0) + ProjectTask.SortStep;

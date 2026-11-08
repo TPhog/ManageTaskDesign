@@ -128,6 +128,52 @@ public class PortalProjectsTests(AppFactory factory) : PortalTestBase(factory)
     }
 
     [Fact]
+    public async Task Timeline_shows_progress_updates_and_request_outcomes()   // BR-95, M5 "cập nhật tiến độ"
+    {
+        await LoginAsync();
+        var (clientId, token) = await CreateClientWithPortalLinkAsync();
+        var projectId = await CreateProjectAsync(clientId, "Progress");
+        var logo = await CreateDeliverableAsync(projectId, "Logo");   // 2 free rounds
+        (await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/progress-updates",
+            new { message = "  Đã xong bản phác thảo logo  " })).StatusCode.Should().Be(HttpStatusCode.Created);
+        var request = (await (await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/requests",
+                new { content = "Đổi màu", source = "ZALO", deliverableId = logo }))
+            .Content.ReadFromJsonAsync<JsonElement>()).GetProperty("request");
+        (await Client.PostAsJsonAsync($"/api/admin/requests/{request.GetProperty("id").GetGuid()}/triage", new
+        {
+            rounds = new[]
+            {
+                new { deliverableId = (Guid?)logo, receivedAt = (string?)null,
+                      items = new[] { new { description = "Đổi màu", type = "MINOR", billing = (string?)null } } },
+            },
+            rowVersion = request.GetProperty("rowVersion").GetUInt32(),
+        })).StatusCode.Should().Be(HttpStatusCode.OK);
+        var portal = await OpenPortalSessionAsync(token);
+
+        var timeline = await portal.GetFromJsonAsync<JsonElement>($"/api/portal/projects/{projectId}/timeline");
+        var detail = await portal.GetFromJsonAsync<JsonElement>($"/api/portal/projects/{projectId}");
+
+        timeline.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("message").GetString())
+            .Should().Equal("Yêu cầu của bạn đã được tiếp nhận", "Đã xong bản phác thảo logo");
+        var deliverable = detail.GetProperty("deliverables")[0];
+        deliverable.GetProperty("usedRounds").GetInt32().Should().Be(1);
+        deliverable.GetProperty("remainingRounds").GetInt32().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Progress_update_requires_a_message_and_an_existing_project()
+    {
+        await LoginAsync();
+        var (clientId, _) = await CreateClientWithPortalLinkAsync();
+        var projectId = await CreateProjectAsync(clientId, "Progress");
+
+        (await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/progress-updates", new { message = "   " }))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await Client.PostAsJsonAsync($"/api/admin/projects/{Guid.NewGuid()}/progress-updates", new { message = "x" }))
+            .StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task Unknown_project_returns_404()
     {
         await LoginAsync();

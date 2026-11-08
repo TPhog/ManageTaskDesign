@@ -9,6 +9,7 @@ using FreelanceFlow.Api.Features.Portal;
 using FreelanceFlow.Api.Features.Projects;
 using FreelanceFlow.Api.Features.Quotations;
 using FreelanceFlow.Api.Features.Requests;
+using FreelanceFlow.Api.Features.Revisions;
 using FreelanceFlow.Api.Features.Services;
 using FreelanceFlow.Api.Features.Settings;
 using FreelanceFlow.Api.Features.Tasks;
@@ -211,6 +212,8 @@ app.MapTasksEndpoints();
 app.MapQuotationsEndpoints();
 app.MapQuotationWorkflowEndpoints();
 app.MapRequestsEndpoints();
+app.MapRevisionsEndpoints();
+app.MapProgressUpdatesEndpoints();
 app.MapPortalSessionEndpoints();
 app.MapPortalProjectsEndpoints();
 

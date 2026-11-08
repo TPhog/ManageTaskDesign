@@ -105,6 +105,8 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
         var deliverableAName = "ISOLATION-DELIVERABLE-A-" + Guid.NewGuid().ToString("N");
         await CreateDeliverableAsync(projectA, deliverableAName);
         await ChangeProjectStatusAsync(projectA, new { to = "IN_PROGRESS", confirmWarnings = true }); // A gets a timeline entry
+        (await Client.PostAsJsonAsync($"/api/admin/projects/{projectA}/progress-updates",
+            new { message = $"Tiến độ {projectAName}" })).EnsureSuccessStatusCode(); // M5: designer progress update on A's timeline
         var projectB = await CreateProjectAsync(clientB, "ISOLATION-B-" + Guid.NewGuid().ToString("N"));
 
         return new Scenario(

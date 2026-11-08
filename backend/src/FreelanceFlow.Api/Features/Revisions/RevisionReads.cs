@@ -61,6 +61,29 @@ internal static class RevisionReads
                 suggestions?.GetValueOrDefault(x.Item.Id))).ToList())).ToList();
     }
 
+    /// <summary>docs/08 …/revisions: deliverables (sort order) with quota + rounds, then project-level rounds.</summary>
+    public static async Task<ProjectRevisionsDto> LoadProjectAsync(AppDbContext db, Guid projectId, DateOnly today)
+    {
+        var deliverables = await db.Deliverables.AsNoTracking()
+            .Where(d => d.ProjectId == projectId)
+            .OrderBy(d => d.SortOrder).ThenBy(d => d.CreatedAt)
+            .ToListAsync();
+        var used = await RevisionQuota.UsedRounds(db.RevisionRounds.Where(r => r.ProjectId == projectId), db.RevisionItems)
+            .ToDictionaryAsync(x => x.DeliverableId, x => x.UsedRounds);
+        var rounds = await LoadRoundsAsync(db, r => r.ProjectId == projectId, today);
+        var byDeliverable = rounds.Where(r => r.DeliverableId != null).ToLookup(r => r.DeliverableId!.Value);
+
+        return new ProjectRevisionsDto(
+            projectId,
+            deliverables.Select(d =>
+            {
+                var u = used.GetValueOrDefault(d.Id);
+                return new DeliverableRevisionsDto(d.Id, d.Name, d.Status, d.IncludedRounds, u,
+                    RevisionQuota.RemainingRounds(d.IncludedRounds, u), d.ExtraRoundPrice, byDeliverable[d.Id].ToList());
+            }).ToList(),
+            rounds.Where(r => r.DeliverableId == null).ToList());
+    }
+
     public static async Task<RevisionItemDto?> LoadItemAsync(AppDbContext db, Guid itemId, DateOnly today, BillingSuggestion? suggestion = null)
     {
         var roundId = await db.RevisionItems.Where(i => i.Id == itemId).Select(i => (Guid?)i.RoundId).FirstOrDefaultAsync();
