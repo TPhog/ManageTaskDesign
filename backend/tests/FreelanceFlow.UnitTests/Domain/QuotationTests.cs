@@ -43,6 +43,73 @@ public class QuotationTests
         return q;
     }
 
+    // ---------- fix round: caps, CreateDraft validation, undo date ----------
+
+    private static void AssertValidation(Action act) =>
+        act.Should().Throw<DomainException>().Which.Code.Should().Be("VALIDATION_FAILED");
+
+    [Theory]
+    [InlineData(0, 1000)]
+    [InlineData(10_001, 1000)]
+    [InlineData(1, -1)]
+    [InlineData(1, 1_000_000_000_001)]
+    public void Line_quantity_and_price_outside_caps_are_rejected(int quantity, long unitPrice) =>
+        AssertValidation(() => Draft(Line("Logo", quantity, unitPrice)));
+
+    [Fact]
+    public void Line_at_the_caps_is_accepted_when_subtotal_stays_safe()
+    {
+        var q = Draft(Line("Logo", 1, 1_000_000_000_000), Line("Banner", 10_000, 1_000_000_000));
+        q.Subtotal.Should().Be(11_000_000_000_000);
+    }
+
+    [Fact]
+    public void Subtotal_above_js_safe_integer_is_rejected() =>
+        AssertValidation(() => Draft(Line("A", 10_000, 1_000_000_000_000)));   // 1e16 > 2^53-1
+
+    [Fact]
+    public void Total_above_js_safe_integer_after_vat_is_rejected()
+    {
+        var q = Draft(Line("A", 9_000, 1_000_000_000_000));                       // 9e15 <= 9.007e15
+        AssertValidation(() => q.EditDraft(Edit(q, vat: 20)));                   // 1.08e16 total
+    }
+
+    [Theory]
+    [InlineData("INITIAL", "", 7, 50)]
+    [InlineData("BOGUS", "T", 7, 50)]
+    [InlineData("INITIAL", "T", 0, 50)]
+    [InlineData("INITIAL", "T", -3, 50)]
+    [InlineData("INITIAL", "T", 366, 50)]
+    [InlineData("INITIAL", "T", 7, -1)]
+    [InlineData("INITIAL", "T", 7, 101)]
+    public void CreateDraft_rejects_invalid_header(string kind, string title, int validity, int deposit) =>
+        AssertValidation(() => Quotation.CreateDraft(Guid.NewGuid(), kind, title, validity, deposit, "t", [Line("Logo", 1, 1000)]));
+
+    [Fact]
+    public void Undo_to_deposit_paid_after_direct_paid_sets_deposit_paid_date()
+    {
+        var q = Accepted();
+        q.ChangePaymentStatus(PaymentStatuses.Paid, Today, null);
+        q.DepositPaidAt.Should().BeNull();
+
+        q.ChangePaymentStatus(PaymentStatuses.DepositPaid, new DateOnly(2026, 11, 12), "Bấm nhầm");
+
+        q.DepositPaidAt.Should().Be(new DateOnly(2026, 11, 12));
+        q.PaidAt.Should().BeNull();
+    }
+
+    [Fact]
+    public void Undo_to_deposit_paid_keeps_an_existing_deposit_paid_date()
+    {
+        var q = Accepted();
+        q.ChangePaymentStatus(PaymentStatuses.DepositPaid, new DateOnly(2026, 11, 10), null);
+        q.ChangePaymentStatus(PaymentStatuses.Paid, new DateOnly(2026, 11, 20), null);
+
+        q.ChangePaymentStatus(PaymentStatuses.DepositPaid, new DateOnly(2026, 11, 25), "Bấm nhầm");
+
+        q.DepositPaidAt.Should().Be(new DateOnly(2026, 11, 10));
+    }
+
     // ---------- money (§8.3) ----------
 
     [Fact]

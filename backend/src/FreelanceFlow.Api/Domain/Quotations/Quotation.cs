@@ -40,6 +40,10 @@ public class Quotation : IAuditable
 
     public List<QuotationItem> Items { get; set; } = [];
 
+    private const int MaxQuantity = 10_000;
+    private const long MaxUnitPrice = 1_000_000_000_000;
+    private const long MaxMoney = 9_007_199_254_740_991;   // JS Number.MAX_SAFE_INTEGER — the frontend reads these as numbers
+
     // NOTE: computed values are methods, never properties — a new property would change the EF model.
 
     // ---------- Draft (BR-30, §8.3) ----------
@@ -48,6 +52,8 @@ public class Quotation : IAuditable
     public static Quotation CreateDraft(Guid projectId, string kind, string title, int validityDays,
         int depositPercent, string terms, IEnumerable<QuotationItemInput> items)
     {
+        if (kind is not (QuotationKinds.Initial or QuotationKinds.Additional)) throw Invalid("Loại báo giá không hợp lệ");
+        ValidateHeader(title, validityDays, depositPercent);
         var q = new Quotation
         {
             ProjectId = projectId,
@@ -69,10 +75,8 @@ public class Quotation : IAuditable
     public ItemChanges EditDraft(QuotationDraftEdit edit)
     {
         EnsureDraft();
-        if (string.IsNullOrWhiteSpace(edit.Title)) throw Invalid("Vui lòng nhập tiêu đề báo giá");
-        if (edit.ValidityDays is < 1 or > 365) throw Invalid("Hiệu lực từ 1 đến 365 ngày");
+        ValidateHeader(edit.Title, edit.ValidityDays, edit.DepositPercent);
         if (edit.VatPercent is < 0 or > 20) throw Invalid("VAT từ 0 đến 20%");
-        if (edit.DepositPercent is < 0 or > 100) throw Invalid("Cọc từ 0 đến 100%");
 
         var kept = new List<QuotationItem>();
         for (var index = 0; index < edit.Items.Count; index++)
@@ -225,7 +229,11 @@ public class Quotation : IAuditable
                 PaidAt = null;
                 break;
             case PaymentStatuses.DepositPaid:
-                if (isUndo) PaidAt = null;
+                if (isUndo)
+                {
+                    PaidAt = null;
+                    DepositPaidAt ??= date;   // a direct UNPAID→PAID never recorded the deposit date
+                }
                 else DepositPaidAt = date;
                 break;
             case PaymentStatuses.Paid:
@@ -290,15 +298,35 @@ public class Quotation : IAuditable
     /// <summary>§8.3 in order: amount → subtotal → taxable → vat (half-up) → total → deposit (half-up).</summary>
     private void Recalculate()
     {
-        foreach (var item in Items)
-            item.Amount = checked(item.Quantity * item.UnitPrice);
-        Subtotal = Items.Sum(i => i.Amount);
-        if (DiscountAmount < 0 || DiscountAmount > Subtotal)
-            throw Invalid("Giảm giá phải từ 0 đến tạm tính");
-        var taxable = Subtotal - DiscountAmount;
-        VatAmount = Money.Percent(taxable, VatPercent);
-        Total = taxable + VatAmount;
-        DepositAmount = Money.Percent(Total, DepositPercent);
+        try
+        {
+            long subtotal = 0;
+            foreach (var item in Items)
+            {
+                item.Amount = checked(item.Quantity * item.UnitPrice);
+                subtotal = checked(subtotal + item.Amount);
+                if (subtotal > MaxMoney) throw Invalid("Tổng tiền vượt quá giới hạn cho phép");
+            }
+            Subtotal = subtotal;
+            if (DiscountAmount < 0 || DiscountAmount > Subtotal)
+                throw Invalid("Giảm giá phải từ 0 đến tạm tính");
+            var taxable = Subtotal - DiscountAmount;
+            VatAmount = Money.Percent(taxable, VatPercent);
+            Total = checked(taxable + VatAmount);
+            if (Total > MaxMoney) throw Invalid("Tổng tiền vượt quá giới hạn cho phép");
+            DepositAmount = Money.Percent(Total, DepositPercent);
+        }
+        catch (OverflowException)
+        {
+            throw Invalid("Tổng tiền vượt quá giới hạn cho phép");
+        }
+    }
+
+    private static void ValidateHeader(string title, int validityDays, int depositPercent)
+    {
+        if (string.IsNullOrWhiteSpace(title)) throw Invalid("Vui lòng nhập tiêu đề báo giá");
+        if (validityDays is < 1 or > 365) throw Invalid("Hiệu lực từ 1 đến 365 ngày");
+        if (depositPercent is < 0 or > 100) throw Invalid("Cọc từ 0 đến 100%");
     }
 
     private QuotationItem NewItem(QuotationItemInput input, int index)
@@ -312,8 +340,8 @@ public class Quotation : IAuditable
     {
         var description = input.Description.Trim();
         if (description.Length is < 1 or > 500) throw Invalid("Mô tả dòng báo giá dài 1–500 ký tự");
-        if (input.Quantity < 1) throw Invalid("Số lượng tối thiểu là 1");
-        if (input.UnitPrice < 0) throw Invalid("Đơn giá không được âm");
+        if (input.Quantity is < 1 or > MaxQuantity) throw Invalid($"Số lượng từ 1 đến {MaxQuantity:N0}");
+        if (input.UnitPrice is < 0 or > MaxUnitPrice) throw Invalid("Đơn giá từ 0 đến 1.000.000.000.000 ₫");
         if (!QuotationItemSources.All.Contains(input.SourceType)) throw Invalid("Nguồn dòng báo giá không hợp lệ");
 
         item.Description = description;
