@@ -16,6 +16,9 @@ public class ProjectFileConfiguration : IEntityTypeConfiguration<ProjectFile>
                 "kind IN ('REFERENCE','PREVIEW','FINAL','EVIDENCE','BRIEF','SYSTEM')");
             t.HasCheckConstraint("ck_files_size", "size_bytes > 0");
             t.HasCheckConstraint("ck_files_uploaded_by", "uploaded_by IN ('DESIGNER','CLIENT')");
+            t.HasCheckConstraint("ck_files_owner_type",
+                "owner_type IS NULL OR owner_type IN ('TASK','PROGRESS_UPDATE','CLIENT_REQUEST','DELIVERABLE')");
+            t.HasCheckConstraint("ck_files_owner", "(owner_type IS NULL) = (owner_id IS NULL)");
         });
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id");
@@ -33,6 +36,16 @@ public class ProjectFileConfiguration : IEntityTypeConfiguration<ProjectFile>
         b.Property(x => x.UploadedBy).HasColumnName("uploaded_by").IsRequired();
         b.Property(x => x.DeletedAt).HasColumnName("deleted_at");
         b.Property(x => x.CreatedAt).HasColumnName("created_at");
+        // Plan 08 - images
+        b.Property(x => x.OwnerType).HasColumnName("owner_type");
+        b.Property(x => x.OwnerId).HasColumnName("owner_id");
+        b.Property(x => x.Width).HasColumnName("width");
+        b.Property(x => x.Height).HasColumnName("height");
+        b.Property(x => x.OriginalBytes).HasColumnName("original_bytes");
+        b.Property(x => x.PreviewBytes).HasColumnName("preview_bytes");
+        b.Property(x => x.ThumbBytes).HasColumnName("thumb_bytes");
+        b.HasIndex(x => new { x.OwnerType, x.OwnerId })
+            .HasFilter("deleted_at IS NULL").HasDatabaseName("ix_files_owner");
 
         b.HasIndex(x => new { x.ProjectId, x.CreatedAt }).IsDescending(false, true)
             .HasFilter("deleted_at IS NULL").HasDatabaseName("ix_files_project");

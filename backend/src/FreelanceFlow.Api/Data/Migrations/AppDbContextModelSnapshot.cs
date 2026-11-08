@@ -326,15 +326,35 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("deliverable_id");
 
+                    b.Property<int?>("Height")
+                        .HasColumnType("integer")
+                        .HasColumnName("height");
+
                     b.Property<string>("Kind")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("kind");
 
+                    b.Property<long?>("OriginalBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("original_bytes");
+
                     b.Property<string>("OriginalName")
                         .IsRequired()
                         .HasColumnType("text")
                         .HasColumnName("original_name");
+
+                    b.Property<Guid?>("OwnerId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("owner_id");
+
+                    b.Property<string>("OwnerType")
+                        .HasColumnType("text")
+                        .HasColumnName("owner_type");
+
+                    b.Property<long?>("PreviewBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("preview_bytes");
 
                     b.Property<Guid?>("ProjectId")
                         .HasColumnType("uuid")
@@ -358,6 +378,10 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("storage_key");
 
+                    b.Property<long?>("ThumbBytes")
+                        .HasColumnType("bigint")
+                        .HasColumnName("thumb_bytes");
+
                     b.Property<string>("UploadedBy")
                         .IsRequired()
                         .HasColumnType("text")
@@ -369,6 +393,10 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasDefaultValue(false)
                         .HasColumnName("visible_to_client");
 
+                    b.Property<int?>("Width")
+                        .HasColumnType("integer")
+                        .HasColumnName("width");
+
                     b.HasKey("Id");
 
                     b.HasIndex("DeliverableId");
@@ -379,6 +407,10 @@ namespace FreelanceFlow.Api.Data.Migrations
                     b.HasIndex("StorageKey")
                         .IsUnique();
 
+                    b.HasIndex("OwnerType", "OwnerId")
+                        .HasDatabaseName("ix_files_owner")
+                        .HasFilter("deleted_at IS NULL");
+
                     b.HasIndex("ProjectId", "CreatedAt")
                         .IsDescending(false, true)
                         .HasDatabaseName("ix_files_project")
@@ -388,9 +420,35 @@ namespace FreelanceFlow.Api.Data.Migrations
                         {
                             t.HasCheckConstraint("ck_files_kind", "kind IN ('REFERENCE','PREVIEW','FINAL','EVIDENCE','BRIEF','SYSTEM')");
 
+                            t.HasCheckConstraint("ck_files_owner", "(owner_type IS NULL) = (owner_id IS NULL)");
+
+                            t.HasCheckConstraint("ck_files_owner_type", "owner_type IS NULL OR owner_type IN ('TASK','PROGRESS_UPDATE','CLIENT_REQUEST','DELIVERABLE')");
+
                             t.HasCheckConstraint("ck_files_size", "size_bytes > 0");
 
                             t.HasCheckConstraint("ck_files_uploaded_by", "uploaded_by IN ('DESIGNER','CLIENT')");
+                        });
+                });
+
+            modelBuilder.Entity("FreelanceFlow.Api.Domain.Files.StorageAlert", b =>
+                {
+                    b.Property<int>("Threshold")
+                        .HasColumnType("integer")
+                        .HasColumnName("threshold");
+
+                    b.Property<DateTimeOffset?>("ClearedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("cleared_at");
+
+                    b.Property<DateTimeOffset>("NotifiedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("notified_at");
+
+                    b.HasKey("Threshold");
+
+                    b.ToTable("storage_alerts", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_storage_alerts_threshold", "threshold IN (50,70,85,90,95)");
                         });
                 });
 
@@ -1283,6 +1341,22 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
+                    b.Property<bool>("WatermarkEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("watermark_enabled");
+
+                    b.Property<int>("WatermarkOpacity")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(18)
+                        .HasColumnName("watermark_opacity");
+
+                    b.Property<string>("WatermarkText")
+                        .HasColumnType("text")
+                        .HasColumnName("watermark_text");
+
                     b.Property<uint>("xmin")
                         .IsConcurrencyToken()
                         .ValueGeneratedOnAddOrUpdate()
@@ -1306,6 +1380,10 @@ namespace FreelanceFlow.Api.Data.Migrations
                             t.HasCheckConstraint("ck_settings_singleton", "id = 1");
 
                             t.HasCheckConstraint("ck_settings_validity", "default_validity_days BETWEEN 1 AND 365");
+
+                            t.HasCheckConstraint("ck_settings_watermark_opacity", "watermark_opacity BETWEEN 10 AND 40");
+
+                            t.HasCheckConstraint("ck_settings_watermark_text", "watermark_text IS NULL OR char_length(watermark_text) <= 100");
                         });
                 });
 

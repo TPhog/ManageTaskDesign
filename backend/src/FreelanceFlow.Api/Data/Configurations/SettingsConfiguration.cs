@@ -17,6 +17,9 @@ public class SettingsConfiguration : IEntityTypeConfiguration<Settings>
             t.HasCheckConstraint("ck_settings_prefix", "quotation_prefix ~ '^[A-Z]{1,5}$'");
             t.HasCheckConstraint("ck_settings_validity", "default_validity_days BETWEEN 1 AND 365");
             t.HasCheckConstraint("ck_settings_deposit", "default_deposit_percent BETWEEN 0 AND 100");
+            t.HasCheckConstraint("ck_settings_watermark_opacity", "watermark_opacity BETWEEN 10 AND 40");
+            t.HasCheckConstraint("ck_settings_watermark_text",
+                "watermark_text IS NULL OR char_length(watermark_text) <= 100");
         });
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id").HasColumnType("smallint").ValueGeneratedNever();
@@ -32,6 +35,9 @@ public class SettingsConfiguration : IEntityTypeConfiguration<Settings>
         b.Property(x => x.DefaultDepositPercent).HasColumnName("default_deposit_percent").HasDefaultValue(50);
         b.Property(x => x.DefaultTerms).HasColumnName("default_terms").HasDefaultValue("");
         b.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        b.Property(x => x.WatermarkEnabled).HasColumnName("watermark_enabled").HasDefaultValue(true);
+        b.Property(x => x.WatermarkText).HasColumnName("watermark_text");
+        b.Property(x => x.WatermarkOpacity).HasColumnName("watermark_opacity").HasDefaultValue(18);
 
         b.HasOne(x => x.Bank).WithMany().HasForeignKey(x => x.BankBin).HasPrincipalKey(bk => bk.Bin);
         b.HasOne<ProjectFile>().WithMany().HasForeignKey(x => x.LogoFileId);

@@ -35,6 +35,7 @@ public class AppDbContext : DbContext
     public DbSet<Quotation> Quotations => Set<Quotation>();
     public DbSet<QuotationItem> QuotationItems => Set<QuotationItem>();
     public DbSet<ProjectFile> Files => Set<ProjectFile>();
+    public DbSet<StorageAlert> StorageAlerts => Set<StorageAlert>();
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

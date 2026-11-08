@@ -16,6 +16,14 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.*" />
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+    <PackageReference Include="SkiaSharp.NativeAssets.Linux.NoDependencies" Version="3.119.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Plan 08: watermark font (SIL OFL 1.1, see OFL.txt); Linux NoDependencies has no fontconfig -->
+    <EmbeddedResource Include="Infrastructure\Images\Fonts\NotoSans-Bold.ttf" LogicalName="FreelanceFlow.WatermarkFont.ttf" />
+    <None Include="Infrastructure\Images\Fonts\OFL.txt" />
   </ItemGroup>
 
   <ItemGroup>

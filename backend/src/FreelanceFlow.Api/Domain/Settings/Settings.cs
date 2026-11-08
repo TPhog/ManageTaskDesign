@@ -1,3 +1,5 @@
+using FreelanceFlow.Api.Domain.Common;
+
 namespace FreelanceFlow.Api.Domain.Settings;
 
 public class Settings
@@ -15,6 +17,34 @@ public class Settings
     public int DefaultDepositPercent { get; set; } = 50;
     public string DefaultTerms { get; set; } = "";
     public DateTimeOffset UpdatedAt { get; set; }
+
+    // Plan 08 - watermark (spec 4)
+    public const int MaxWatermarkText = 100;
+    public const int MinWatermarkOpacity = 10;
+    public const int MaxWatermarkOpacity = 40;
+
+    public bool WatermarkEnabled { get; set; } = true;
+    /// <summary>null = default "{DisplayName} · Bản xem trước".</summary>
+    public string? WatermarkText { get; set; }
+    public int WatermarkOpacity { get; set; } = 18;
+
+    public string EffectiveWatermarkText =>
+        WatermarkText is { Length: > 0 } custom
+            ? custom
+            : $"{(string.IsNullOrWhiteSpace(DisplayName) ? "FreelanceFlow" : DisplayName.Trim())} · Bản xem trước";
+
+    public void SetWatermark(bool enabled, string? text, int opacityPercent, DateTimeOffset now)
+    {
+        var trimmed = string.IsNullOrWhiteSpace(text) ? null : text.Trim();
+        if (trimmed is { Length: > MaxWatermarkText })
+            throw new DomainException("VALIDATION_FAILED", $"Nội dung watermark tối đa {MaxWatermarkText} ký tự");
+        if (opacityPercent is < MinWatermarkOpacity or > MaxWatermarkOpacity)
+            throw new DomainException("VALIDATION_FAILED", $"Độ mờ watermark từ {MinWatermarkOpacity} đến {MaxWatermarkOpacity}%");
+        WatermarkEnabled = enabled;
+        WatermarkText = trimmed;
+        WatermarkOpacity = opacityPercent;
+        UpdatedAt = now;
+    }
 
     public Bank? Bank { get; set; }
 }
