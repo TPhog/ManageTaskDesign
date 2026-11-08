@@ -154,6 +154,8 @@ export interface TaskDetail {
   checklist: ChecklistItem[]
   createdAt: string
   updatedAt: string
+  /** Set when the task was created from a revision item */
+  revisionItemId?: string | null
 }
 
 export interface TaskListParams {

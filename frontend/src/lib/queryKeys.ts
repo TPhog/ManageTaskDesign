@@ -31,6 +31,19 @@ export const qk = {
     detail: (id: string)        => ['quotations', id]                as const,
   },
 
+  requests: {
+    all:      ['requests']                                      as const,
+    list:     (status: string) => ['requests', 'list', status]  as const,
+    newCount: ['requests', 'new-count']                         as const,
+    detail:   (id: string)     => ['requests', 'detail', id]    as const,
+  },
+
+  revisions: {
+    project:  (projectId: string) => ['revisions', projectId]   as const,
+    suggest:  (deliverableId: string | null, types: string[]) => ['revisions', 'suggest', deliverableId, types] as const,
+    progress: (projectId: string) => ['revisions', 'progress', projectId] as const,
+  },
+
   portal: {
     me:       ['portal', 'me']                                         as const,
     projects: ['portal', 'projects']                                   as const,
