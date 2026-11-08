@@ -1,5 +1,8 @@
 import type { ApiError } from '@/lib/api'
 import type {
+  AdditionalPreviewLine,
+  AdditionalQuotationPreview,
+  CreateAdditionalQuotationBody,
   ProjectRevisions,
   RevisionItem,
   RevisionItemInput,
@@ -62,3 +65,45 @@ export function errorText(err: ApiError, fallback: string): string {
   const fieldError = err.errors ? Object.values(err.errors).flat()[0] : undefined
   return fieldError ?? err.detail ?? fallback
 }
+
+/** Same ceiling as PUT /quotations/{id} (QuotationValidation.MaxUnitPrice). */
+export const MAX_LINE_PRICE = 100_000_000_000
+
+export type PickedService = { id: string; name: string; basePrice: number }
+
+/** One planned line of an additional quotation with what the designer chose for it (plan 09). */
+export interface PricedLine {
+  line: AdditionalPreviewLine
+  serviceId: string | null
+  /** the server names the line after the service once one is picked */
+  serviceName: string | null
+  unitPrice: number
+}
+
+export const pricedLinesFromPreview = (preview: AdditionalQuotationPreview): PricedLine[] =>
+  preview.lines.map(line => ({ line, serviceId: null, serviceName: null, unitPrice: line.suggestedUnitPrice }))
+
+/** Picking prefills the base price (still editable); clearing keeps whatever price is typed. */
+export const pickService = (p: PricedLine, service: PickedService | null): PricedLine =>
+  service
+    ? { ...p, serviceId: service.id, serviceName: service.name, unitPrice: service.basePrice }
+    : { ...p, serviceId: null, serviceName: null }
+
+/** Every shown price is sent, so the draft is exactly what the dialog showed (server: typed -> service -> suggestion). */
+export function additionalQuotationBody(revisionItemIds: string[], priced: PricedLine[]): CreateAdditionalQuotationBody {
+  return {
+    revisionItemIds,
+    newDeliverableServices: priced
+      .filter(p => p.line.kind === 'NEW_DELIVERABLE')
+      .map(p => ({ revisionItemId: p.line.revisionItemIds[0], serviceId: p.serviceId, unitPrice: p.unitPrice })),
+    linePrices: priced
+      .filter(p => p.line.kind !== 'NEW_DELIVERABLE')
+      .map(p => ({ revisionItemId: p.line.revisionItemIds[0], unitPrice: p.unitPrice })),
+  }
+}
+
+export const zeroPricedLineNames = (priced: PricedLine[]): string[] =>
+  priced.filter(p => p.unitPrice === 0).map(p => p.serviceName ?? p.line.description)
+
+export const linePriceError = (n: number): string | null =>
+  Number.isInteger(n) && n >= 0 && n <= MAX_LINE_PRICE ? null : 'Đơn giá từ 0 đến 100.000.000.000 ₫'

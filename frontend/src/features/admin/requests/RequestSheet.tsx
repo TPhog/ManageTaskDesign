@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { FileText, Plus, Receipt } from 'lucide-react'
 import { toast } from 'sonner'
@@ -19,10 +19,10 @@ import { itemTypeLabel, requestSourceLabel, requestStatusLabel } from '@/lib/rev
 import type { RequestDetail, RoundInput } from '@/lib/revisionTypes'
 import type { ProjectDetail } from '@/lib/types'
 import { todayVn } from '@/features/admin/tasks/taskUtils'
+import { AdditionalQuotationDialog } from '@/features/admin/revisions/AdditionalQuotationDialog'
 import { RoundEditor } from '@/features/admin/revisions/RoundEditor'
 import { cleanRounds, emptyRound, errorText, quotableItems } from '@/features/admin/revisions/revisionUtils'
 import {
-  useCreateAdditionalQuotation,
   useDeclineRequest,
   useRequest,
   useTriageRequest,
@@ -151,27 +151,16 @@ function TriagePanel({ detail }: { detail: RequestDetail }) {
 
 /** docs/08 §2.3 step 4: after saving, offer the additional quotation when chargeable items are waiting. */
 function TriagedSummary({ detail }: { detail: RequestDetail }) {
-  const navigate = useNavigate()
   const r = detail.request
   const quotable = quotableItems(detail.rounds)
-  const create = useCreateAdditionalQuotation(r.projectId)
-
-  function createQuotation() {
-    create.mutate({ revisionItemIds: quotable.map(i => i.id) }, {
-      onSuccess: res => {
-        toast.success('Đã tạo báo giá phát sinh (nháp)')
-        navigate(`/admin/quotations/${res.id}`)
-      },
-      onError: err => toast.error(errorText(err as ApiError, 'Không thể tạo báo giá phát sinh')),
-    })
-  }
+  const [quoteOpen, setQuoteOpen] = useState(false)
 
   return (
     <section aria-label="Vòng sửa đã tạo" className="space-y-3">
       {quotable.length > 0 && (
         <div className="flex flex-col gap-3 rounded-lg border border-orange-200 bg-orange-50 p-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-orange-900">{quotable.length} mục tính phí chưa báo giá</p>
-          <Button size="sm" disabled={create.isPending} onClick={createQuotation}>
+          <Button size="sm" onClick={() => setQuoteOpen(true)}>
             <Receipt aria-hidden="true" />
             Tạo báo giá phát sinh
           </Button>
@@ -197,6 +186,12 @@ function TriagedSummary({ detail }: { detail: RequestDetail }) {
       <Button asChild variant="outline" size="sm">
         <Link to={`/admin/projects/${r.projectId}?tab=revisions`}>Mở tab Yêu cầu & Revision</Link>
       </Button>
+      <AdditionalQuotationDialog
+        projectId={r.projectId}
+        revisionItemIds={quotable.map(i => i.id)}
+        open={quoteOpen}
+        onClose={() => setQuoteOpen(false)}
+      />
     </section>
   )
 }

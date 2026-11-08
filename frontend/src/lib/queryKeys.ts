@@ -61,6 +61,7 @@ export const qk = {
     project:  (projectId: string) => ['revisions', projectId]   as const,
     suggest:  (deliverableId: string | null, types: string[]) => ['revisions', 'suggest', deliverableId, types] as const,
     progress: (projectId: string) => ['revisions', 'progress', projectId] as const,
+    quotePreview: (projectId: string, itemIds: string[]) => ['revisions', 'quote-preview', projectId, itemIds] as const,
   },
 
   images: {

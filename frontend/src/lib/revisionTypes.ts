@@ -70,6 +70,11 @@ export interface RevisionItem {
   suggestedBilling: Billing | null
   suggestionReason: string | null
   tasks: LinkedTask[]
+  /** plan 09: service picked for a NEW_DELIVERABLE line; BR-48 deliverable it became. Optional so older fixtures keep compiling */
+  serviceId?: string | null
+  serviceName?: string | null
+  createdDeliverableId?: string | null
+  createdDeliverableName?: string | null
 }
 
 export interface RevisionRound {
@@ -157,10 +162,25 @@ export interface CreateItemTaskBody {
   dueDate?: string | null
 }
 
+export type AdditionalLineKind = 'ROUND' | 'NEW_DELIVERABLE' | 'SCOPE_CHANGE'
+
+export interface AdditionalPreviewLine {
+  kind: AdditionalLineKind
+  revisionItemIds: string[]
+  description: string
+  details: string
+  suggestedUnitPrice: number
+}
+
+export interface AdditionalQuotationPreview {
+  lines: AdditionalPreviewLine[]
+}
+
 export interface CreateAdditionalQuotationBody {
   title?: string
   revisionItemIds: string[]
-  newDeliverableServices?: { revisionItemId: string; serviceId: string }[]
+  newDeliverableServices?: { revisionItemId: string; serviceId: string | null; unitPrice?: number | null }[]
+  linePrices?: { revisionItemId: string; unitPrice: number }[]
 }
 
 /** GET /admin/projects/{id}/activity item */

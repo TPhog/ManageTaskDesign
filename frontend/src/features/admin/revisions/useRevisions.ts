@@ -7,6 +7,7 @@ import type { CreateQuotationResult } from '@/lib/quotationTypes'
 import type { PagedResult, TaskDetail } from '@/lib/types'
 import type {
   ActivityEntry,
+  AdditionalQuotationPreview,
   Billing,
   BillingSuggestion,
   ClientRequest,
@@ -191,6 +192,17 @@ export function useCreateAdditionalQuotation(projectId: string) {
       changed(projectId)
       qc.invalidateQueries({ queryKey: qk.quotations.all })
     },
+  })
+}
+
+/** Plan 09: lines from-revisions would build, with suggested prices (read-only POST). */
+export function useAdditionalQuotationPreview(projectId: string, revisionItemIds: string[], enabled: boolean) {
+  return useQuery({
+    queryKey: qk.revisions.quotePreview(projectId, revisionItemIds),
+    queryFn: () => api.post<AdditionalQuotationPreview>(
+      `/admin/projects/${projectId}/quotations/from-revisions/preview`, { revisionItemIds }),
+    enabled: enabled && revisionItemIds.length > 0,
+    refetchOnWindowFocus: false,   // a refetch must not wipe prices being typed
   })
 }
 

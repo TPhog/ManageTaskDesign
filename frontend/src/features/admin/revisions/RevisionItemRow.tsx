@@ -80,6 +80,15 @@ export function RevisionItemRow({ item, projectId, deliverableId, selectable, se
                 </Link>
               </>
             )}
+            {item.serviceName && !item.createdDeliverableId && <> · Dịch vụ: {item.serviceName}</>}
+            {item.createdDeliverableId && (
+              <>
+                {' · '}
+                <Link to={`/admin/projects/${projectId}?tab=deliverables`} className="text-primary underline-offset-2 hover:underline">
+                  Đã thành hạng mục: {item.createdDeliverableName ?? 'xem Deliverables'}
+                </Link>
+              </>
+            )}
           </p>
         </div>
       </div>

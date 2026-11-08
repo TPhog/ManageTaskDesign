@@ -1,31 +1,29 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { MessagesSquare, Plus, Receipt } from 'lucide-react'
-import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/EmptyState'
 import { MoneyText } from '@/components/MoneyText'
 import { QuotaMeter } from '@/components/QuotaMeter'
 import { StatusBadge } from '@/components/StatusBadge'
-import type { ApiError } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 import type { RevisionRound } from '@/lib/revisionTypes'
 import type { ProjectDetail } from '@/lib/types'
 import { AddRoundDialog } from '@/features/admin/revisions/AddRoundDialog'
+import { AdditionalQuotationDialog } from '@/features/admin/revisions/AdditionalQuotationDialog'
 import { RevisionItemRow } from '@/features/admin/revisions/RevisionItemRow'
-import { allRounds, errorText, isQuotable, quotableItems } from '@/features/admin/revisions/revisionUtils'
-import { useCreateAdditionalQuotation, useProjectRevisions } from '@/features/admin/revisions/useRevisions'
+import { allRounds, isQuotable, quotableItems } from '@/features/admin/revisions/revisionUtils'
+import { useProjectRevisions } from '@/features/admin/revisions/useRevisions'
 
 const panelClass = 'rounded-xl border bg-card shadow-card'
 
 /** docs/08 …/revisions: deliverable → round → items; select CHARGEABLE items → "Tạo báo giá phát sinh" (REV-04). */
 export function RevisionsTab({ project }: { project: ProjectDetail }) {
-  const navigate = useNavigate()
   const { data, isLoading, error, refetch } = useProjectRevisions(project.id)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [addOpen, setAddOpen] = useState(false)
-  const create = useCreateAdditionalQuotation(project.id)
+  const [quoteOpen, setQuoteOpen] = useState(false)
 
   if (isLoading) return <Skeleton className="h-64 w-full rounded-xl" />
   if (error || !data) {
@@ -48,17 +46,6 @@ export function RevisionsTab({ project }: { project: ProjectDetail }) {
       if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
-    })
-  }
-
-  function createQuotation() {
-    create.mutate({ revisionItemIds: chosen }, {
-      onSuccess: res => {
-        setSelected(new Set())
-        toast.success('Đã tạo báo giá phát sinh (nháp)')
-        navigate(`/admin/quotations/${res.id}`)
-      },
-      onError: err => toast.error(errorText(err as ApiError, 'Không thể tạo báo giá phát sinh')),
     })
   }
 
@@ -103,7 +90,7 @@ export function RevisionsTab({ project }: { project: ProjectDetail }) {
             <Plus aria-hidden="true" />
             Thêm vòng sửa
           </Button>
-          <Button size="sm" disabled={chosen.length === 0 || create.isPending} onClick={createQuotation}>
+          <Button size="sm" disabled={chosen.length === 0} onClick={() => setQuoteOpen(true)}>
             <Receipt aria-hidden="true" />
             Tạo báo giá phát sinh ({chosen.length})
           </Button>
@@ -151,6 +138,13 @@ export function RevisionsTab({ project }: { project: ProjectDetail }) {
       )}
 
       <AddRoundDialog project={project} open={addOpen} onClose={() => setAddOpen(false)} />
+      <AdditionalQuotationDialog
+        projectId={project.id}
+        revisionItemIds={chosen}
+        open={quoteOpen}
+        onClose={() => setQuoteOpen(false)}
+        onCreated={() => setSelected(new Set())}
+      />
     </div>
   )
 }
