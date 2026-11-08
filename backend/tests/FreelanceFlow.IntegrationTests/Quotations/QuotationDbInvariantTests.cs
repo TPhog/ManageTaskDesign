@@ -60,6 +60,55 @@ public class QuotationDbInvariantTests(AppFactory factory) : IntegrationTestBase
             .Should().Be(1);
     }
 
+    [Theory]
+    [InlineData("number = 'HACKED-1'")]
+    [InlineData("title = 'Đổi tiêu đề'")]
+    [InlineData("snapshot = '[1]'::jsonb")]
+    [InlineData("total = 1")]
+    [InlineData("created_at = now() - interval '1 day'")]
+    public async Task Sent_quotation_frozen_columns_cannot_change(string assignment)
+    {
+        var projectId = await CreateProjectAsync();
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var (id, _) = await InsertDraftAsync(db, projectId);
+        await SendRawAsync(db, id, NewNumber());
+
+        var act = () => db.Database.ExecuteSqlRawAsync($"UPDATE quotations SET {assignment} WHERE id = '{id}'");
+
+        (await act.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(Locked);
+    }
+
+    [Fact]
+    public async Task Item_cannot_be_moved_from_draft_into_sent_quotation()
+    {
+        var projectId = await CreateProjectAsync();
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var (sentId, _) = await InsertDraftAsync(db, projectId);
+        await SendRawAsync(db, sentId, NewNumber());
+        var (_, draftItemId) = await InsertDraftAsync(db, projectId);
+
+        var act = () => db.Database.ExecuteSqlInterpolatedAsync($"UPDATE quotation_items SET quotation_id = {sentId} WHERE id = {draftItemId}");
+
+        (await act.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(Locked);
+    }
+
+    [Fact]
+    public async Task Item_cannot_be_moved_out_of_sent_quotation()
+    {
+        var projectId = await CreateProjectAsync();
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var (sentId, sentItemId) = await InsertDraftAsync(db, projectId);
+        await SendRawAsync(db, sentId, NewNumber());
+        var (draftId, _) = await InsertDraftAsync(db, projectId);
+
+        var act = () => db.Database.ExecuteSqlInterpolatedAsync($"UPDATE quotation_items SET quotation_id = {draftId} WHERE id = {sentItemId}");
+
+        (await act.Should().ThrowAsync<PostgresException>()).Which.SqlState.Should().Be(Locked);
+    }
+
     [Fact]
     public async Task Sent_quotation_can_be_superseded()
     {
