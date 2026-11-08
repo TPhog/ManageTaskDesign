@@ -29,6 +29,8 @@ public static class SearchEndpoints
         var prefix = SearchQuery.PrefixPattern(term);
         var byNumber = SearchQuery.HasNumberChars(term);
         var number = SearchQuery.NumberContainsPattern(term);
+        var byPhone = SearchQuery.HasPhoneChars(term);
+        var phone = SearchQuery.PhoneContainsPattern(term);
         var exactNumber = SearchQuery.NumberExactPattern(term);
         const string esc = SearchQuery.EscapeChar;
         const int limit = SearchQuery.GroupLimit;
@@ -37,7 +39,8 @@ public static class SearchEndpoints
         var clients = await db.Clients.AsNoTracking()
             .Where(c => EF.Functions.ILike(EF.Functions.Unaccent(c.Name), EF.Functions.Unaccent(contains), esc)
                 || (c.Company != null && EF.Functions.ILike(EF.Functions.Unaccent(c.Company), EF.Functions.Unaccent(contains), esc))
-                || (c.Phone != null && EF.Functions.ILike(c.Phone, contains, esc)))
+                || (byPhone && c.Phone != null
+                    && EF.Functions.ILike(c.Phone.Replace(" ", "").Replace(".", "").Replace("-", ""), phone, esc)))
             .OrderBy(c => EF.Functions.ILike(EF.Functions.Unaccent(c.Name), EF.Functions.Unaccent(prefix), esc) ? 0 : 1)
             .ThenBy(c => c.Name)
             .Take(limit)

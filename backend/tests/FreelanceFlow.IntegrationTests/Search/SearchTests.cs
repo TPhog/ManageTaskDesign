@@ -57,6 +57,21 @@ public class SearchTests(AppFactory factory) : IntegrationTestBase(factory)
     }
 
     [Fact]
+    public async Task Phone_search_ignores_spaces_dots_and_dashes_on_both_sides()
+    {
+        await LoginAsync();
+        var tok = Token();
+        var d = Random.Shared.Next(100, 999).ToString();
+        var spaced = await CreateClientAsync($"Spaced {tok}", phone: $"0901 {d} 567");
+        var dashed = await CreateClientAsync($"Dashed {tok}", phone: $"0902-{d}-567");
+
+        Ids(await SearchAsync($"0901{d}"), "clients").Should().Contain(spaced);
+        Ids(await SearchAsync($"0901 {d}"), "clients").Should().Contain(spaced);
+        Ids(await SearchAsync($"0902.{d}.567"), "clients").Should().Contain(dashed);
+        Ids(await SearchAsync($"0902{d}567"), "clients").Should().Contain(dashed);
+    }
+
+    [Fact]
     public async Task Each_group_matches_only_its_own_columns()   // no cross-entity leakage
     {
         await LoginAsync();

@@ -29,4 +29,12 @@ internal static class SearchQuery
     public static string NumberContainsPattern(string term) => $"%{EscapeLike(CompactNumber(term))}%";
 
     public static string NumberExactPattern(string term) => EscapeLike(CompactNumber(term));
+
+    /// <summary>Phone numbers are compared without spaces, dots and dashes on both sides ("0901234" finds "0901 234 567").</summary>
+    public static string CompactPhone(string term) =>
+        new(term.Where(ch => ch is not ('-' or '.') && !char.IsWhiteSpace(ch)).ToArray());
+
+    public static bool HasPhoneChars(string term) => CompactPhone(term).Length > 0;
+
+    public static string PhoneContainsPattern(string term) => $"%{EscapeLike(CompactPhone(term))}%";
 }
