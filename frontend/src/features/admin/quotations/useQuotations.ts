@@ -32,6 +32,7 @@ function useOnQuotationChanged() {
     })
     qc.invalidateQueries({ queryKey: qk.projects.all })
     qc.invalidateQueries({ queryKey: qk.revisions.all }) // item→quotation links, quota and suggestions
+    qc.invalidateQueries({ queryKey: qk.tasks.all }) // plan 09: accept may create template tasks
   }
 }
 

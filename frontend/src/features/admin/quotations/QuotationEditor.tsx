@@ -11,10 +11,11 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { MoneyInput } from '@/components/MoneyInput'
 import { MoneyText } from '@/components/MoneyText'
 import { StatusBadge } from '@/components/StatusBadge'
+import { ServicePicker } from '@/features/admin/services/ServicePicker'
 import { api, type ApiError } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { QuotationDetail, QuotationItem, QuotationItemSource, UpdateQuotationBody } from '@/lib/quotationTypes'
-import { computeTotals, kindLabel, quotationErrorMessage, zeroPriceRows } from './quotationUtils'
+import { computeTotals, kindLabel, quotationErrorMessage, zeroPriceLineNames, zeroPriceRows } from './quotationUtils'
 import { useDeleteQuotation, useQuotationCommand, useUpdateQuotation } from './useQuotations'
 
 const panelClass = 'rounded-xl border bg-card p-5 shadow-card'
@@ -88,6 +89,7 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
   const invalid = header.title.trim() === '' || rows.some(r => r.description.trim() === '')
   const busy = update.isPending || command.isPending || remove.isPending
   const zeroRows = zeroPriceRows(rows)
+  const zeroNames = zeroPriceLineNames(rows)
   // QA D-04: BR-31 allows 0 ₫, so warn clearly instead of blocking
   const sendRisky = zeroRows.length > 0 || preview.total === 0
   const { data: settings } = useQuery({
@@ -194,7 +196,7 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
           {zeroRows.length > 0 && (
             <p className="mb-3 flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
               <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-              {zeroRows.length} dòng có đơn giá 0 ₫ — nhập giá trước khi gửi (hạng mục không có dịch vụ mẫu vào báo giá với giá 0).
+              {zeroRows.length} dòng có đơn giá 0 ₫. Nhập đơn giá hoặc bấm “Chọn từ dịch vụ” ở dòng đó; để 0 ₫ nếu là phần tặng khách.
             </p>
           )}
           {rows.length === 0 ? (
@@ -244,7 +246,17 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
                   >
                     <Trash2 aria-hidden="true" />
                   </Button>
-                  {r.unitPrice === 0 && <p className="text-xs text-amber-800 sm:col-span-5">Đơn giá đang là 0 ₫</p>}
+                  <div className="flex flex-wrap items-center gap-2 sm:col-span-5">
+                    <ServicePicker
+                      id={`svc-${r.key}`}
+                      value=""
+                      onPick={s => s && setRow(r.key, { description: s.name, unitPrice: s.basePrice })}
+                      placeholder="Chọn từ dịch vụ"
+                      ariaLabel={`Chọn từ dịch vụ cho dòng ${i + 1}`}
+                      className="w-full sm:w-64"
+                    />
+                    {r.unitPrice === 0 && <p className="text-xs text-amber-800">Đơn giá đang là 0 ₫</p>}
+                  </div>
                   <Textarea
                     aria-label={`Chi tiết dòng ${i + 1}`}
                     placeholder="Chi tiết (tùy chọn)"
@@ -316,7 +328,12 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
             {sendRisky && (
               <span className="mt-2 block rounded-lg bg-amber-50 p-2 font-medium text-amber-800">
                 {preview.total === 0 ? 'Tổng tiền đang là 0 ₫. ' : ''}
-                {zeroRows.length > 0 ? `${zeroRows.length} dòng có đơn giá 0 ₫. ` : ''}
+                {zeroNames.length > 0 && (
+                  <>
+                    <span className="block">{zeroNames.length} dòng có đơn giá 0 ₫:</span>
+                    {zeroNames.map((name, k) => <span key={k} className="block font-normal">• {name}</span>)}
+                  </>
+                )}
                 Khách sẽ nhận đúng số tiền này.
               </span>
             )}

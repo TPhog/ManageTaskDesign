@@ -1,6 +1,6 @@
 import type { ApiError } from '@/lib/api'
 import { liveQuoteRefs } from '@/lib/quoteRefs'
-import type { Deliverable, DeliverableQuoteRef, DeliverableStatus } from '@/lib/types'
+import type { Deliverable, DeliverableQuoteRef, DeliverableStatus, ProjectStatus } from '@/lib/types'
 import type { PaymentStatus, QuotationKind, QuotationListItem, QuotationStatus } from '@/lib/quotationTypes'
 
 /** BR-03 mirror for the editor preview only (the server is authoritative): percent of whole đồng, half-up. */
@@ -74,6 +74,26 @@ export function quoteTargetWarnings(targets: Pick<Deliverable, 'name' | 'service
 /** QA D-03/D-04: indexes of the lines whose unit price is 0 ₫. */
 export const zeroPriceRows = (rows: { unitPrice: number }[]): number[] =>
   rows.flatMap((r, i) => (r.unitPrice === 0 ? [i] : []))
+
+/** Plan 09 / DF-03: the send confirmation names every 0 ₫ line. */
+export const zeroPriceLineNames = (rows: { description: string; unitPrice: number }[]): string[] =>
+  rows.flatMap((r, i) => (r.unitPrice === 0 ? [r.description.trim() || `Dòng ${i + 1}`] : []))
+
+/** Plan 09: typed prices for deliverables without a service (blank / 0 = leave the line at 0 ₫). */
+export const deliverablePricesBody = (
+  targets: Pick<Deliverable, 'id' | 'serviceId'>[], prices: Record<string, number>,
+): { deliverableId: string; unitPrice: number }[] =>
+  targets.filter(d => !d.serviceId && (prices[d.id] ?? 0) > 0).map(d => ({ deliverableId: d.id, unitPrice: prices[d.id] }))
+
+/** What accepting does with NEW_DELIVERABLE lines, by project status (server: AcceptedNewDeliverables). */
+export function acceptOutcome(status: ProjectStatus | undefined): { creates: boolean; text: string } {
+  if (status === 'CANCELLED') return { creates: false, text: 'Dự án đã huỷ nên sẽ không tạo hạng mục nào.' }
+  if (status === 'IN_PROGRESS' || status === 'ON_HOLD')
+    return { creates: true, text: 'Dự án đang chạy nên hạng mục mới ở trạng thái Đang làm, kèm công việc từ các bước mẫu của dịch vụ.' }
+  if (status === 'COMPLETED')
+    return { creates: true, text: 'Dự án đã hoàn thành: hạng mục mới ở trạng thái Chưa bắt đầu, chưa có công việc — mở lại dự án để bắt đầu.' }
+  return { creates: true, text: 'Hạng mục mới ở trạng thái Chưa bắt đầu, chưa có công việc; bước mẫu được đề xuất khi bắt đầu dự án.' }
+}
 
 export interface PaymentAction {
   to: PaymentStatus

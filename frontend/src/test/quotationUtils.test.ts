@@ -7,6 +7,9 @@ import {
   quoteTargetWarnings,
   todayVn,
   zeroPriceRows,
+  zeroPriceLineNames,
+  deliverablePricesBody,
+  acceptOutcome,
 } from '@/features/admin/quotations/quotationUtils'
 import type { QuotationListItem } from '@/lib/quotationTypes'
 
@@ -111,4 +114,32 @@ describe('quoteTargetWarnings (QA D-02/D-03)', () => {
 
 describe('zeroPriceRows (QA D-03/D-04)', () => {
   it('returns the indexes of 0 ₫ lines', () => expect(zeroPriceRows([{ unitPrice: 1 }, { unitPrice: 0 }, { unitPrice: 0 }])).toEqual([1, 2]))
+})
+
+describe('zeroPriceLineNames (plan 09, DF-03)', () => {
+  it('names each 0 ₫ line, falling back to its position when the description is blank', () => {
+    expect(zeroPriceLineNames([
+      { description: 'Logo', unitPrice: 2_000_000 },
+      { description: '  Menu A5 ', unitPrice: 0 },
+      { description: '', unitPrice: 0 },
+    ])).toEqual(['Menu A5', 'Dòng 3'])
+  })
+})
+
+describe('deliverablePricesBody (plan 09)', () => {
+  it('sends typed prices only for deliverables without a service and above 0', () => {
+    const targets = [{ id: 'a', serviceId: null }, { id: 'b', serviceId: 'svc' }, { id: 'c', serviceId: null }]
+    expect(deliverablePricesBody(targets, { a: 450_000, b: 999, c: 0 })).toEqual([{ deliverableId: 'a', unitPrice: 450_000 }])
+  })
+})
+
+describe('acceptOutcome (plan 09)', () => {
+  it('says what accepting does per project status', () => {
+    expect(acceptOutcome('IN_PROGRESS').text).toContain('Đang làm')
+    expect(acceptOutcome('ON_HOLD').text).toContain('Đang làm')
+    expect(acceptOutcome('QUOTED').text).toContain('Chưa bắt đầu')
+    expect(acceptOutcome('COMPLETED').text).toContain('mở lại dự án')
+    expect(acceptOutcome('CANCELLED').creates).toBe(false)
+    expect(acceptOutcome('DRAFT').creates).toBe(true)
+  })
 })

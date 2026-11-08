@@ -13,11 +13,13 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { MoneyInput } from '@/components/MoneyInput'
 import { StatusBadge } from '@/components/StatusBadge'
 import type { ApiError } from '@/lib/api'
 import { liveQuoteRefs, quoteRefLabel } from '@/lib/quoteRefs'
 import type { ProjectDetail } from '@/lib/types'
-import { isFinishedDeliverable, quotationErrorMessage, quoteTargetWarnings } from './quotationUtils'
+import { linePriceError } from '@/features/admin/revisions/revisionUtils'
+import { deliverablePricesBody, isFinishedDeliverable, quotationErrorMessage, quoteTargetWarnings } from './quotationUtils'
 import { useCreateQuotation } from './useQuotations'
 
 type Mode = 'all' | 'selected'
@@ -31,6 +33,7 @@ export function CreateQuotationDialog({ project, open, onClose }: { project: Pro
   const [selected, setSelected] = useState<string[]>([])
   const [title, setTitle] = useState('')
   const [acknowledged, setAcknowledged] = useState(false)
+  const [prices, setPrices] = useState<Record<string, number>>({})
 
   const active = project.deliverables.filter(d => d.status !== 'CANCELLED')
   const finished = project.deliverables.filter(d => isFinishedDeliverable(d.status))
@@ -38,13 +41,16 @@ export function CreateQuotationDialog({ project, open, onClose }: { project: Pro
   const warn = quoteTargetWarnings(targets)
   // QA D-02: billing a deliverable twice needs an explicit decision (BR-01: warn, do not block)
   const needsAck = warn.alreadyQuoted.length > 0
+  const unpriced = targets.filter(d => !d.serviceId)
   const canSubmit = (mode === 'all' || selected.length > 0) && (!needsAck || acknowledged)
+    && unpriced.every(d => !linePriceError(prices[d.id] ?? 0))
 
   function close() {
     setMode('all')
     setSelected([])
     setTitle('')
     setAcknowledged(false)
+    setPrices({})
     onClose()
   }
 
@@ -59,6 +65,7 @@ export function CreateQuotationDialog({ project, open, onClose }: { project: Pro
         title: title.trim() || null,
         fromDeliverables: true,
         deliverableIds: mode === 'selected' ? selected : undefined,
+        deliverablePrices: deliverablePricesBody(targets, prices),
       },
       {
         onSuccess: res => {
@@ -134,36 +141,38 @@ export function CreateQuotationDialog({ project, open, onClose }: { project: Pro
             </fieldset>
           )}
 
-          {(warn.noPrice.length > 0 || needsAck) && (
+          {unpriced.length > 0 && (
+            <fieldset className="space-y-2">
+              <legend className="mb-1 text-sm font-medium text-foreground">Đơn giá hạng mục chưa có dịch vụ mẫu</legend>
+              {unpriced.map(d => (
+                <div key={d.id} className="grid items-center gap-2 sm:grid-cols-[1fr_11rem]">
+                  <Label htmlFor={`price-${d.id}`} className="font-normal">{d.name}{d.quantity > 1 ? ` × ${d.quantity}` : ''}</Label>
+                  <MoneyInput id={`price-${d.id}`} aria-label={`Đơn giá ${d.name}`} value={prices[d.id] ?? 0}
+                    onChange={n => setPrices(p => ({ ...p, [d.id]: n }))} />
+                </div>
+              ))}
+              <p className="text-xs text-muted-foreground">Để trống = 0 ₫, bạn nhập sau trong bản nháp.</p>
+            </fieldset>
+          )}
+
+          {needsAck && (
             <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              {warn.noPrice.length > 0 && (
-                <p className="flex items-start gap-2">
-                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                  <span>
-                    {warn.noPrice.length} hạng mục chưa có dịch vụ mẫu nên dòng báo giá sẽ là 0 ₫: {warn.noPrice.join(', ')}. Nhập đơn giá trong bản nháp trước khi gửi.
-                  </span>
-                </p>
-              )}
-              {needsAck && (
-                <>
-                  <div className="flex items-start gap-2">
-                    <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                    <div>
-                      <p>Đã có trong báo giá đã gửi hoặc đã chấp nhận — tạo thêm sẽ tính tiền lần nữa:</p>
-                      <ul className="mt-1 list-disc pl-5">
-                        {warn.alreadyQuoted.map(a => (
-                          <li key={a.name}>{a.name} ({a.refs.map(quoteRefLabel).join(', ')})</li>
-                        ))}
-                      </ul>
-                      <p className="mt-1 text-xs">Muốn sửa báo giá đã gửi? Mở báo giá đó và bấm “Tạo version mới”.</p>
-                    </div>
-                  </div>
-                  <label className="flex items-center gap-2 font-medium">
-                    <input type="checkbox" checked={acknowledged} onChange={e => setAcknowledged(e.target.checked)} />
-                    Tôi vẫn muốn báo giá lại các hạng mục này
-                  </label>
-                </>
-              )}
+              <div className="flex items-start gap-2">
+                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                <div>
+                  <p>Đã có trong báo giá đã gửi hoặc đã chấp nhận — tạo thêm sẽ tính tiền lần nữa:</p>
+                  <ul className="mt-1 list-disc pl-5">
+                    {warn.alreadyQuoted.map(a => (
+                      <li key={a.name}>{a.name} ({a.refs.map(quoteRefLabel).join(', ')})</li>
+                    ))}
+                  </ul>
+                  <p className="mt-1 text-xs">Muốn sửa báo giá đã gửi? Mở báo giá đó và bấm “Tạo version mới”.</p>
+                </div>
+              </div>
+              <label className="flex items-center gap-2 font-medium">
+                <input type="checkbox" checked={acknowledged} onChange={e => setAcknowledged(e.target.checked)} />
+                Tôi vẫn muốn báo giá lại các hạng mục này
+              </label>
             </div>
           )}
 

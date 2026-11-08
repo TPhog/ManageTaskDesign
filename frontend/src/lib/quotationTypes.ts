@@ -95,6 +95,18 @@ export interface QuotationVersion {
   effectiveStatus: EffectiveStatus
 }
 
+/** Plan 09: a NEW_DELIVERABLE revision item on a line of this quotation (BR-48). itemDescription = the name the deliverable gets. */
+export interface QuotationNewDeliverable {
+  revisionItemId: string
+  quotationItemId: string
+  lineDescription: string
+  serviceId: string | null
+  serviceName: string | null
+  createdDeliverableId: string | null
+  createdDeliverableName: string | null
+  itemDescription: string
+}
+
 export interface QuotationDetail {
   id: string
   projectId: string
@@ -135,6 +147,8 @@ export interface QuotationDetail {
   snapshot: QuotationSnapshot | null
   qrOptions: QrOption[]
   versions: QuotationVersion[]
+  /** plan 09; optional so older fixtures keep compiling */
+  newDeliverables?: QuotationNewDeliverable[]
 }
 
 /** D1: deliverableIds = only those finished deliverables; omitted = whole project. */
@@ -143,6 +157,8 @@ export interface CreateQuotationBody {
   title: string | null
   fromDeliverables: boolean
   deliverableIds?: string[]
+  /** plan 09: prices for deliverables without a service */
+  deliverablePrices?: { deliverableId: string; unitPrice: number }[]
 }
 
 export interface CreateQuotationResult {

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,9 +13,11 @@ import {
 import { DateInput } from '@/components/DateInput'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import type { ApiError } from '@/lib/api'
+import { api, type ApiError } from '@/lib/api'
+import { qk } from '@/lib/queryKeys'
+import type { ProjectDetail } from '@/lib/types'
 import type { QuotationDetail } from '@/lib/quotationTypes'
-import { quotationErrorMessage, todayVn, type PaymentAction } from './quotationUtils'
+import { acceptOutcome, quotationErrorMessage, todayVn, type PaymentAction } from './quotationUtils'
 import { useQuotationCommand } from './useQuotations'
 
 interface DialogProps {
@@ -30,6 +33,14 @@ export function AcceptDialog({ quotation, open, onClose }: DialogProps) {
   const command = useQuotationCommand(quotation.id)
   const [date, setDate] = useState(todayVn())
   const [note, setNote] = useState('')
+  const pending = (quotation.newDeliverables ?? []).filter(n => !n.createdDeliverableId)
+  // what accept does depends on the project status (quotation detail has none) — only needed with new deliverables to add
+  const { data: project } = useQuery({
+    queryKey: qk.projects.detail(quotation.projectId),
+    queryFn: () => api.get<ProjectDetail>(`/admin/projects/${quotation.projectId}`),
+    enabled: open && pending.length > 0,
+  })
+  const outcome = acceptOutcome(project?.status)
 
   function close() {
     setNote('')
@@ -41,7 +52,9 @@ export function AcceptDialog({ quotation, open, onClose }: DialogProps) {
       { action: 'accept', body: { acceptedAt: date, note: note.trim() || null, rowVersion: quotation.rowVersion } },
       {
         onSuccess: () => {
-          toast.success('Đã đánh dấu chấp nhận')
+          toast.success(pending.length > 0 && outcome.creates
+            ? `Đã đánh dấu chấp nhận · thêm ${pending.length} hạng mục mới`
+            : 'Đã đánh dấu chấp nhận')
           close()
         },
         onError: failed,
@@ -57,6 +70,24 @@ export function AcceptDialog({ quotation, open, onClose }: DialogProps) {
           <DialogDescription>Ghi nhận khách đã đồng ý báo giá {quotation.number} (qua Zalo, email…).</DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-2">
+          {pending.length > 0 && (
+            <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+              <p className="font-medium">
+                {outcome.creates
+                  ? `Sẽ thêm ${pending.length} hạng mục mới vào dự án:`
+                  : `${pending.length} hạng mục mới sẽ không được tạo:`}
+              </p>
+              <ul className="mt-1 list-disc pl-5">
+                {pending.map(n => (
+                  <li key={n.revisionItemId}>
+                    {n.itemDescription || n.serviceName || n.lineDescription}
+                    {n.serviceName ? '' : ' — không có dịch vụ mẫu (0 vòng sửa miễn phí)'}
+                  </li>
+                ))}
+              </ul>
+              {project && <p className="mt-2 text-xs">{outcome.text}</p>}
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="accept-date">Ngày chấp nhận</Label>
             <DateInput id="accept-date" value={date} onChange={setDate} />

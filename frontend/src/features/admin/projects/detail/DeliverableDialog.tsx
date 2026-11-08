@@ -171,7 +171,7 @@ export function DeliverableDialog({ projectId, open, onClose, editing }: Props) 
               />
               {serviceId === NO_SERVICE && (
                 <p className="text-xs text-muted-foreground">
-                  Không có dịch vụ mẫu thì dòng báo giá của hạng mục này là 0 ₫ — nhập đơn giá trong bản nháp báo giá.
+                  Không có dịch vụ mẫu: bạn nhập đơn giá khi tạo báo giá (hoặc trong bản nháp).
                 </p>
               )}
             </div>
