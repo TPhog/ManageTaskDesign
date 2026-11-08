@@ -9,14 +9,18 @@ public sealed class AppFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public const string TestUsername = "designer";
     public const string TestPassword = "testpassword1234";
+    public const string TestDatabaseName = "freelanceflow_test";
 
     private readonly PostgreSqlContainer _db = new PostgreSqlBuilder()
         .WithImage("postgres:17-alpine")
-        .WithDatabase("freelanceflow_test")
+        .WithDatabase(TestDatabaseName)
         .WithUsername("ff")
         .WithPassword("changeme")
         .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(5432))
         .Build();
+
+    /// <summary>Connection string of the Testcontainers database (valid after InitializeAsync).</summary>
+    public string DatabaseConnectionString => _db.GetConnectionString();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
