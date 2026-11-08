@@ -7,6 +7,7 @@ import type {
   TaskDetail,
   TaskListItem,
   TaskListParams,
+  TaskNote,
   TaskStatus,
   TaskUpdateInput,
 } from '@/lib/types'
@@ -28,7 +29,11 @@ function errorText(err: ApiError, fallback: string): string {
 /** Every task write returns the fresh TaskDetail: store it, then refresh the lists that show the task. */
 function onTaskSaved(qc: QueryClient, task: TaskDetail | undefined) {
   if (task) qc.setQueryData(qk.tasks.detail(task.id), task)
-  return qc.invalidateQueries({ queryKey: qk.tasks.lists })
+  // plan 06b: task status feeds deliverable progress and the project flow (both under qk.projects.all)
+  return Promise.all([
+    qc.invalidateQueries({ queryKey: qk.tasks.lists }),
+    qc.invalidateQueries({ queryKey: qk.projects.all }),
+  ])
 }
 
 export function useTaskList(params: TaskListParams) {
@@ -94,7 +99,7 @@ export function useMoveTask() {
       if (task) qc.setQueryData(qk.tasks.detail(task.id), task)
     },
     // Refetch the lists either way so the cache never keeps a card in a position the server rejected
-    onSettled: () => qc.invalidateQueries({ queryKey: qk.tasks.lists }),
+    onSettled: () => Promise.all([qc.invalidateQueries({ queryKey: qk.tasks.lists }), qc.invalidateQueries({ queryKey: qk.projects.all })]),
   })
 }
 
@@ -125,8 +130,13 @@ export function useChecklist(taskId: string) {
   })
 
   const update = useMutation({
-    mutationFn: (item: { id: string; text: string; done: boolean }) =>
-      api.put<TaskDetail>(`/admin/tasks/${taskId}/checklist/${item.id}`, { text: item.text, done: item.done }),
+    // description omitted = the server keeps it (the checkbox toggle does not send it)
+    mutationFn: (item: { id: string; text: string; done: boolean; description?: string }) =>
+      api.put<TaskDetail>(`/admin/tasks/${taskId}/checklist/${item.id}`, {
+        text: item.text,
+        done: item.done,
+        ...(item.description !== undefined ? { description: item.description } : {}),
+      }),
     // Optimistic tick so the checkbox does not flicker back while saving
     onMutate: async item => {
       await qc.cancelQueries({ queryKey: detailKey })
@@ -134,7 +144,7 @@ export function useChecklist(taskId: string) {
       if (prev) {
         qc.setQueryData<TaskDetail>(detailKey, {
           ...prev,
-          checklist: prev.checklist.map(i => (i.id === item.id ? { ...i, text: item.text, done: item.done } : i)),
+          checklist: prev.checklist.map(i => (i.id === item.id ? { ...i, text: item.text, done: item.done, description: item.description ?? i.description } : i)),
         })
       }
       return { prev }
@@ -149,6 +159,48 @@ export function useChecklist(taskId: string) {
   const remove = useMutation({
     mutationFn: (itemId: string) => api.delete<TaskDetail>(`/admin/tasks/${taskId}/checklist/${itemId}`),
     onSuccess,
+    onError,
+  })
+
+  return { add, update, remove }
+}
+
+export function useTaskNotes(taskId: string) {
+  return useQuery({
+    queryKey: qk.tasks.notes(taskId),
+    queryFn: () => api.get<TaskNote[]>(`/admin/tasks/${taskId}/notes`),
+  })
+}
+
+/** Notes change notesCount on the task detail and on the Kanban card. */
+export function useTaskNoteMutations(taskId: string) {
+  const qc = useQueryClient()
+  const refresh = () =>
+    Promise.all([
+      qc.invalidateQueries({ queryKey: qk.tasks.notes(taskId) }),
+      qc.invalidateQueries({ queryKey: qk.tasks.detail(taskId) }),
+      qc.invalidateQueries({ queryKey: qk.tasks.lists }),
+    ])
+  const onError = (err: ApiError) => toast.error(errorText(err, 'Không thể lưu ghi chú'))
+
+  const add = useMutation({
+    mutationFn: (body: string) => api.post<TaskNote>(`/admin/tasks/${taskId}/notes`, { body }),
+    onSuccess: refresh,
+    onError,
+  })
+
+  const update = useMutation({
+    mutationFn: ({ id, body }: { id: string; body: string }) => api.put<TaskNote>(`/admin/tasks/${taskId}/notes/${id}`, { body }),
+    onSuccess: refresh,
+    onError,
+  })
+
+  const remove = useMutation({
+    mutationFn: (id: string) => api.delete<void>(`/admin/tasks/${taskId}/notes/${id}`),
+    onSuccess: () => {
+      toast.success('Đã xoá ghi chú')
+      return refresh()
+    },
     onError,
   })
 

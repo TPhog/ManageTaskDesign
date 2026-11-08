@@ -16,7 +16,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, ListChecks, MoreHorizontal } from 'lucide-react'
+import { FileText, GripVertical, ListChecks, MessageSquare, MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -225,7 +225,7 @@ interface CardBodyProps {
 
 function CardBody({ task, today, onOpen, handle, menu }: CardBodyProps) {
   return (
-    <div className="rounded-lg border bg-card p-3 shadow-sm">
+    <div data-testid={`task-card-${task.id}`} className="rounded-lg border bg-card p-3 shadow-sm">
       <div className="flex items-start gap-1.5">
         {handle}
         {onOpen ? (
@@ -248,6 +248,19 @@ function CardBody({ task, today, onOpen, handle, menu }: CardBodyProps) {
           <span className="inline-flex items-center gap-1 text-xs tabular-nums text-muted-foreground">
             <ListChecks className="h-3.5 w-3.5" aria-hidden="true" />
             {task.checklistDone}/{task.checklistTotal}
+          </span>
+        )}
+        {task.hasDescription && (
+          <span title="Có mô tả" className="inline-flex items-center text-muted-foreground">
+            <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="sr-only">Có mô tả</span>
+          </span>
+        )}
+        {task.notesCount > 0 && (
+          <span title={`${task.notesCount} ghi chú`} className="inline-flex items-center gap-1 text-xs tabular-nums text-muted-foreground">
+            <MessageSquare className="h-3.5 w-3.5" aria-hidden="true" />
+            {task.notesCount}
+            <span className="sr-only"> ghi chú</span>
           </span>
         )}
       </div>

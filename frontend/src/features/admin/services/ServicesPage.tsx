@@ -16,6 +16,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { StatusBadge } from '@/components/StatusBadge'
+import { TaskTemplateEditor } from './TaskTemplateEditor'
+import { templateError } from './templateUtils'
 
 // Mirrors ServiceDto in Features/Services/ServicesEndpoints.cs
 interface Service {
@@ -26,6 +28,8 @@ interface Service {
   defaultIncludedRounds: number
   extraRoundPrice: number
   active: boolean
+  /** plan 06b: ordered step names used by "Bắt đầu dự án" */
+  taskTemplate: string[]
 }
 
 const schema = z.object({
@@ -42,6 +46,8 @@ export default function ServicesPage() {
   const queryClient = useQueryClient()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Service | null>(null)
+  const [template, setTemplate] = useState<string[]>([])
+  const [templateErr, setTemplateErr] = useState<string | null>(null)
 
   const { data: services, isLoading } = useQuery({
     queryKey: ['services'],
@@ -57,6 +63,8 @@ export default function ServicesPage() {
   function openCreate() {
     setEditing(null)
     reset({ name: '', description: '', basePrice: 0, defaultIncludedRounds: 0, extraRoundPrice: 0 })
+    setTemplate([])
+    setTemplateErr(null)
     setSheetOpen(true)
   }
 
@@ -69,14 +77,18 @@ export default function ServicesPage() {
       defaultIncludedRounds: svc.defaultIncludedRounds,
       extraRoundPrice: svc.extraRoundPrice,
     })
+    setTemplate(svc.taskTemplate ?? [])
+    setTemplateErr(null)
     setSheetOpen(true)
   }
 
   const saveMutation = useMutation({
-    mutationFn: (data: FormValues) =>
-      editing
-        ? api.put(`/admin/services/${editing.id}`, { ...data, active: editing.active })
-        : api.post('/admin/services', data),
+    mutationFn: (data: FormValues) => {
+      const body = { ...data, taskTemplate: template.map(s => s.trim()) }
+      return editing
+        ? api.put(`/admin/services/${editing.id}`, { ...body, active: editing.active })
+        : api.post('/admin/services', body)
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['services'] })
       setSheetOpen(false)
@@ -85,6 +97,8 @@ export default function ServicesPage() {
     onError: (err: ApiError) => {
       if (err.status === 409) {
         setError('name', { message: 'Đã có dịch vụ trùng tên' })
+      } else if (err.errors?.taskTemplate) {
+        setTemplateErr(err.errors.taskTemplate[0] ?? 'Bước mẫu không hợp lệ')
       } else {
         toast.error('Lưu thất bại. Vui lòng thử lại.')
       }
@@ -181,6 +195,9 @@ export default function ServicesPage() {
                     <td className="px-4 py-3.5">
                       <div className="font-medium text-foreground">{svc.name}</div>
                       {svc.description && <div className="max-w-xs truncate text-xs text-muted-foreground">{svc.description}</div>}
+                      {(svc.taskTemplate?.length ?? 0) > 0 && (
+                        <div className="text-xs text-muted-foreground">{svc.taskTemplate.length} bước mẫu</div>
+                      )}
                     </td>
                     <td className="px-4 py-3.5 text-right font-medium tabular-nums"><MoneyText amount={svc.basePrice} /></td>
                     <td className="hidden px-4 py-3.5 text-right tabular-nums text-muted-foreground sm:table-cell">{svc.defaultIncludedRounds}</td>
@@ -219,7 +236,15 @@ export default function ServicesPage() {
             <SheetTitle>{editing ? 'Sửa dịch vụ' : 'Thêm dịch vụ'}</SheetTitle>
             <SheetDescription>Giá tính bằng VND, không có phần thập phân.</SheetDescription>
           </SheetHeader>
-          <form onSubmit={handleSubmit(data => saveMutation.mutate(data))} className="mt-6 flex flex-1 flex-col" noValidate>
+          <form
+            onSubmit={handleSubmit(data => {
+              const error = templateError(template)
+              setTemplateErr(error)
+              if (!error) saveMutation.mutate(data)
+            })}
+            className="mt-6 flex flex-1 flex-col"
+            noValidate
+          >
             <div className="flex-1 space-y-5 overflow-y-auto pr-1">
               <div className="space-y-2">
                 <Label htmlFor="service-name">Tên dịch vụ</Label>
@@ -247,6 +272,7 @@ export default function ServicesPage() {
                   {fieldError('extraRoundPrice')}
                 </div>
               </div>
+              <TaskTemplateEditor value={template} onChange={setTemplate} error={templateErr} />
             </div>
             <SheetFooter className="mt-6 gap-2">
               <Button type="button" variant="outline" onClick={() => setSheetOpen(false)}>Huỷ</Button>

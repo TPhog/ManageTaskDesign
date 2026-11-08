@@ -9,13 +9,14 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
+import { MarkdownField } from './MarkdownField'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { api } from '@/lib/api'
 import { qk } from '@/lib/queryKeys'
 import type { ProjectDetail, TaskDetail } from '@/lib/types'
 import { TaskChecklist } from './TaskChecklist'
+import { TaskNotes } from './TaskNotes'
 import { TASK_PRIORITIES, TASK_STATUSES, taskPriorityLabel, taskStatusLabel } from './taskUtils'
 import { useDeleteTask, useTask, useUpdateTask } from './useTasks'
 
@@ -24,7 +25,7 @@ const NO_DELIVERABLE = '_none'
 
 const schema = z.object({
   title: z.string().trim().min(1, 'Vui lòng nhập tiêu đề').max(200, 'Tối đa 200 ký tự'),
-  description: z.string(),
+  description: z.string().max(20000, 'Tối đa 20000 ký tự'),
   status: z.enum(['TODO', 'IN_PROGRESS', 'REVIEW', 'DONE', 'BLOCKED']),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
   startDate: z.string(),
@@ -71,6 +72,7 @@ export function TaskDrawer({ taskId, onClose }: Props) {
             {/* remount after each save so the form shows the server's values */}
             <TaskForm key={`${task.id}-${task.updatedAt}`} task={task} onDeleted={onClose} />
             <TaskChecklist task={task} />
+            <TaskNotes taskId={task.id} />
           </div>
         )}
       </SheetContent>
@@ -177,10 +179,15 @@ function TaskForm({ task, onDeleted }: { task: TaskDetail; onDeleted: () => void
         </Select>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="task-description">Mô tả</Label>
-        <Textarea id="task-description" rows={5} placeholder="Ghi chú, link tham khảo…" {...register('description')} />
-      </div>
+      <MarkdownField
+        id="task-description"
+        label="Mô tả"
+        value={watch('description')}
+        onChange={v => setValue('description', v, { shouldDirty: true })}
+        maxLength={20000}
+        placeholder="Mục tiêu, link tham khảo, yêu cầu của khách… (Markdown)"
+        error={errors.description?.message}
+      />
 
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
         {confirmDelete ? (
