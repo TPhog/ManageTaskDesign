@@ -13,6 +13,7 @@ import ServicesPage from './features/admin/services/ServicesPage'
 import ProjectsPage from './features/admin/projects/ProjectsPage'
 import ProjectDetailPage from './features/admin/projects/detail/ProjectDetailPage'
 import ClientsPage from './features/admin/clients/ClientsPage'
+import TasksPage from './features/admin/tasks/TasksPage'
 
 export const router = createBrowserRouter([
   {
@@ -29,6 +30,7 @@ export const router = createBrowserRouter([
       { path: 'services', element: <ServicesPage /> },
       { path: 'projects', element: <ProjectsPage /> },
       { path: 'projects/:id', element: <ProjectDetailPage /> },
+      { path: 'tasks', element: <TasksPage /> },
       { path: 'clients', element: <ClientsPage /> },
     ],
   },

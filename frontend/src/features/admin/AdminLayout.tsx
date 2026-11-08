@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { LayoutDashboard, FolderKanban, Users, Briefcase, Settings, LogOut, Menu } from 'lucide-react'
+import { LayoutDashboard, FolderKanban, ListChecks, Users, Briefcase, Settings, LogOut, Menu } from 'lucide-react'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 const navItems = [
   { to: '/admin', label: 'Tổng quan', icon: LayoutDashboard, end: true },
   { to: '/admin/projects', label: 'Dự án', icon: FolderKanban },
+  { to: '/admin/tasks', label: 'Công việc', icon: ListChecks },
   { to: '/admin/clients', label: 'Khách hàng', icon: Users },
   { to: '/admin/services', label: 'Dịch vụ', icon: Briefcase },
   { to: '/admin/settings', label: 'Cài đặt', icon: Settings },

@@ -1,9 +1,15 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
-import { createProject, expectToast, selectOption } from './helpers'
+import { createProject, createTask, expectToast, selectOption } from './helpers'
 
 /** Today in Vietnam as YYYY-MM-DD (the app compares due dates with today(VN), BR-81). */
 function vnToday(): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date())
+}
+
+function addDaysIso(isoDate: string, days: number): string {
+  const d = new Date(`${isoDate}T00:00:00Z`)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d.toISOString().slice(0, 10)
 }
 
 /** Mouse drag in small steps so dnd-kit's PointerSensor (5px threshold) activates. */
@@ -94,5 +100,52 @@ test.describe('Project tasks tab', () => {
     await expect(row).toContainText('Chờ duyệt')
     await expect(row).toContainText('Khẩn cấp')
     await expect(row).toContainText('Hôm nay')
+  })
+})
+
+test.describe('All tasks page', () => {
+  test('sidebar opens the tasks page', async ({ page }) => {
+    await page.goto('/admin')
+    await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: 'Công việc' }).click()
+    await expect(page).toHaveURL(/\/admin\/tasks$/)
+    await expect(page.getByRole('heading', { name: 'Công việc', level: 1 })).toBeVisible()
+  })
+
+  test('shows overdue and due-today tasks under their quick filters', async ({ page }) => {
+    await page.goto('/admin')
+    const stamp = Date.now()
+    const projectName = `E2E Tasks ${stamp}`
+    const projectId = await createProject(page, projectName)
+    const today = vnToday()
+    const dueToday = `Gửi file in E2E ${stamp}`
+    const overdue = `Sửa banner E2E ${stamp}`
+    await createTask(page, projectId, { title: dueToday, dueDate: today })
+    await createTask(page, projectId, { title: overdue, dueDate: addDaysIso(today, -1) })
+
+    await page.goto('/admin/tasks')
+    const filters = page.getByRole('group', { name: 'Lọc nhanh' })
+
+    await filters.getByRole('button', { name: 'Hôm nay', exact: true }).click()
+    await expect(page).toHaveURL(/due=today/)
+    await expect(page.getByRole('row', { name: new RegExp(dueToday) })).toContainText('Hôm nay')
+    await expect(page.getByRole('row', { name: new RegExp(overdue) })).toHaveCount(0)
+
+    await filters.getByRole('button', { name: 'Quá hạn', exact: true }).click()
+    await expect(page).toHaveURL(/due=overdue/)
+    const overdueRow = page.getByRole('row', { name: new RegExp(overdue) })
+    await expect(overdueRow).toContainText('Quá hạn')
+    await expect(page.getByRole('row', { name: new RegExp(dueToday) })).toHaveCount(0)
+
+    // the title opens the drawer in place
+    await overdueRow.getByRole('button', { name: overdue, exact: true }).click()
+    const drawer = page.getByRole('dialog', { name: 'Chi tiết công việc' })
+    await expect(drawer.getByLabel('Tiêu đề')).toHaveValue(overdue)
+    await page.keyboard.press('Escape')
+    await expect(drawer).toBeHidden()
+
+    // the project link goes to the project's task tab
+    await overdueRow.getByRole('link', { name: projectName }).click()
+    await expect(page).toHaveURL(new RegExp(`/admin/projects/${projectId}\\?tab=tasks`))
+    await expect(page.getByRole('region', { name: 'Cột Cần làm' })).toContainText(overdue)
   })
 })
