@@ -9,6 +9,7 @@ using FreelanceFlow.Api.Features.Portal;
 using FreelanceFlow.Api.Features.Projects;
 using FreelanceFlow.Api.Features.Services;
 using FreelanceFlow.Api.Features.Settings;
+using FreelanceFlow.Api.Features.Tasks;
 using FreelanceFlow.Api.Infrastructure;
 using FreelanceFlow.Api.Infrastructure.Security;
 using Microsoft.AspNetCore.HttpOverrides;
@@ -204,6 +205,7 @@ app.MapClientsEndpoints();
 app.MapProjectsEndpoints();
 app.MapBriefsEndpoints();
 app.MapDeliverablesEndpoints();
+app.MapTasksEndpoints();
 app.MapPortalSessionEndpoints();
 app.MapPortalProjectsEndpoints();
 

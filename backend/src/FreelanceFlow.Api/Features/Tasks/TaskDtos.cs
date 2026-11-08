@@ -1,0 +1,66 @@
+namespace FreelanceFlow.Api.Features.Tasks;
+
+// GET /api/admin/tasks item (docs/05 §3.9). Designer-only: tasks never reach the portal (TSK-05).
+public record TaskListItemDto(
+    Guid Id,
+    Guid ProjectId,
+    string ProjectName,
+    string ClientName,
+    Guid? DeliverableId,
+    string? DeliverableName,
+    string Title,
+    string Status,
+    string Priority,
+    DateOnly? StartDate,
+    DateOnly? DueDate,
+    double SortOrder,
+    DateTimeOffset? CompletedAt,
+    bool IsOverdue,
+    int ChecklistTotal,
+    int ChecklistDone,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
+
+public record ChecklistItemDto(Guid Id, string Text, bool Done, int SortOrder);
+
+public record TaskDetailDto(
+    Guid Id,
+    Guid ProjectId,
+    string ProjectName,
+    Guid? DeliverableId,
+    string? DeliverableName,
+    string Title,
+    string Description,
+    string Status,
+    string Priority,
+    DateOnly? StartDate,
+    DateOnly? DueDate,
+    double SortOrder,
+    DateTimeOffset? CompletedAt,
+    bool IsOverdue,
+    IReadOnlyList<ChecklistItemDto> Checklist,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset UpdatedAt);
+
+public record CreateTaskRequest(
+    string? Title,
+    string? Description,
+    string? Status,
+    string? Priority,
+    DateOnly? StartDate,
+    DateOnly? DueDate,
+    Guid? DeliverableId);
+
+// Status/Priority null = keep current; every other field is replaced
+public record UpdateTaskRequest(
+    string? Title,
+    string? Description,
+    string? Status,
+    string? Priority,
+    DateOnly? StartDate,
+    DateOnly? DueDate,
+    Guid? DeliverableId);
+
+public record MoveTaskRequest(string? Status, double? SortOrder);
+
+public record ChecklistItemRequest(string? Text, bool? Done);
