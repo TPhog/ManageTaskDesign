@@ -16,6 +16,7 @@ public static class PortalProjectsEndpoints
         group.MapGet("", ListProjects);
         group.MapGet("{id:guid}", GetProject);
         group.MapGet("{id:guid}/timeline", GetTimeline);
+        group.MapGet("{id:guid}/revisions", GetRevisions);
     }
 
     private static async Task<IResult> ListProjects(
@@ -106,6 +107,60 @@ public static class PortalProjectsEndpoints
             summary,
             deliverableDtos,
             brief));
+    }
+
+    /// <summary>
+    /// POR-02 / REV-07: rounds and items per deliverable with the quota (docs/02 §5.1), then project-level rounds.
+    /// Client-safe fields only — description, type, billing, work status (docs/05 §4).
+    /// </summary>
+    private static async Task<IResult> GetRevisions(
+        Guid id,
+        [FromServices] PortalPrincipal principal,
+        AppDbContext db)
+    {
+        if (!await PortalScope.OwnProjects(db, principal).AnyAsync(p => p.Id == id)) return Results.NotFound();
+
+        // Below this point `id` is proven to belong to the client.
+        var rounds = await db.RevisionRounds.AsNoTracking()
+            .Where(r => r.ProjectId == id)
+            .OrderBy(r => r.RoundNo).ThenBy(r => r.CreatedAt)
+            .Select(r => new { r.Id, r.DeliverableId, r.RoundNo, r.ReceivedAt })
+            .ToListAsync();
+        var roundIds = rounds.Select(r => r.Id).ToList();
+        var items = (await db.RevisionItems.AsNoTracking()
+                .Where(i => roundIds.Contains(i.RoundId))
+                .OrderBy(i => i.SortOrder).ThenBy(i => i.CreatedAt)
+                .Select(i => new { i.Id, i.RoundId, i.Description, i.Type, i.Billing, i.WorkStatus })
+                .ToListAsync())
+            .ToLookup(i => i.RoundId, i => new PortalRevisionItemDto(i.Id, i.Description, i.Type, i.Billing, i.WorkStatus));
+
+        // used_rounds (docs/04 §4.1): the same single query as the admin side and GetProject
+        var usedRoundsMap = await RevisionQuota.UsedRounds(db.RevisionRounds.Where(r => r.ProjectId == id), db.RevisionItems)
+            .ToDictionaryAsync(x => x.DeliverableId, x => x.UsedRounds);
+
+        var deliverables = await db.Deliverables.AsNoTracking()
+            .Where(d => d.ProjectId == id)
+            .OrderBy(d => d.SortOrder).ThenBy(d => d.CreatedAt)
+            .Select(d => new { d.Id, d.Name, d.Status, d.IncludedRounds })
+            .ToListAsync();
+
+        var roundDtos = rounds
+            .Select(r => (r.DeliverableId, Dto: new PortalRoundDto(r.Id, r.RoundNo, r.ReceivedAt, items[r.Id].ToList())))
+            .ToList();
+        var byDeliverable = roundDtos.Where(x => x.DeliverableId != null).ToLookup(x => x.DeliverableId!.Value, x => x.Dto);
+
+        var deliverableDtos = deliverables
+            .Where(d => d.Status != "CANCELLED" || byDeliverable[d.Id].Any())
+            .Select(d =>
+            {
+                var used = usedRoundsMap.GetValueOrDefault(d.Id);
+                return new PortalDeliverableRevisionsDto(d.Id, d.Name, d.IncludedRounds, used,
+                    RevisionQuota.RemainingRounds(d.IncludedRounds, used), byDeliverable[d.Id].ToList());
+            })
+            .ToList();
+        var projectRounds = roundDtos.Where(x => x.DeliverableId == null).Select(x => x.Dto).ToList();
+
+        return Results.Ok(new PortalRevisionsDto(deliverableDtos, projectRounds));
     }
 
     private static async Task<IResult> GetTimeline(

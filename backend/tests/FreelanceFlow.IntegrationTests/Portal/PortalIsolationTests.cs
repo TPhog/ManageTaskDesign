@@ -18,6 +18,7 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
         ["GET /api/portal/projects"] = "/api/portal/projects",
         ["GET /api/portal/projects/{id:guid}"] = "/api/portal/projects/{projectA}",
         ["GET /api/portal/projects/{id:guid}/timeline"] = "/api/portal/projects/{projectA}/timeline",
+        ["GET /api/portal/projects/{id:guid}/revisions"] = "/api/portal/projects/{projectA}/revisions",
         ["GET /api/portal/quotations"] = "/api/portal/quotations?projectId={projectA}",
         ["GET /api/portal/quotations/{id:guid}"] = "/api/portal/quotations/{quotationA}",
         ["GET /api/portal/quotations/{id:guid}/versions/{version:int}"] = "/api/portal/quotations/{quotationA}/versions/1",
@@ -145,7 +146,9 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
         var projectAName = "ISOLATION-A-" + Guid.NewGuid().ToString("N");
         var projectA = await CreateProjectAsync(clientA, projectAName);
         var deliverableAName = "ISOLATION-DELIVERABLE-A-" + Guid.NewGuid().ToString("N");
-        await CreateDeliverableAsync(projectA, deliverableAName);
+        var deliverableA = await CreateDeliverableAsync(projectA, deliverableAName);
+        await CreateRoundAsync(projectA, deliverableA, "SECRET-INTERNAL-ITEM",
+            ($"Sửa {projectAName}", "MINOR", "IN_QUOTA")); // M7b: A has a round whose item carries an internal note
         await ChangeProjectStatusAsync(projectA, new { to = "IN_PROGRESS", confirmWarnings = true }); // A gets a timeline entry
         (await Client.PostAsJsonAsync($"/api/admin/projects/{projectA}/progress-updates",
             new { message = $"Tiến độ {projectAName}" })).EnsureSuccessStatusCode(); // M5: designer progress update on A's timeline

@@ -101,3 +101,21 @@ public sealed record PortalRequestDto(
     string Status,
     string? DeclineReason,
     IReadOnlyList<PortalRequestAttachmentDto> Attachments);
+
+// ---------- revisions (docs/05 §4, REV-07): never internalNotes, scopeOverrideReason, quotation links, tasks or round notes ----------
+
+public sealed record PortalRevisionItemDto(Guid Id, string Description, string Type, string Billing, string WorkStatus);
+
+public sealed record PortalRoundDto(Guid Id, int RoundNo, DateOnly ReceivedAt, IReadOnlyList<PortalRevisionItemDto> Items);
+
+public sealed record PortalDeliverableRevisionsDto(
+    Guid Id,
+    string Name,
+    int IncludedRounds,
+    int UsedRounds,
+    int RemainingRounds,
+    IReadOnlyList<PortalRoundDto> Rounds);
+
+public sealed record PortalRevisionsDto(
+    IReadOnlyList<PortalDeliverableRevisionsDto> Deliverables,
+    IReadOnlyList<PortalRoundDto> ProjectRounds);

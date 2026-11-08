@@ -161,4 +161,33 @@ public abstract class PortalTestBase(AppFactory factory) : IntegrationTestBase(f
         if (deliverableId is { } d) form.Add(new StringContent(d.ToString()), "deliverableId");
         return form;
     }
+
+    /// <summary>
+    /// Designer-created round (docs/05 §3.8); the first item then gets <paramref name="internalNotes"/> via PUT.
+    /// Returns the RoundDto JSON of the create call.
+    /// </summary>
+    protected async Task<JsonElement> CreateRoundAsync(Guid projectId, Guid? deliverableId, string internalNotes,
+        params (string Description, string Type, string Billing)[] items)
+    {
+        var resp = await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/rounds", new
+        {
+            deliverableId,
+            receivedAt = (string?)null,
+            items = items.Select(i => new { description = i.Description, type = i.Type, billing = i.Billing }).ToArray(),
+        });
+        resp.StatusCode.Should().Be(HttpStatusCode.Created, await resp.Content.ReadAsStringAsync());
+        var round = await resp.Content.ReadFromJsonAsync<JsonElement>();
+
+        var first = round.GetProperty("items")[0];
+        var put = await Client.PutAsJsonAsync($"/api/admin/revision-items/{first.GetProperty("id").GetGuid()}", new
+        {
+            description = first.GetProperty("description").GetString(),
+            type = first.GetProperty("type").GetString(),
+            billing = first.GetProperty("billing").GetString(),
+            internalNotes,
+            rowVersion = first.GetProperty("rowVersion").GetUInt32(),
+        });
+        put.StatusCode.Should().Be(HttpStatusCode.OK, await put.Content.ReadAsStringAsync());
+        return round;
+    }
 }
