@@ -2,6 +2,7 @@ using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Projects;
 using FreelanceFlow.Api.Domain.Revisions;
+using FreelanceFlow.Api.Domain.Tasks;
 using FreelanceFlow.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -149,9 +150,16 @@ public static class ProjectsEndpoints
         var usedRoundsMap = await RevisionQuota.UsedRounds(db.RevisionRounds.Where(r => r.ProjectId == id), db.RevisionItems)
             .ToDictionaryAsync(x => x.DeliverableId, x => x.UsedRounds);
 
+        // Plan 06b F3: % of the deliverable's tasks that are DONE (the single query lives in Domain/Tasks)
+        var taskCounts = await TaskProgress.PerDeliverable(db.Tasks.Where(t => t.ProjectId == id))
+            .ToDictionaryAsync(x => x.DeliverableId);
+
         var deliverableDtos = deliverables.Select(d =>
         {
             var used = usedRoundsMap.GetValueOrDefault(d.Id);
+            var tasks = taskCounts.GetValueOrDefault(d.Id);
+            var taskTotal = tasks?.Total ?? 0;
+            var taskDone = tasks?.Done ?? 0;
             return new
             {
                 d.Id,
@@ -165,6 +173,11 @@ public static class ProjectsEndpoints
                 d.ExtraRoundPrice,
                 d.DueDate,
                 d.SortOrder,
+                TaskTotal = taskTotal,
+                TaskDone = taskDone,
+                ProgressPercent = TaskProgress.Percent(taskTotal, taskDone),
+                d.ClientDecision,
+                d.ClientDecisionAt,
             };
         });
 

@@ -228,6 +228,7 @@ app.MapAdditionalQuotationEndpoints();
 app.MapRequestsEndpoints();
 app.MapRevisionsEndpoints();
 app.MapProgressUpdatesEndpoints();
+app.MapProjectFlowEndpoints();
 app.MapPortalSessionEndpoints();
 app.MapPortalProjectsEndpoints();
 app.MapPortalQuotationsEndpoints();

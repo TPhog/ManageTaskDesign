@@ -207,6 +207,16 @@ public class ProjectFlowTests
     }
 
     [Fact]
+    public void Execute_warnings_are_ordered_deposit_unpaid_then_tasks_overdue_then_quota_exceeded()
+    {
+        var s = Eval(Facts("IN_PROGRESS", brief: true, deliverables: [D("IN_PROGRESS", included: 1, used: 1)],
+            quotations: [Q("ACCEPTED")], overdue: 2));
+
+        s.Stage.Should().Be("EXECUTE");
+        s.Warnings.Select(w => w.Kind).Should().Equal("DEPOSIT_UNPAID", "TASKS_OVERDUE", "QUOTA_EXCEEDED");
+    }
+
+    [Fact]
     public void One_new_request_has_a_singular_label()
     {
         var s = Eval(Facts("IN_PROGRESS", brief: true, deliverables: [D("IN_PROGRESS")],

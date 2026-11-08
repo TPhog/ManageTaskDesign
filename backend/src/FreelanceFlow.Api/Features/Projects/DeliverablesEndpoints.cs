@@ -9,6 +9,8 @@ namespace FreelanceFlow.Api.Features.Projects;
 
 public static class DeliverablesEndpoints
 {
+    private const int MaxReviewMessage = 500;
+
     public static void MapDeliverablesEndpoints(this IEndpointRouteBuilder app)
     {
         var adminGroup = app.MapGroup("/api/admin").RequireAuthorization();
@@ -16,6 +18,8 @@ public static class DeliverablesEndpoints
         adminGroup.MapPost("projects/{projectId:guid}/deliverables", CreateDeliverable);
         adminGroup.MapPut("deliverables/{id:guid}", UpdateDeliverable);
         adminGroup.MapPost("deliverables/{id:guid}/status", ChangeStatus);
+        adminGroup.MapPost("deliverables/{id:guid}/submit-review", SubmitReview);
+        adminGroup.MapPost("deliverables/{id:guid}/confirm-approval", ConfirmApproval);
     }
 
     private static async Task<IResult> CreateDeliverable(
@@ -123,18 +127,15 @@ public static class DeliverablesEndpoints
         var deliverable = await db.Deliverables.FindAsync(id);
         if (deliverable == null) return Results.NotFound();
 
-        var warning = deliverable.ValidateStatusTransition(body.To);
-        if (warning != null)
-            return Results.Conflict(new { code = "INVALID_TRANSITION", detail = warning });
-
         var fromStatus = deliverable.Status;
-        deliverable.Status = body.To;
-
-        // Get clientId for activity log
-        var clientId = await db.Projects
-            .Where(p => p.Id == deliverable.ProjectId)
-            .Select(p => p.ClientId)
-            .FirstOrDefaultAsync();
+        try
+        {
+            deliverable.ChangeStatus(body.To);   // leaving IN_REVIEW drops the portal decision
+        }
+        catch (DomainException ex)
+        {
+            return Results.Conflict(new { code = "INVALID_TRANSITION", detail = ex.Detail });
+        }
 
         var clientMessage = body.To switch
         {
@@ -145,7 +146,7 @@ public static class DeliverablesEndpoints
         };
 
         activity.Write("deliverable", deliverable.Id, "deliverable.status_changed",
-            clientId: clientId == Guid.Empty ? null : clientId,
+            clientId: await ClientIdOfAsync(db, deliverable.ProjectId),
             projectId: deliverable.ProjectId,
             data: new { from = fromStatus, to = body.To, name = deliverable.Name },
             visibleToClient: clientMessage != null,
@@ -156,6 +157,77 @@ public static class DeliverablesEndpoints
         var usedRounds = await ComputeUsedRounds(db, id);
         return Results.Ok(ToDto(deliverable, usedRounds));
     }
+
+    /// <summary>Plan 06b "Gửi duyệt": IN_PROGRESS → IN_REVIEW with a message on the client's timeline (BR-95).</summary>
+    private static async Task<IResult> SubmitReview(
+        Guid id,
+        SubmitReviewRequest? body,
+        AppDbContext db,
+        ActivityWriter activity)
+    {
+        var deliverable = await db.Deliverables.FindAsync(id);
+        if (deliverable == null) return Results.NotFound();
+
+        var message = body?.ClientMessage?.Trim();
+        if (message is { Length: > MaxReviewMessage })
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["clientMessage"] = [$"Tối đa {MaxReviewMessage} ký tự"],
+            });
+
+        var fromStatus = deliverable.Status;
+        try
+        {
+            deliverable.SubmitForReview();
+        }
+        catch (DomainException ex)
+        {
+            return Results.Conflict(new { code = ex.Code, detail = ex.Detail });
+        }
+
+        activity.Write("deliverable", deliverable.Id, "deliverable.status_changed",
+            clientId: await ClientIdOfAsync(db, deliverable.ProjectId),
+            projectId: deliverable.ProjectId,
+            data: new { from = fromStatus, to = deliverable.Status, name = deliverable.Name, via = "submit-review" },
+            visibleToClient: true,
+            clientMessage: string.IsNullOrEmpty(message) ? $"Hạng mục {deliverable.Name} đã sẵn sàng để bạn duyệt" : message);
+
+        await db.SaveChangesAsync();
+
+        return Results.Ok(ToDto(deliverable, await ComputeUsedRounds(db, id)));
+    }
+
+    /// <summary>Plan 06b F2: the designer confirms the approval (portal decision or not) — IN_REVIEW → APPROVED.</summary>
+    private static async Task<IResult> ConfirmApproval(Guid id, AppDbContext db, ActivityWriter activity)
+    {
+        var deliverable = await db.Deliverables.FindAsync(id);
+        if (deliverable == null) return Results.NotFound();
+
+        var fromStatus = deliverable.Status;
+        var clientApproved = deliverable.ClientDecision == ClientDecisions.Approved;
+        try
+        {
+            deliverable.ConfirmApproval();
+        }
+        catch (DomainException ex)
+        {
+            return Results.Conflict(new { code = ex.Code, detail = ex.Detail });
+        }
+
+        activity.Write("deliverable", deliverable.Id, "deliverable.status_changed",
+            clientId: await ClientIdOfAsync(db, deliverable.ProjectId),
+            projectId: deliverable.ProjectId,
+            data: new { from = fromStatus, to = deliverable.Status, name = deliverable.Name, clientApproved },
+            visibleToClient: true,
+            clientMessage: $"{deliverable.Name}: Đã duyệt");
+
+        await db.SaveChangesAsync();
+
+        return Results.Ok(ToDto(deliverable, await ComputeUsedRounds(db, id)));
+    }
+
+    private static Task<Guid?> ClientIdOfAsync(AppDbContext db, Guid projectId) =>
+        db.Projects.Where(p => p.Id == projectId).Select(p => (Guid?)p.ClientId).FirstOrDefaultAsync();
 
     // used_rounds (docs/04 §4.1): the single query lives in Domain/Revisions
     private static Task<int> ComputeUsedRounds(AppDbContext db, Guid deliverableId) =>
@@ -179,6 +251,8 @@ public static class DeliverablesEndpoints
         d.SortOrder,
         d.CreatedAt,
         d.UpdatedAt,
+        d.ClientDecision,
+        d.ClientDecisionAt,
     };
 }
 
@@ -199,3 +273,5 @@ record UpdateDeliverableRequest(
     int SortOrder);
 
 record ChangeDeliverableStatusRequest(string To);
+
+record SubmitReviewRequest(string? ClientMessage);

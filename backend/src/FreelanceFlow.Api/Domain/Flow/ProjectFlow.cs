@@ -196,6 +196,7 @@ public static class ProjectFlow
         }
         if (f.OverdueTasks > 0)
             b.Warn(FlowWarningKinds.TasksOverdue, $"{f.OverdueTasks} công việc quá hạn", FlowSeverities.Warning);
+        QuotaWarnings(b, active);
     }
 
     private static void Review(Builder b, FlowFacts f, List<FlowDeliverable> active)
@@ -206,6 +207,7 @@ public static class ProjectFlow
         foreach (var d in approved)
             b.Act(FlowActionKinds.Deliver, $"Bàn giao: {d.Name}", new FlowTarget(DeliverableId: d.Id));
         RevisionFollowUps(b, f, active);
+        QuotaWarnings(b, active);
         if (approved.Count > 0) Balance(b, f);   // F4: money still due when handing over
     }
 
@@ -224,6 +226,10 @@ public static class ProjectFlow
                 new FlowTarget(RequestId: f.NewRequestIds[0]));
         if (f.UnquotedChargeableItems > 0)
             b.Act(FlowActionKinds.CreateAdditionalQuotation, $"Tạo báo giá phát sinh ({f.UnquotedChargeableItems} mục tính phí)");
+    }
+
+    private static void QuotaWarnings(Builder b, List<FlowDeliverable> active)
+    {
         foreach (var d in active.Where(d => d.UsedRounds > 0 && d.UsedRounds >= d.IncludedRounds))
             b.Warn(FlowWarningKinds.QuotaExceeded, $"{d.Name} đã dùng hết {d.IncludedRounds} vòng sửa trong quota", FlowSeverities.Info);
     }
