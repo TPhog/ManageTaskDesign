@@ -91,4 +91,61 @@ public class ImageFileTests
         var fromClient = () => Create(ImageOwnerTypes.ClientRequest, "CLIENT", requestId: OwnerId).SetVisibleToClient(true);
         fromClient.Should().Throw<DomainException>().Which.Code.Should().Be("BUSINESS_RULE");
     }
+
+    private static ProjectFile ClientPhoto() =>
+        ProjectFile.CreateImage(ProjectId, ImageOwnerTypes.ClientRequest, OwnerId, OwnerId, "CLIENT", false, "mau.png",
+            800, 600, originalBytes: 500, previewBytes: 0, thumbBytes: 100, sha256: new byte[32], Now, previewIsOriginal: true);
+
+    [Fact]
+    public void Client_photo_may_serve_its_original_as_preview_but_a_designer_image_may_not()
+    {
+        var photo = ClientPhoto();
+
+        photo.PreviewIsOriginal.Should().BeTrue();
+        photo.SizeBytes.Should().Be(600);
+        photo.ServedVariant(ImageVariants.Preview).Should().Be(ImageVariants.Original);
+        photo.ServedVariant(ImageVariants.Thumb).Should().Be(ImageVariants.Thumb);
+        photo.StoredVariantKeys().Should().Equal(
+            $"projects/{ProjectId}/{photo.Id}/original.webp",
+            $"projects/{ProjectId}/{photo.Id}/thumb.webp");
+
+        var designer = () => ProjectFile.CreateImage(ProjectId, ImageOwnerTypes.Task, OwnerId, null, "DESIGNER", true, "a.png",
+            800, 600, 500, 0, 100, new byte[32], Now, previewIsOriginal: true);
+        designer.Should().Throw<DomainException>().Which.Code.Should().Be("VALIDATION_FAILED");
+        var aliasWithBytes = () => ProjectFile.CreateImage(ProjectId, ImageOwnerTypes.ClientRequest, OwnerId, OwnerId, "CLIENT", false,
+            "a.png", 800, 600, 500, 400, 100, new byte[32], Now, previewIsOriginal: true);
+        aliasWithBytes.Should().Throw<DomainException>().Which.Code.Should().Be("VALIDATION_FAILED");
+        var noPreview = () => ProjectFile.CreateImage(ProjectId, ImageOwnerTypes.ClientRequest, OwnerId, OwnerId, "CLIENT", false,
+            "a.png", 800, 600, 500, 0, 100, new byte[32], Now);
+        noPreview.Should().Throw<DomainException>().Which.Code.Should().Be("VALIDATION_FAILED");
+    }
+
+    [Fact]
+    public void Discarding_the_original_frees_its_bytes_once_and_serves_the_preview_instead()
+    {
+        var f = Create();   // 500 / 400 / 100
+
+        f.DiscardOriginal(Now).Should().Be(500);
+
+        f.OriginalDeletedAt.Should().Be(Now);
+        f.SizeBytes.Should().Be(500);
+        f.ServedVariant(ImageVariants.Original).Should().Be(ImageVariants.Preview);
+        f.ServedVariant(ImageVariants.Preview).Should().Be(ImageVariants.Preview);
+        f.StoredVariantKeys().Should().Equal(
+            $"projects/{ProjectId}/{f.Id}/preview.webp",
+            $"projects/{ProjectId}/{f.Id}/thumb.webp");
+        f.DiscardOriginal(Now.AddDays(1)).Should().Be(0);
+        f.OriginalDeletedAt.Should().Be(Now);
+        f.SizeBytes.Should().Be(500);
+    }
+
+    [Fact]
+    public void A_client_photo_stored_once_keeps_its_only_copy_and_unknown_variants_are_refused()
+    {
+        var act = () => ClientPhoto().DiscardOriginal(Now);
+        act.Should().Throw<DomainException>().Which.Code.Should().Be("BUSINESS_RULE");
+        var raw = () => Create().ServedVariant("raw");
+        raw.Should().Throw<DomainException>().Which.Code.Should().Be("VALIDATION_FAILED");
+        Create().StoredVariantKeys().Should().HaveCount(3);
+    }
 }

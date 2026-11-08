@@ -19,6 +19,9 @@ public class ProjectFileConfiguration : IEntityTypeConfiguration<ProjectFile>
             t.HasCheckConstraint("ck_files_owner_type",
                 "owner_type IS NULL OR owner_type IN ('TASK','PROGRESS_UPDATE','CLIENT_REQUEST','DELIVERABLE')");
             t.HasCheckConstraint("ck_files_owner", "(owner_type IS NULL) = (owner_id IS NULL)");
+            // P10: only a client's own photo may be served from its original, and its only copy is never discarded
+            t.HasCheckConstraint("ck_files_preview_alias",
+                "NOT preview_is_original OR (uploaded_by = 'CLIENT' AND original_deleted_at IS NULL)");
         });
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id");
@@ -44,12 +47,17 @@ public class ProjectFileConfiguration : IEntityTypeConfiguration<ProjectFile>
         b.Property(x => x.OriginalBytes).HasColumnName("original_bytes");
         b.Property(x => x.PreviewBytes).HasColumnName("preview_bytes");
         b.Property(x => x.ThumbBytes).HasColumnName("thumb_bytes");
+        // P10
+        b.Property(x => x.PreviewIsOriginal).HasColumnName("preview_is_original").HasDefaultValue(false);
+        b.Property(x => x.OriginalDeletedAt).HasColumnName("original_deleted_at");
         b.HasIndex(x => new { x.OwnerType, x.OwnerId })
             .HasFilter("deleted_at IS NULL").HasDatabaseName("ix_files_owner");
 
         b.HasIndex(x => new { x.ProjectId, x.CreatedAt }).IsDescending(false, true)
             .HasFilter("deleted_at IS NULL").HasDatabaseName("ix_files_project");
         b.HasIndex(x => x.RequestId).HasDatabaseName("ix_files_request");
+        b.HasIndex(x => new { x.ProjectId, x.Sha256 })
+            .HasFilter("deleted_at IS NULL").HasDatabaseName("ix_files_project_sha256");   // P10 duplicate warning
 
         b.HasOne<Project>().WithMany().HasForeignKey(x => x.ProjectId);
         b.HasOne<Deliverable>().WithMany().HasForeignKey(x => x.DeliverableId);

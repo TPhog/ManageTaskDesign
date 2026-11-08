@@ -365,6 +365,10 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("original_bytes");
 
+                    b.Property<DateTimeOffset?>("OriginalDeletedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("original_deleted_at");
+
                     b.Property<string>("OriginalName")
                         .IsRequired()
                         .HasColumnType("text")
@@ -381,6 +385,12 @@ namespace FreelanceFlow.Api.Data.Migrations
                     b.Property<long?>("PreviewBytes")
                         .HasColumnType("bigint")
                         .HasColumnName("preview_bytes");
+
+                    b.Property<bool>("PreviewIsOriginal")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("preview_is_original");
 
                     b.Property<Guid?>("ProjectId")
                         .HasColumnType("uuid")
@@ -442,6 +452,10 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasDatabaseName("ix_files_project")
                         .HasFilter("deleted_at IS NULL");
 
+                    b.HasIndex("ProjectId", "Sha256")
+                        .HasDatabaseName("ix_files_project_sha256")
+                        .HasFilter("deleted_at IS NULL");
+
                     b.ToTable("files", null, t =>
                         {
                             t.HasCheckConstraint("ck_files_kind", "kind IN ('REFERENCE','PREVIEW','FINAL','EVIDENCE','BRIEF','SYSTEM')");
@@ -449,6 +463,8 @@ namespace FreelanceFlow.Api.Data.Migrations
                             t.HasCheckConstraint("ck_files_owner", "(owner_type IS NULL) = (owner_id IS NULL)");
 
                             t.HasCheckConstraint("ck_files_owner_type", "owner_type IS NULL OR owner_type IN ('TASK','PROGRESS_UPDATE','CLIENT_REQUEST','DELIVERABLE')");
+
+                            t.HasCheckConstraint("ck_files_preview_alias", "NOT preview_is_original OR (uploaded_by = 'CLIENT' AND original_deleted_at IS NULL)");
 
                             t.HasCheckConstraint("ck_files_size", "size_bytes > 0");
 
