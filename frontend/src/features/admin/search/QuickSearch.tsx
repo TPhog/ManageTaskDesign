@@ -81,7 +81,7 @@ export function QuickSearch({ open, onOpenChange }: { open: boolean; onOpenChang
           Tìm khách hàng, dự án hoặc số báo giá. Dùng phím mũi tên để chọn, Enter để mở.
         </DialogDescription>
         <Command shouldFilter={false} label="Tìm kiếm nhanh">
-          <CommandInput value={text} onValueChange={setText} placeholder="Tìm khách, dự án, số báo giá…" />
+          <CommandInput maxLength={100} value={text} onValueChange={setText} placeholder="Tìm khách, dự án, số báo giá…" />
           <CommandList className="max-h-[60vh]">
             {!canSearch(searchTerm(text)) ? (
               <p className={messageClass}>Nhập ít nhất 2 ký tự để tìm.</p>

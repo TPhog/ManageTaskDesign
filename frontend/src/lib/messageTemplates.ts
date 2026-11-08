@@ -52,7 +52,7 @@ export function quotationSentMessage(
   const s = q.snapshot
   return renderTemplate(portalUrl ? QUOTATION_SENT_TEMPLATE : QUOTATION_SENT_NO_LINK_TEMPLATE, {
     'tên': s?.client.name ?? q.clientName,
-    'số': quotationNumberLabel(s?.number ?? q.number ?? '', s?.version ?? q.version),
+    'số': (s?.number ?? q.number) ? quotationNumberLabel((s?.number ?? q.number)!, s?.version ?? q.version) : 'nháp',
     'tổng': formatVnd(s?.total ?? q.total),
     'link portal': portalUrl,
   })

@@ -45,5 +45,15 @@ test.describe('Quotation message template', () => {
     const again = page.getByRole('dialog', { name: 'Tin nhắn mẫu' })
     await expect(again.getByLabel('Tin nhắn gửi khách')).toHaveValue(/mở link portal em đã gửi trước đó/)
     await expect(again.getByRole('button', { name: 'Tạo link portal' })).toHaveCount(0)
+
+    // Portal turned off: no "old link" message, the dialog points to the client page instead
+    await page.keyboard.press('Escape')
+    await apiPost(page.request, page, `/api/admin/clients/${clientId}/portal/disable`, {})
+    await page.reload()
+    await page.getByRole('button', { name: 'Tin nhắn mẫu', exact: true }).click()
+    const off = page.getByRole('dialog', { name: 'Tin nhắn mẫu' })
+    await expect(off.getByText('Portal của khách đang tắt')).toBeVisible()
+    await expect(off.getByLabel('Tin nhắn gửi khách')).not.toHaveValue(/link portal em đã gửi trước đó/)
+    await expect(off.getByRole('button', { name: 'Copy tin nhắn', exact: true })).toBeDisabled()
   })
 })

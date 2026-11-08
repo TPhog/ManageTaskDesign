@@ -20,10 +20,12 @@ interface Props {
   flow: FlowState | undefined
   isLoading: boolean
   isError: boolean
+  /** a refetch is in flight: cached flow data may be stale, so the ?step= link waits for it */
+  isFetching: boolean
 }
 
 /** Plan 06b F1: one primary next step, warnings (never blocking, F4) and secondary links. BR-01: every step is a click. */
-export function NextStepCard({ project, flow, isLoading, isError }: Props) {
+export function NextStepCard({ project, flow, isLoading, isError, isFetching }: Props) {
   const [startOpen, setStartOpen] = useState(false)
   // only the ?step= deep link asks first (it opens without a click); the button goes straight to the server check
   const [completeOpen, setCompleteOpen] = useState(false)
@@ -37,7 +39,7 @@ export function NextStepCard({ project, flow, isLoading, isError }: Props) {
 
   // Dashboard "Việc cần làm" links dialog steps as ?step=…: open the dialog once if the flow still offers it, then drop the param
   useEffect(() => {
-    if (!step || !flow) return
+    if (!step || !flow || isFetching) return
     if (flow.actions.some(a => a.kind === step)) {
       if (step === 'START_PROJECT') setStartOpen(true)
       else setCompleteOpen(true)
@@ -47,7 +49,7 @@ export function NextStepCard({ project, flow, isLoading, isError }: Props) {
       next.delete('step')
       return next
     }, { replace: true })
-  }, [step, flow, setSearchParams])
+  }, [step, flow, isFetching, setSearchParams])
 
   if (isLoading) {
     return (

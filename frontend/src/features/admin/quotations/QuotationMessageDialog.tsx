@@ -55,7 +55,8 @@ export function QuotationMessageDialog({ quotation: q, open, onOpenChange, justS
   const s = q.snapshot
   if (!s) return null // every non-DRAFT quotation has a snapshot
 
-  const message = quotationSentMessage(q, link)   // same template as the flow's COPY_QUOTATION_MESSAGE
+  const portalOff = !link && !!client?.hasPortalLink && !client.portalEnabled
+  const message = portalOff ? '' : quotationSentMessage(q, link)   // same template as the flow's COPY_QUOTATION_MESSAGE
   const canCreateLink = !link && client !== undefined && !client.hasPortalLink && client.status === 'ACTIVE'
 
   function handleOpenChange(next: boolean) {
@@ -74,6 +75,8 @@ export function QuotationMessageDialog({ quotation: q, open, onOpenChange, justS
 
   let hint: string | null = null
   if (link) hint = 'Link chỉ hiển thị một lần. Hãy copy và gửi cho khách ngay.'
+  else if (client?.hasPortalLink && !client.portalEnabled)
+    hint = 'Portal của khách đang tắt — bật lại ở Khách hàng trước khi gửi tin nhắn.'
   else if (client?.hasPortalLink)
     hint = 'Khách đã có link portal (link chỉ hiện một lần lúc tạo), nên tin nhắn nhắc khách mở link cũ. Cần link mới? Vào Khách hàng → Link portal.'
   else if (canCreateLink) hint = 'Khách chưa có link portal. Tạo link để khách xem báo giá và quét QR.'
@@ -101,7 +104,7 @@ export function QuotationMessageDialog({ quotation: q, open, onOpenChange, justS
           {!client && !link ? (
             <Skeleton className="h-4 w-2/3" />
           ) : hint ? (
-            <p className={link ? 'text-xs text-amber-700' : 'text-xs text-muted-foreground'}>{hint}</p>
+            <p className={link || portalOff ? 'text-xs text-amber-700' : 'text-xs text-muted-foreground'}>{hint}</p>
           ) : null}
 
           <div className="flex flex-wrap justify-end gap-2">
@@ -117,7 +120,7 @@ export function QuotationMessageDialog({ quotation: q, open, onOpenChange, justS
                 Copy link
               </Button>
             )}
-            <Button onClick={() => copy(message, 'Đã copy tin nhắn mẫu')}>
+            <Button onClick={() => copy(message, 'Đã copy tin nhắn mẫu')} disabled={portalOff}>
               <MessageSquareText aria-hidden="true" />
               Copy tin nhắn
             </Button>

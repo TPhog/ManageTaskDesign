@@ -120,7 +120,7 @@ export default function ProjectDetailPage() {
       </div>
 
       {flow.data && <FlowStepper flow={flow.data} />}
-      <NextStepCard project={project} flow={flow.data} isLoading={flow.isLoading} isError={flow.isError} />
+      <NextStepCard project={project} flow={flow.data} isLoading={flow.isLoading} isError={flow.isError} isFetching={flow.isFetching} />
 
       {/* tabs */}
       <Tabs

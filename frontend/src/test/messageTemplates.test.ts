@@ -51,6 +51,12 @@ describe('quotationSentMessage (docs/08 §2.3 bước 6, also COPY_QUOTATION_MES
     )
   })
 
+  it('says nháp instead of leaving a literal {số} when the quotation has no number', () => {
+    const m = quotationSentMessage({ ...sent, number: null }, null)
+    expect(m).toContain('báo giá nháp (')
+    expect(m).not.toContain('{số}')
+  })
+
   it('prefers the snapshot taken when the quotation was sent (BR-39)', () => {
     const snapshot = { client: { name: 'Tên lúc gửi', company: null }, number: 'BG-2026-0007', version: 1, total: 999 } as unknown as QuotationDetail['snapshot']
     const m = quotationSentMessage({ ...sent, clientName: 'Tên mới', total: 5, snapshot }, null)

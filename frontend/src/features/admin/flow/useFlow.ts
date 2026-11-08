@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api, type ApiError } from '@/lib/api'
 import { qk } from '@/lib/queryKeys'
-import type { DeliverableStatus } from '@/lib/types'
+import type { ClientDetail, DeliverableStatus, ProjectDetail } from '@/lib/types'
 import type { QuotationDetail } from '@/lib/quotationTypes'
 import type { FlowProjectActions, FlowState, StartPreviewItem, StartProjectBody, StartProjectResult } from '@/lib/flowTypes'
 import { paymentReminderMessage, quotationSentMessage } from '@/lib/messageTemplates'
@@ -90,20 +90,6 @@ export function useDeliverableStatus() {
   })
 }
 
-/** COMPLETE_PROJECT: warnings (money due, unfinished deliverables) were shown first — they never block (F4). */
-export function useCompleteProject(projectId: string) {
-  const refresh = useRefreshProjectData()
-  return useMutation({
-    mutationFn: ({ rowVersion }: { rowVersion: number }) =>
-      api.post<unknown>(`/admin/projects/${projectId}/status`, { to: 'COMPLETED', confirmWarnings: true, rowVersion }),
-    onSuccess: () => {
-      toast.success('Dự án đã hoàn thành')
-      return refresh()
-    },
-    onError: (err: ApiError) => toast.error(flowErrorText(err, 'Không thể hoàn thành dự án')),
-  })
-}
-
 /** COPY_QUOTATION_MESSAGE / COPY_PAYMENT_REMINDER: build the text from the quotation and put it on the clipboard. */
 export function useCopyQuotationText() {
   const qc = useQueryClient()
@@ -113,6 +99,23 @@ export function useCopyQuotationText() {
         queryKey: qk.quotations.detail(quotationId),
         queryFn: () => api.get<QuotationDetail>(`/admin/quotations/${quotationId}`),
       })
+      if (kind === 'COPY_QUOTATION_MESSAGE') {
+        // the "old link" wording only makes sense when the client has a usable portal link
+        const project = await qc.fetchQuery({
+          queryKey: qk.projects.detail(q.projectId),
+          queryFn: () => api.get<ProjectDetail>(`/admin/projects/${q.projectId}`),
+        })
+        const client = await qc.fetchQuery({
+          queryKey: qk.clients.detail(project.client.id),
+          queryFn: () => api.get<ClientDetail>(`/admin/clients/${project.client.id}`),
+        })
+        if (!client.hasPortalLink || !client.portalEnabled) {
+          toast.warning(client.hasPortalLink
+            ? 'Portal của khách đang tắt — bật lại ở Khách hàng trước khi gửi tin nhắn.'
+            : 'Khách chưa có link portal — mở báo giá → "Tin nhắn mẫu" để tạo link và sao chép tin nhắn.')
+          return
+        }
+      }
       await navigator.clipboard.writeText(kind === 'COPY_QUOTATION_MESSAGE' ? quotationSentMessage(q, null) : paymentReminderMessage(q))
       toast.success('Đã sao chép tin nhắn — dán vào Zalo cho khách')
     } catch {
