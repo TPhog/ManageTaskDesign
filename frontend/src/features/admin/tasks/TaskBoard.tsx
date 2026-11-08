@@ -10,6 +10,7 @@ import {
   useSensor,
   useSensors,
   type Announcements,
+  type UniqueIdentifier,
   type CollisionDetection,
   type DragEndEvent,
 } from '@dnd-kit/core'
@@ -27,20 +28,13 @@ import { cn } from '@/lib/utils'
 import type { TaskListItem, TaskStatus } from '@/lib/types'
 import { QuickCreateTask } from './QuickCreateTask'
 import { DueText, PriorityBadge } from './TaskMeta'
-import { TASK_STATUSES, columnId, columnTasks, planMove, taskStatusLabel, todayVn } from './taskUtils'
+import { COLUMN_PREFIX, TASK_STATUSES, columnId, columnTasks, planMove, taskStatusLabel, todayVn } from './taskUtils'
 import { useMoveTask } from './useTasks'
 
 // The pointer decides (card under it, else the column under it); keyboard drags have no pointer → nearest corners
 const collisionDetection: CollisionDetection = args => {
   const hits = pointerWithin(args)
   return hits.length > 0 ? hits : closestCorners(args)
-}
-
-const announcements: Announcements = {
-  onDragStart: () => 'Đã nhấc thẻ công việc. Dùng phím mũi tên để di chuyển.',
-  onDragOver: ({ over }) => (over ? 'Thẻ đang ở vị trí mới.' : 'Thẻ không nằm trên cột nào.'),
-  onDragEnd: ({ over }) => (over ? 'Đã thả thẻ.' : 'Đã thả thẻ ngoài bảng, không thay đổi.'),
-  onDragCancel: () => 'Đã huỷ di chuyển thẻ.',
 }
 
 const screenReaderInstructions = {
@@ -63,6 +57,28 @@ export function TaskBoard({ projectId, tasks, onOpen }: Props) {
   )
   const today = todayVn()
   const active = tasks.find(t => t.id === activeId)
+
+  const titleOf = (id: UniqueIdentifier) => tasks.find(t => t.id === String(id))?.title ?? 'công việc'
+  // Label of the column a drop target belongs to (a column itself or a card inside one)
+  const columnLabelOf = (id: UniqueIdentifier) => {
+    const key = String(id)
+    const status = key.startsWith(COLUMN_PREFIX)
+      ? (key.slice(COLUMN_PREFIX.length) as TaskStatus)
+      : tasks.find(t => t.id === key)?.status
+    return status ? taskStatusLabel[status] : ''
+  }
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => `Đã nhấc «${titleOf(active.id)}». Dùng phím mũi tên để di chuyển.`,
+    onDragOver: ({ active, over }) =>
+      over ? `«${titleOf(active.id)}» đang ở cột ${columnLabelOf(over.id)}.` : `«${titleOf(active.id)}» không nằm trên cột nào.`,
+    onDragEnd: ({ active, over }) => {
+      if (!over) return `Đã thả «${titleOf(active.id)}» ngoài bảng, không thay đổi.`
+      return planMove(tasks, String(active.id), String(over.id))
+        ? `Đã thả «${titleOf(active.id)}» vào cột ${columnLabelOf(over.id)}.`
+        : `Đã thả «${titleOf(active.id)}», không thay đổi.`
+    },
+    onDragCancel: ({ active }) => `Đã huỷ di chuyển «${titleOf(active.id)}», không thay đổi.`,
+  }
 
   function moveTo(id: string, overId: string) {
     const plan = planMove(tasks, id, overId)
@@ -89,6 +105,7 @@ export function TaskBoard({ projectId, tasks, onOpen }: Props) {
             key={status}
             projectId={projectId}
             status={status}
+            activeStatus={active?.status}
             tasks={columnTasks(tasks, status)}
             today={today}
             onOpen={onOpen}
@@ -104,14 +121,16 @@ export function TaskBoard({ projectId, tasks, onOpen }: Props) {
 interface ColumnProps {
   projectId: string
   status: TaskStatus
+  /** Status of the card being dragged; its own column is not a drop target */
+  activeStatus?: TaskStatus
   tasks: TaskListItem[]
   today: string
   onOpen: (id: string) => void
   onMoveTo: (id: string, status: TaskStatus) => void
 }
 
-function BoardColumn({ projectId, status, tasks, today, onOpen, onMoveTo }: ColumnProps) {
-  const { setNodeRef, isOver } = useDroppable({ id: columnId(status) })
+function BoardColumn({ projectId, status, activeStatus, tasks, today, onOpen, onMoveTo }: ColumnProps) {
+  const { setNodeRef, isOver } = useDroppable({ id: columnId(status), disabled: status === activeStatus })
   const label = taskStatusLabel[status]
 
   return (

@@ -101,6 +101,76 @@ test.describe('Project tasks tab', () => {
     await expect(row).toContainText('Khẩn cấp')
     await expect(row).toContainText('Hôm nay')
   })
+
+  test('deleting a task from the drawer does not refetch the deleted task', async ({ page }) => {
+    const title = `Xoá thử E2E ${Date.now()}`
+    await quickCreate(page, 'Cần làm', title)
+    await column(page, 'Cần làm').getByRole('button', { name: title, exact: true }).click()
+    const drawer = page.getByRole('dialog', { name: 'Chi tiết công việc' })
+    await expect(drawer.getByLabel('Tiêu đề')).toHaveValue(title)
+
+    const gets: string[] = []
+    page.on('request', r => {
+      if (r.method() === 'GET' && /\/api\/admin\/tasks\/[0-9a-f-]{36}$/.test(r.url())) gets.push(r.url())
+    })
+    await drawer.getByRole('button', { name: 'Xoá công việc' }).click()
+    await drawer.getByRole('button', { name: 'Xác nhận xoá' }).click()
+    await expectToast(page, 'Đã xoá công việc')
+    await expect(drawer).toBeHidden()
+    await expect(column(page, 'Cần làm').getByRole('button', { name: title, exact: true })).toHaveCount(0)
+    await page.waitForTimeout(500)
+    expect(gets).toEqual([])
+  })
+})
+
+/** Keyboard drag from the card's grip; dnd-kit needs a pause between keys. */
+async function keyboardDrag(page: Page, title: string, ...keys: string[]) {
+  await page.getByRole('button', { name: `Kéo thẻ ${title}` }).focus()
+  await page.keyboard.press('Space')
+  await page.waitForTimeout(300)
+  for (const key of keys) {
+    await page.keyboard.press(key)
+    await page.waitForTimeout(300)
+  }
+  await page.keyboard.press('Space')
+  await page.waitForTimeout(500)
+}
+
+test.describe('Keyboard drag', () => {
+  test('moves cards between columns, back with one ArrowLeft, and reorders within a column', async ({ page }) => {
+    await page.goto('/admin')
+    const projectId = await createProject(page)
+    const stamp = Date.now()
+    const [a, b, c] = [`KA ${stamp}`, `KB ${stamp}`, `KC ${stamp}`]
+    await createTask(page, projectId, { title: a, status: 'IN_PROGRESS' })
+    await createTask(page, projectId, { title: b, status: 'IN_PROGRESS' })
+    await createTask(page, projectId, { title: c, status: 'TODO' })
+    await page.goto(`/admin/projects/${projectId}?tab=tasks`)
+    const order = async (label: string) =>
+      (await column(page, label).locator('li').allInnerTexts()).map(t => t.split('\n')[0])
+    const inColumn = (label: string, title: string) => column(page, label).getByRole('button', { name: title, exact: true })
+
+    // into a column that has cards
+    await keyboardDrag(page, c, 'ArrowRight')
+    await expect(inColumn('Đang làm', c)).toBeVisible()
+
+    // one ArrowLeft goes back one column
+    await keyboardDrag(page, c, 'ArrowLeft')
+    await expect(inColumn('Cần làm', c)).toBeVisible()
+
+    // into an empty column
+    await keyboardDrag(page, c, 'ArrowRight', 'ArrowRight')
+    await expect(inColumn('Chờ duyệt', c)).toBeVisible()
+
+    // reorder inside a column, persisted
+    expect(await order('Đang làm')).toEqual([a, b])
+    await keyboardDrag(page, a, 'ArrowDown')
+    await expect.poll(() => order('Đang làm')).toEqual([b, a])
+    await page.reload()
+    await expect(column(page, 'Đang làm')).toContainText(a)
+    expect(await order('Đang làm')).toEqual([b, a])
+    await expect(inColumn('Chờ duyệt', c)).toBeVisible()
+  })
 })
 
 test.describe('All tasks page', () => {

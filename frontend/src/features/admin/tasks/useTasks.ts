@@ -90,7 +90,11 @@ export function useMoveTask() {
       for (const [key, data] of ctx?.snapshots ?? []) qc.setQueryData(key, data)
       toast.error(errorText(err, 'Không thể di chuyển công việc'))
     },
-    onSuccess: task => onTaskSaved(qc, task),
+    onSuccess: task => {
+      if (task) qc.setQueryData(qk.tasks.detail(task.id), task)
+    },
+    // Refetch the lists either way so the cache never keeps a card in a position the server rejected
+    onSettled: () => qc.invalidateQueries({ queryKey: qk.tasks.lists }),
   })
 }
 
@@ -98,8 +102,9 @@ export function useDeleteTask() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => api.delete<void>(`/admin/tasks/${id}`),
-    onSuccess: (_data, id) => {
-      qc.removeQueries({ queryKey: qk.tasks.detail(id) })
+    // The detail cache entry is left alone: removing it while the drawer still observes it triggers a 404 refetch.
+    // The drawer closes right after (onDeleted) and nothing can reach the deleted id again.
+    onSuccess: () => {
       toast.success('Đã xoá công việc')
       return qc.invalidateQueries({ queryKey: qk.tasks.lists })
     },
