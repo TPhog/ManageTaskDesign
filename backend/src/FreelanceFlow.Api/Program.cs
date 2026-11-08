@@ -211,6 +211,7 @@ app.MapDeliverablesEndpoints();
 app.MapTasksEndpoints();
 app.MapQuotationsEndpoints();
 app.MapQuotationWorkflowEndpoints();
+app.MapAdditionalQuotationEndpoints();
 app.MapRequestsEndpoints();
 app.MapRevisionsEndpoints();
 app.MapProgressUpdatesEndpoints();

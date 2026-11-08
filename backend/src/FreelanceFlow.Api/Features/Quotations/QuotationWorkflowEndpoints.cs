@@ -91,6 +91,25 @@ public static class QuotationWorkflowEndpoints
                 data: new { number = q.Number, version = q.Version, total = q.Total },
                 visibleToClient: true,
                 clientMessage: $"Báo giá {q.Number} (v{q.Version}) đã được gửi");
+
+            // BR-47: revision items on the previous version's lines follow the copied lines; dropped lines unlink.
+            // Only items linked to the superseded version's lines are loaded (FollowQuotationLine unlinks unmapped ones).
+            if (q.PreviousVersionId is { } previousId)
+            {
+                var copiedLines = q.Items.Where(i => i.CopiedFromItemId != null)
+                    .ToDictionary(i => i.CopiedFromItemId!.Value, i => i.Id);
+                var previousLines = await db.QuotationItems.Where(i => i.QuotationId == previousId).Select(i => i.Id).ToListAsync();
+                var linked = await db.RevisionItems
+                    .Where(r => r.QuotationItemId != null && previousLines.Contains(r.QuotationItemId.Value))
+                    .ToListAsync();
+                var moved = 0;
+                foreach (var item in linked)
+                    if (item.FollowQuotationLine(copiedLines)) moved++;
+                if (linked.Count > 0)
+                    activity.Write("quotation", q.Id, "quotation.revision_links_moved",
+                        clientId: project.ClientId, projectId: project.Id,
+                        data: new { fromQuotationId = previousId, moved, unlinked = linked.Count - moved });
+            }
             await db.SaveChangesAsync();
             await tx.CommitAsync();
         }
