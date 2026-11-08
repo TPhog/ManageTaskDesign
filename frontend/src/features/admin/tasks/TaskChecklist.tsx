@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -7,13 +7,17 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import type { ChecklistItem, TaskDetail } from '@/lib/types'
 import { useChecklist } from './useTasks'
+import { useDirtyMap, useReportDirty } from './useDirtyMap'
 
 const DESCRIPTION_MAX = 5000
 
-export function TaskChecklist({ task }: { task: TaskDetail }) {
+export function TaskChecklist({ task, onDirtyChange }: { task: TaskDetail; onDirtyChange?: (dirty: boolean) => void }) {
   const { add, update, remove } = useChecklist(task.id)
   const [text, setText] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
+  const report = useDirtyMap(onDirtyChange)
+  const reportNew = useCallback((d: boolean) => report('new', d), [report])
+  useReportDirty(text.trim() !== '', reportNew)
   const done = task.checklist.filter(i => i.done).length
   const total = task.checklist.length
   const pct = total === 0 ? 0 : Math.round((done * 100) / total)
@@ -50,6 +54,7 @@ export function TaskChecklist({ task }: { task: TaskDetail }) {
             item={item}
             open={openId === item.id}
             saving={update.isPending}
+            onDirtyChange={d => report(item.id, d)}
             onToggleOpen={() => setOpenId(openId === item.id ? null : item.id)}
             onToggleDone={checked => update.mutate({ id: item.id, text: item.text, done: checked })}
             onSaveDescription={description =>
@@ -84,11 +89,13 @@ interface RowProps {
   onToggleDone: (done: boolean) => void
   onSaveDescription: (description: string) => void
   onRemove: () => void
+  onDirtyChange: (dirty: boolean) => void
 }
 
 /** Plan 06b F5: a subtask expands to show and edit its description. */
-function ChecklistRow({ item, open, saving, onToggleOpen, onToggleDone, onSaveDescription, onRemove }: RowProps) {
+function ChecklistRow({ item, open, saving, onToggleOpen, onToggleDone, onSaveDescription, onRemove, onDirtyChange }: RowProps) {
   const [draft, setDraft] = useState(item.description)
+  useReportDirty(draft !== item.description, onDirtyChange)
 
   return (
     <li className="rounded-md px-2 py-1.5 hover:bg-muted/60">

@@ -18,10 +18,11 @@ interface ConfirmDialogProps {
   onConfirm: () => void
   pending?: boolean
   destructive?: boolean
+  cancelLabel?: string
 }
 
 /** docs/08 §1: confirmation for irreversible actions (send quotation, delete draft…). */
-export function ConfirmDialog({ open, onOpenChange, title, description, confirmLabel, onConfirm, pending, destructive }: ConfirmDialogProps) {
+export function ConfirmDialog({ open, onOpenChange, title, description, confirmLabel, onConfirm, pending, destructive, cancelLabel = 'Huỷ' }: ConfirmDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -30,7 +31,7 @@ export function ConfirmDialog({ open, onOpenChange, title, description, confirmL
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <DialogFooter className="gap-2">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Huỷ</Button>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{cancelLabel}</Button>
           <Button type="button" variant={destructive ? 'destructive' : 'default'} disabled={pending} onClick={onConfirm}>
             {pending ? 'Đang xử lý…' : confirmLabel}
           </Button>

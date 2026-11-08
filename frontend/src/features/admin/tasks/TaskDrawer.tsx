@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -7,6 +7,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Trash2 } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { MarkdownField } from './MarkdownField'
@@ -18,6 +19,7 @@ import type { ProjectDetail, TaskDetail } from '@/lib/types'
 import { TaskChecklist } from './TaskChecklist'
 import { TaskNotes } from './TaskNotes'
 import { TASK_PRIORITIES, TASK_STATUSES, taskPriorityLabel, taskStatusLabel } from './taskUtils'
+import { useDirtyMap, useReportDirty } from './useDirtyMap'
 import { useDeleteTask, useTask, useUpdateTask } from './useTasks'
 
 // Radix Select reserves '' for "no value"
@@ -42,9 +44,30 @@ interface Props {
 
 export function TaskDrawer({ taskId, onClose }: Props) {
   const { data: task, isLoading, isError } = useTask(taskId)
+  const [dirty, setDirty] = useState(false)
+  const [confirmDiscard, setConfirmDiscard] = useState(false)
+  const report = useDirtyMap(setDirty)
+  const reportForm = useCallback((d: boolean) => report('form', d), [report])
+  const reportChecklist = useCallback((d: boolean) => report('checklist', d), [report])
+  const reportNotes = useCallback((d: boolean) => report('notes', d), [report])
+
+  // D-30: leaving the page with unsaved edits asks the browser to confirm
+  useEffect(() => {
+    if (!dirty) return
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = '' }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [dirty])
+
+  // Esc, overlay click and the X button all arrive here
+  function requestClose() {
+    if (dirty) setConfirmDiscard(true)
+    else onClose()
+  }
 
   return (
-    <Sheet open={!!taskId} onOpenChange={open => { if (!open) onClose() }}>
+    <>
+    <Sheet open={!!taskId} onOpenChange={open => { if (!open) requestClose() }}>
       <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
         <SheetHeader className="pr-8">
           <SheetTitle>Chi tiết công việc</SheetTitle>
@@ -70,17 +93,28 @@ export function TaskDrawer({ taskId, onClose }: Props) {
         ) : (
           <div className="mt-6 space-y-8">
             {/* remount after each save so the form shows the server's values */}
-            <TaskForm key={`${task.id}-${task.updatedAt}`} task={task} onDeleted={onClose} />
-            <TaskChecklist task={task} />
-            <TaskNotes taskId={task.id} />
+            <TaskForm key={`${task.id}-${task.updatedAt}`} task={task} onDeleted={onClose} onDirtyChange={reportForm} />
+            <TaskChecklist task={task} onDirtyChange={reportChecklist} />
+            <TaskNotes taskId={task.id} onDirtyChange={reportNotes} />
           </div>
         )}
       </SheetContent>
     </Sheet>
+    <ConfirmDialog
+      open={confirmDiscard}
+      onOpenChange={setConfirmDiscard}
+      title="Bỏ thay đổi chưa lưu?"
+      description="Các thay đổi chưa lưu trong công việc này sẽ mất."
+      confirmLabel="Bỏ thay đổi"
+      cancelLabel="Tiếp tục sửa"
+      destructive
+      onConfirm={() => { setConfirmDiscard(false); onClose() }}
+    />
+    </>
   )
 }
 
-function TaskForm({ task, onDeleted }: { task: TaskDetail; onDeleted: () => void }) {
+function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDeleted: () => void; onDirtyChange: (dirty: boolean) => void }) {
   const update = useUpdateTask(task.id)
   const remove = useDeleteTask()
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -104,6 +138,8 @@ function TaskForm({ task, onDeleted }: { task: TaskDetail; onDeleted: () => void
       deliverableId: task.deliverableId ?? NO_DELIVERABLE,
     },
   })
+
+  useReportDirty(isDirty, onDirtyChange)
 
   function onSubmit(v: FormValues) {
     update.mutate({

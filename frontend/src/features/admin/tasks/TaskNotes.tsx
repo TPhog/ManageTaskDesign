@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useCallback, useState, type FormEvent } from 'react'
 import { Pencil, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -7,14 +7,18 @@ import { Textarea } from '@/components/ui/textarea'
 import { formatDatetime } from '@/lib/format'
 import type { TaskNote } from '@/lib/types'
 import { useTaskNoteMutations, useTaskNotes } from './useTasks'
+import { useDirtyMap, useReportDirty } from './useDirtyMap'
 
 export const NOTE_MAX_LENGTH = 5000
 
 /** Plan 06b F5: timestamped notes, newest first, designer-only. */
-export function TaskNotes({ taskId }: { taskId: string }) {
+export function TaskNotes({ taskId, onDirtyChange }: { taskId: string; onDirtyChange?: (dirty: boolean) => void }) {
   const { data: notes, isLoading, isError } = useTaskNotes(taskId)
   const { add, update, remove } = useTaskNoteMutations(taskId)
   const [text, setText] = useState('')
+  const report = useDirtyMap(onDirtyChange)
+  const reportNew = useCallback((d: boolean) => report('new', d), [report])
+  useReportDirty(text.trim() !== '', reportNew)
 
   function submit(e: FormEvent) {
     e.preventDefault()
@@ -57,6 +61,7 @@ export function TaskNotes({ taskId }: { taskId: string }) {
               note={note}
               saving={update.isPending}
               deleting={remove.isPending}
+              onEditingChange={editing => report(note.id, editing)}
               onSave={(body, done) => update.mutate({ id: note.id, body }, { onSuccess: done })}
               onDelete={() => remove.mutate(note.id)}
             />
@@ -75,10 +80,12 @@ interface NoteItemProps {
   deleting: boolean
   onSave: (body: string, done: () => void) => void
   onDelete: () => void
+  onEditingChange: (editing: boolean) => void
 }
 
-function NoteItem({ note, saving, deleting, onSave, onDelete }: NoteItemProps) {
+function NoteItem({ note, saving, deleting, onSave, onDelete, onEditingChange }: NoteItemProps) {
   const [editing, setEditing] = useState(false)
+  useReportDirty(editing, onEditingChange)
   const [confirming, setConfirming] = useState(false)
   const [draft, setDraft] = useState(note.body)
   const edited = note.updatedAt !== note.createdAt
