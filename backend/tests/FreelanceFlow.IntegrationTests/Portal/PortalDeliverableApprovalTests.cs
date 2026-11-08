@@ -1,6 +1,9 @@
 using System.Net;
 using System.Text.Json;
+using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Infrastructure.Notifications;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FreelanceFlow.IntegrationTests.Portal;
 
@@ -139,6 +142,56 @@ public class PortalDeliverableApprovalTests(AppFactory factory) : PortalTestBase
         var deliverables = JsonDocument.Parse(raw).RootElement.GetProperty("deliverables").EnumerateArray().ToList();
         deliverables.Single(d => d.GetProperty("id").GetGuid() == s.DeliverableId).GetProperty("progressPercent").GetInt32().Should().Be(50);
         deliverables.Single(d => d.GetProperty("id").GetGuid() == banner).GetProperty("progressPercent").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Approving_in_an_archived_project_is_404()
+    {
+        var s = await ArrangeAsync("IN_PROGRESS", "IN_REVIEW");
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.Projects.Where(p => p.Id == s.ProjectId).ExecuteUpdateAsync(u => u.SetProperty(p => p.ArchivedAt, DateTimeOffset.UtcNow));
+        }
+
+        (await ApproveAsync(s.Portal, s.DeliverableId)).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Designer_status_change_clears_a_decision_committed_after_the_row_was_loaded()   // B1 race
+    {
+        var s = await ArrangeAsync("IN_PROGRESS", "IN_REVIEW");
+        Factory.BeforeSave.RunOnNextSave(async () =>
+        {
+            using var scope = Factory.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.Deliverables.Where(d => d.Id == s.DeliverableId).ExecuteUpdateAsync(u => u
+                .SetProperty(d => d.ClientDecision, "APPROVED").SetProperty(d => d.ClientDecisionAt, DateTimeOffset.UtcNow));
+        });
+
+        var resp = await Client.PostAsJsonAsync($"/api/admin/deliverables/{s.DeliverableId}/status", new { to = "IN_PROGRESS" });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK, await resp.Content.ReadAsStringAsync());
+        using var check = Factory.Services.CreateScope();
+        var row = await check.ServiceProvider.GetRequiredService<AppDbContext>().Deliverables.AsNoTracking()
+            .SingleAsync(d => d.Id == s.DeliverableId);
+        row.Status.Should().Be("IN_PROGRESS");
+        row.ClientDecision.Should().BeNull();
+        row.ClientDecisionAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Concurrent_double_approve_logs_and_notifies_once()
+    {
+        var s = await ArrangeAsync("IN_PROGRESS", "IN_REVIEW");
+
+        var results = await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => ApproveAsync(s.Portal, s.DeliverableId)));
+
+        results.Should().OnlyContain(r => r.StatusCode == HttpStatusCode.OK);
+        (await AdminActivityAsync(s.ProjectId)).Count(a => a.Action == "deliverable.client_approved").Should().Be(1);
+        await Factory.Notifications.WaitForAsync(n => n.Fields!.Any(f => f.Name == "Hạng mục" && f.Value == s.Name));
+        await Task.Delay(300);
+        Factory.Notifications.Sent.Count(n => n.Fields!.Any(f => f.Name == "Hạng mục" && f.Value == s.Name)).Should().Be(1);
     }
 
     [Fact]

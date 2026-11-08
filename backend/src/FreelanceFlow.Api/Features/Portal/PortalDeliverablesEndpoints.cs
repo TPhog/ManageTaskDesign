@@ -1,6 +1,7 @@
 using FreelanceFlow.Api.Common;
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
+using FreelanceFlow.Api.Domain.Projects;
 using FreelanceFlow.Api.Infrastructure;
 using FreelanceFlow.Api.Infrastructure.Notifications;
 using FreelanceFlow.Api.Infrastructure.Security;
@@ -34,35 +35,45 @@ public static class PortalDeliverablesEndpoints
         var owner = await (from d in db.Deliverables.AsNoTracking()
                            join p in PortalScope.OwnProjects(db, principal) on d.ProjectId equals p.Id
                            where d.Id == id
-                           select new { ProjectId = p.Id, ProjectName = p.Name })
+                           select new { ProjectId = p.Id, ProjectName = p.Name, d.Name })
             .FirstOrDefaultAsync();
         if (owner is null) return Results.NotFound();
 
-        var deliverable = await db.Deliverables.FirstAsync(d => d.Id == id);
-        bool recorded;
-        try
+        // Conditional UPDATE (not load-modify-save): it cannot overwrite a concurrent designer status change, and of two
+        // simultaneous approvals only one matches the WHERE — so one activity entry and one alert.
+        await using var tx = await db.Database.BeginTransactionAsync();
+        var now = clock.UtcNow;
+        var rows = await db.Deliverables
+            .Where(d => d.Id == id && d.Status == "IN_REVIEW" && d.ClientDecision == null)
+            .ExecuteUpdateAsync(u => u
+                .SetProperty(d => d.ClientDecision, ClientDecisions.Approved)
+                .SetProperty(d => d.ClientDecisionAt, now));
+
+        if (rows == 0)
         {
-            recorded = deliverable.RecordClientApproval(clock);
-        }
-        catch (DomainException ex)
-        {
-            return Results.Json(new { code = ex.Code, detail = ex.Detail }, statusCode: StatusCodes.Status409Conflict);
+            var current = await db.Deliverables.AsNoTracking().Where(d => d.Id == id)
+                .Select(d => new PortalDeliverableDecisionDto(d.Id, d.Status, d.ClientDecision, d.ClientDecisionAt))
+                .FirstOrDefaultAsync();
+            if (current is null) return Results.NotFound();
+            if (current.Status == "IN_REVIEW" && current.ClientDecision == ClientDecisions.Approved)
+                return Results.Ok(current);   // already approved: idempotent, nothing new to log or announce
+            return Results.Json(
+                new { code = "INVALID_TRANSITION", detail = "Hạng mục không ở trạng thái chờ duyệt" },
+                statusCode: StatusCodes.Status409Conflict);
         }
 
-        if (recorded)
-        {
-            activity.Write("deliverable", deliverable.Id, "deliverable.client_approved",
-                clientId: principal.ClientId, projectId: owner.ProjectId, actorType: "CLIENT",
-                data: new { name = deliverable.Name },
-                visibleToClient: true,
-                clientMessage: $"Khách đã duyệt {deliverable.Name}");
-            await db.SaveChangesAsync();
-            await NotifyDesignerAsync(db, notifier, appSettings.Value, logger,
-                principal.ClientId, owner.ProjectId, owner.ProjectName, deliverable.Name);
-        }
+        activity.Write("deliverable", id, "deliverable.client_approved",
+            clientId: principal.ClientId, projectId: owner.ProjectId, actorType: "CLIENT",
+            data: new { name = owner.Name },
+            visibleToClient: true,
+            clientMessage: $"Khách đã duyệt {owner.Name}");
+        await db.SaveChangesAsync();
+        await tx.CommitAsync();
 
-        return Results.Ok(new PortalDeliverableDecisionDto(
-            deliverable.Id, deliverable.Status, deliverable.ClientDecision, deliverable.ClientDecisionAt));
+        await NotifyDesignerAsync(db, notifier, appSettings.Value, logger,
+            principal.ClientId, owner.ProjectId, owner.ProjectName, owner.Name);
+
+        return Results.Ok(new PortalDeliverableDecisionDto(id, "IN_REVIEW", ClientDecisions.Approved, now));
     }
 
     /// <summary>Discord alert for the designer; runs after commit and must never fail the request.</summary>

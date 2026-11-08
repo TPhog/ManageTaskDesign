@@ -4,11 +4,28 @@ using FreelanceFlow.Api.Infrastructure.Notifications;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
 
 namespace FreelanceFlow.IntegrationTests;
+
+/// <summary>Test hook: runs once just before the next SaveChanges of any request (to simulate a concurrent commit).</summary>
+public sealed class BeforeSaveHook : Microsoft.EntityFrameworkCore.Diagnostics.SaveChangesInterceptor
+{
+    private Func<Task>? _next;
+    public void RunOnNextSave(Func<Task> action) => _next = action;
+
+    public override async ValueTask<Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int>> SavingChangesAsync(
+        Microsoft.EntityFrameworkCore.Diagnostics.DbContextEventData eventData,
+        Microsoft.EntityFrameworkCore.Diagnostics.InterceptionResult<int> result, CancellationToken cancellationToken = default)
+    {
+        var action = Interlocked.Exchange(ref _next, null);
+        if (action != null) await action();
+        return result;
+    }
+}
 
 public sealed class RecordingNotificationSender : INotificationSender
 {
@@ -71,11 +88,14 @@ public sealed class AppFactory : WebApplicationFactory<Program>, IAsyncLifetime
             services.RemoveAll<INotificationSender>();
             services.AddSingleton(Notifications);
             services.AddSingleton<INotificationSender>(Notifications);
+            services.ConfigureDbContext<FreelanceFlow.Api.Data.AppDbContext>(opt => opt.AddInterceptors(BeforeSave));
         });
     }
 
     /// <summary>Everything the notification dispatcher delivered (shared by all tests of the factory).</summary>
     public RecordingNotificationSender Notifications { get; } = new();
+
+    public BeforeSaveHook BeforeSave { get; } = new();
 
     public async Task InitializeAsync() => await _db.StartAsync();
 

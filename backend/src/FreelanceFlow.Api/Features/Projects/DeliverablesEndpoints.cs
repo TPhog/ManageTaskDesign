@@ -137,6 +137,8 @@ public static class DeliverablesEndpoints
             return Results.Conflict(new { code = "INVALID_TRANSITION", detail = ex.Detail });
         }
 
+        PersistClearedDecision(db, deliverable, fromStatus);
+
         var clientMessage = body.To switch
         {
             "IN_REVIEW" => $"{deliverable.Name}: Chờ duyệt",
@@ -214,6 +216,8 @@ public static class DeliverablesEndpoints
             return Results.Conflict(new { code = ex.Code, detail = ex.Detail });
         }
 
+        PersistClearedDecision(db, deliverable, fromStatus);
+
         activity.Write("deliverable", deliverable.Id, "deliverable.status_changed",
             clientId: await ClientIdOfAsync(db, deliverable.ProjectId),
             projectId: deliverable.ProjectId,
@@ -224,6 +228,18 @@ public static class DeliverablesEndpoints
         await db.SaveChangesAsync();
 
         return Results.Ok(ToDto(deliverable, await ComputeUsedRounds(db, id)));
+    }
+
+    /// <summary>
+    /// Leaving IN_REVIEW clears the portal decision. EF only writes changed columns, so if the row was loaded with a
+    /// null decision a portal approval committed in between would survive; force both columns into the UPDATE.
+    /// </summary>
+    private static void PersistClearedDecision(AppDbContext db, Deliverable deliverable, string fromStatus)
+    {
+        if (fromStatus != "IN_REVIEW") return;
+        var entry = db.Entry(deliverable);
+        entry.Property(x => x.ClientDecision).IsModified = true;
+        entry.Property(x => x.ClientDecisionAt).IsModified = true;
     }
 
     private static Task<Guid?> ClientIdOfAsync(AppDbContext db, Guid projectId) =>
