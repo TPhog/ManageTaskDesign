@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import { Inbox, Search } from 'lucide-react'
 import { useNewRequestCount } from '@/features/admin/revisions/useRevisions'
 import { QuickSearch, QuickSearchTrigger } from '@/features/admin/search/QuickSearch'
+import { StorageBanner } from './settings/StorageBanner'
 
 const navItems = [
   { to: '/admin', label: 'Tổng quan', icon: LayoutDashboard, end: true },
@@ -185,6 +186,7 @@ export default function AdminLayout() {
 
       <main className="lg:pl-64">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+          <StorageBanner />
           <Outlet />
         </div>
       </main>

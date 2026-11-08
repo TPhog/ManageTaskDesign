@@ -14,6 +14,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DEFAULT_TERMS_TEMPLATE } from './termsTemplate'
+import { WatermarkSection } from './WatermarkSection'
+import { StorageSummarySection } from './StorageSummarySection'
 import { PageHeader } from '@/components/PageHeader'
 import { cn } from '@/lib/utils'
 
@@ -328,6 +330,8 @@ export default function SettingsPage() {
         </div>
       </form>
 
+      <WatermarkSection />
+      <StorageSummarySection />
       <form onSubmit={handlePwSubmit(data => changePwMutation.mutate(data))} noValidate>
         <Section title="Đổi mật khẩu" description="Mật khẩu mới tối thiểu 12 ký tự.">
           <Field id="pw-current" label="Mật khẩu hiện tại" error={pwErrors.currentPassword?.message}>
