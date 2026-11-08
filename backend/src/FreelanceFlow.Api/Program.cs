@@ -5,6 +5,7 @@ using FreelanceFlow.Api.Domain.Auth;
 using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Features.Auth;
 using FreelanceFlow.Api.Features.Clients;
+using FreelanceFlow.Api.Features.Portal;
 using FreelanceFlow.Api.Features.Projects;
 using FreelanceFlow.Api.Features.Services;
 using FreelanceFlow.Api.Features.Settings;
@@ -46,6 +47,10 @@ builder.Services.AddDbContext<AppDbContext>((sp, opt) =>
 
 // Auth
 builder.Services.AddScoped<IPasswordHasher<DesignerAccount>, PasswordHasher<DesignerAccount>>();
+builder.Services.AddHttpContextAccessor();
+// Portal handlers take PortalPrincipal from DI; clientId never comes from the request (07-security §4.4)
+builder.Services.AddScoped(sp => PortalPrincipal.FromUser(
+    sp.GetRequiredService<IHttpContextAccessor>().HttpContext!.User));
 
 builder.Services.AddAuthentication(options =>
 {
@@ -71,15 +76,44 @@ builder.Services.AddAuthentication(options =>
         ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
         return Task.CompletedTask;
     };
+})
+// Client portal session (07-security §4.2): own cookie; SameSite=Lax so links opened from Zalo keep it
+.AddCookie(PortalPrincipal.Scheme, options =>
+{
+    options.Cookie.Name = PortalPrincipal.CookieName;
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.SlidingExpiration = true;
+    options.ExpireTimeSpan = TimeSpan.FromDays(30);
+    options.Events.OnValidatePrincipal = PortalSessionValidator.ValidatePrincipal;
+    options.Events.OnRedirectToLogin = ctx =>
+    {
+        ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        return Task.CompletedTask;
+    };
+    options.Events.OnRedirectToAccessDenied = ctx =>
+    {
+        ctx.Response.StatusCode = StatusCodes.Status404NotFound; // portal never reveals existence (404, not 403)
+        return Task.CompletedTask;
+    };
 });
 
 builder.Services.AddAuthorization(opt =>
 {
     opt.AddPolicy("DesignerOnly", policy => policy.RequireAuthenticatedUser());
+    // Only the Portal scheme is evaluated: a designer cookie never satisfies this policy, and the
+    // default (Designer) scheme used by /api/admin/* never reads ff_portal.
+    opt.AddPolicy(PortalPrincipal.Policy, policy => policy
+        .AddAuthenticationSchemes(PortalPrincipal.Scheme)
+        .RequireAuthenticatedUser()
+        .RequireClaim(PortalPrincipal.ClientIdClaim));
 });
 
-// Rate limiting — login attempts per IP per minute (07-security); tests raise it via config
+// Rate limiting per IP per minute — login (07-security §2) and portal token exchange (§4.2);
+// tests raise both via config
 var loginPermitLimit = builder.Configuration.GetValue("RateLimit:LoginPerMinute", 5);
+var portalSessionPermitLimit = builder.Configuration.GetValue("RateLimit:PortalSessionPerMinute", 10);
 builder.Services.AddRateLimiter(opt =>
 {
     opt.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
@@ -87,6 +121,14 @@ builder.Services.AddRateLimiter(opt =>
         factory: _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = loginPermitLimit,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
+    opt.AddPolicy("portal-session", ctx => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = portalSessionPermitLimit,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0,
         }));
@@ -139,6 +181,7 @@ app.MapClientsEndpoints();
 app.MapProjectsEndpoints();
 app.MapBriefsEndpoints();
 app.MapDeliverablesEndpoints();
+app.MapPortalSessionEndpoints();
 
 app.MapGet("/health", async (AppDbContext db) =>
 {

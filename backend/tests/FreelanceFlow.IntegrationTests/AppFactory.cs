@@ -32,6 +32,7 @@ public sealed class AppFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("Seed:DesignerPassword", TestPassword);
         builder.UseSetting("App:PublicBaseUrl", "http://localhost");
         builder.UseSetting("RateLimit:LoginPerMinute", "1000");
+        builder.UseSetting("RateLimit:PortalSessionPerMinute", "1000");
     }
 
     public async Task InitializeAsync() => await _db.StartAsync();
