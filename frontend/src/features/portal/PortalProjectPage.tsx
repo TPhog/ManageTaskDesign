@@ -1,7 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, SearchX } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { ArrowLeft, MessageSquarePlus, SearchX } from 'lucide-react'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/StatusBadge'
 import { EmptyState } from '@/components/EmptyState'
@@ -13,8 +13,11 @@ import type { PortalProjectDetail, PortalTimelineItem } from '@/lib/portalTypes'
 import { designTypeLabel, portalDeliverableStatus, portalProjectStatus } from './labels'
 import { ProgressBar } from './ProgressBar'
 import { deliveredText, progressOf, remainingRoundsText } from './progress'
+import { cn } from '@/lib/utils'
 import { PortalQuotationList } from './PortalQuotationList'
-import { usePortalQuotations } from './usePortal'
+import { PortalRequestList } from './PortalRequestList'
+import { acceptsRequests } from './requests'
+import { usePortalQuotations, usePortalRequests } from './usePortal'
 
 const panelClass = 'rounded-xl border bg-card p-4 shadow-card sm:p-5'
 
@@ -35,6 +38,7 @@ export default function PortalProjectPage() {
   })
 
   const { data: quotations } = usePortalQuotations(id, !!project)
+  const { data: requests } = usePortalRequests(id, !!project)
 
   if (isLoading) {
     return (
@@ -64,8 +68,10 @@ export default function PortalProjectPage() {
 
   const { pct } = progressOf(project.deliverableSummary)
 
+  const canRequest = acceptsRequests(project.status)
+
   return (
-    <div className="space-y-4">
+    <div className={cn('space-y-4', canRequest && 'pb-16')}>
       <Link to="/portal" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         Tất cả dự án
@@ -155,6 +161,25 @@ export default function PortalProjectPage() {
         )}
       </section>
 
+      <section aria-labelledby="portal-requests" className={panelClass}>
+        <div className="flex items-center justify-between gap-3">
+          <h2 id="portal-requests" className="text-sm font-semibold text-foreground">Yêu cầu chỉnh sửa của bạn</h2>
+          <Link to="/portal/requests" className="text-xs font-medium text-primary hover:underline">Xem tất cả</Link>
+        </div>
+        {!requests ? (
+          <Skeleton className="mt-3 h-16 w-full" />
+        ) : requests.length === 0 ? (
+          <p className="mt-2 text-sm text-muted-foreground">Bạn chưa gửi yêu cầu nào cho dự án này.</p>
+        ) : (
+          <div className="mt-3">
+            <PortalRequestList items={requests} />
+          </div>
+        )}
+        {!canRequest && (
+          <p className="mt-3 text-xs text-muted-foreground">Dự án đã kết thúc nên không nhận yêu cầu mới.</p>
+        )}
+      </section>
+
       <section aria-labelledby="portal-brief" className={panelClass}>
         <h2 id="portal-brief" className="text-sm font-semibold text-foreground">Brief</h2>
         {project.brief ? (
@@ -194,6 +219,16 @@ export default function PortalProjectPage() {
           </ol>
         )}
       </section>
+
+      {canRequest && (
+        <Link
+          to={`/portal/requests/new?projectId=${project.id}`}
+          className={cn(buttonVariants(), 'fixed bottom-20 right-4 z-20 shadow-lg sm:right-[max(1rem,calc(50%-20rem))]')}
+        >
+          <MessageSquarePlus aria-hidden="true" />
+          Gửi yêu cầu chỉnh sửa
+        </Link>
+      )}
     </div>
   )
 }

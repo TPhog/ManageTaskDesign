@@ -6,6 +6,8 @@ import PortalHomePage from './features/portal/PortalHomePage'
 import PortalProjectPage from './features/portal/PortalProjectPage'
 import PortalQuotationsPage from './features/portal/PortalQuotationsPage'
 import PortalQuotationPage from './features/portal/PortalQuotationPage'
+import PortalRequestsPage from './features/portal/PortalRequestsPage'
+import PortalRequestNewPage from './features/portal/PortalRequestNewPage'
 import LoginPage from './features/admin/auth/LoginPage'
 import { ProtectedRoute } from './features/admin/ProtectedRoute'
 import NotFoundPage from './features/admin/NotFoundPage'
@@ -64,6 +66,8 @@ export const router = createBrowserRouter([
       { path: 'quotations', element: <PortalQuotationsPage /> },
       { path: 'quotations/:id', element: <PortalQuotationPage /> },
       { path: 'quotations/:id/versions/:version', element: <PortalQuotationPage /> },
+      { path: 'requests', element: <PortalRequestsPage /> },
+      { path: 'requests/new', element: <PortalRequestNewPage /> },
     ],
   },
   {

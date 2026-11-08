@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { FileText, FolderOpen, Link2Off, Loader2, LogOut, Mail, Phone, WifiOff, type LucideIcon } from 'lucide-react'
+import { FileText, FolderOpen, Link2Off, Loader2, LogOut, Mail, MessagesSquare, Phone, WifiOff, type LucideIcon } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
@@ -15,6 +15,7 @@ import { isSessionExpired, logoutCompleted } from './errors'
 const navItems: { to: string; label: string; icon: LucideIcon; match: (path: string) => boolean }[] = [
   { to: '/portal', label: 'Dự án', icon: FolderOpen, match: p => p === '/portal' || p.startsWith('/portal/projects') },
   { to: '/portal/quotations', label: 'Báo giá', icon: FileText, match: p => p.startsWith('/portal/quotations') },
+  { to: '/portal/requests', label: 'Yêu cầu', icon: MessagesSquare, match: p => p.startsWith('/portal/requests') },
 ]
 
 export default function PortalLayout() {
