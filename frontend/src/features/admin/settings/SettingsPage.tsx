@@ -15,6 +15,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Skeleton } from '@/components/ui/skeleton'
 import { DEFAULT_TERMS_TEMPLATE } from './termsTemplate'
 import { WatermarkSection } from './WatermarkSection'
+import { DigestSection } from './DigestSection'
 import { StorageSummarySection } from './StorageSummarySection'
 import { PageHeader } from '@/components/PageHeader'
 import { cn } from '@/lib/utils'
@@ -331,6 +332,7 @@ export default function SettingsPage() {
       </form>
 
       <WatermarkSection />
+      <DigestSection />
       <StorageSummarySection />
       <form onSubmit={handlePwSubmit(data => changePwMutation.mutate(data))} noValidate>
         <Section title="Đổi mật khẩu" description="Mật khẩu mới tối thiểu 12 ký tự.">

@@ -223,3 +223,10 @@ export interface TaskUpdateInput {
   dueDate: string | null
   deliverableId: string | null
 }
+
+/** GET/PUT /admin/settings/digest: daily Discord digest on/off + VN hour */
+export interface DigestSettings {
+  enabled: boolean
+  hourVn: number
+  channelConfigured: boolean
+}
