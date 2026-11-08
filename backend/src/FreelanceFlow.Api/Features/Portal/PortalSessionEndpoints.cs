@@ -86,7 +86,8 @@ public static class PortalSessionEndpoints
             settings?.DisplayName ?? "",
             null, // logo file serving arrives with M3
             settings?.ContactPhone,
-            settings?.ContactEmail)));
+            settings?.ContactEmail,
+            settings?.PortalResponseTime ?? FreelanceFlow.Api.Domain.Settings.Settings.DefaultPortalResponseTime)));
     }
 
     private static async Task<IResult> Studio(AppDbContext db)

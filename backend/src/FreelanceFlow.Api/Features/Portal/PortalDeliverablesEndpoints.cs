@@ -35,9 +35,16 @@ public static class PortalDeliverablesEndpoints
         var owner = await (from d in db.Deliverables.AsNoTracking()
                            join p in PortalScope.OwnProjects(db, principal) on d.ProjectId equals p.Id
                            where d.Id == id
-                           select new { ProjectId = p.Id, ProjectName = p.Name, d.Name })
+                           select new { ProjectId = p.Id, ProjectName = p.Name, d.Name, d.Status, d.ClientDecision })
             .FirstOrDefaultAsync();
         if (owner is null) return Results.NotFound();
+
+        // Plan 12 BR-48: no approval while the client's own change request is still being worked on
+        var hasOpenChange = await PortalReview.OpenChangeDeliverableIds(db, owner.ProjectId).AnyAsync(x => x == id);
+        if (ClientReviewStates.Of(owner.Status, owner.ClientDecision, hasOpenChange) == ClientReviewStates.ChangesInProgress)
+            return Results.Json(
+                new { code = "CHANGE_REQUEST_OPEN", detail = "Bạn đang có yêu cầu sửa cho sản phẩm này — chờ nhà thiết kế gửi bản mới rồi duyệt" },
+                statusCode: StatusCodes.Status409Conflict);
 
         // Conditional UPDATE (not load-modify-save): it cannot overwrite a concurrent designer status change, and of two
         // simultaneous approvals only one matches the WHERE — so one activity entry and one alert.

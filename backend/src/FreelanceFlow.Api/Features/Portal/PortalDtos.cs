@@ -7,12 +7,16 @@ namespace FreelanceFlow.Api.Features.Portal;
 
 public sealed record PortalSessionRequest(string? Token);
 
-public sealed record PortalDesignerDto(string DisplayName, string? LogoUrl, string? ContactPhone, string? ContactEmail);
+/// <summary>ResponseTime (Plan 12 CF-13): "Nhà thiết kế thường phản hồi {ResponseTime}".</summary>
+public sealed record PortalDesignerDto(string DisplayName, string? LogoUrl, string? ContactPhone, string? ContactEmail, string ResponseTime);
 
 public sealed record PortalMeDto(string ClientName, PortalDesignerDto Designer);
 
-/// <summary>InReview: deliverables waiting for the client's approval (QA C-06).</summary>
-public sealed record PortalDeliverableSummaryDto(int Total, int Delivered, int Approved, int InReview);
+/// <summary>
+/// InReview: deliverables in IN_REVIEW (raw status, QA C-06). AwaitingClient (Plan 12 BR-48): those still waiting for the
+/// client — not yet approved by the client and without an open change request (ClientReviewStates.AwaitingClient).
+/// </summary>
+public sealed record PortalDeliverableSummaryDto(int Total, int Delivered, int Approved, int InReview, int AwaitingClient);
 
 public sealed record PortalProjectListItemDto(
     Guid Id,
@@ -34,7 +38,9 @@ public sealed record PortalDeliverableDto(
     int RemainingRounds,
     DateOnly? DueDate,
     int? ProgressPercent,     // plan 06b: % of tasks DONE (null = no task); task titles never leave the designer side
-    string? ClientDecision);  // "APPROVED" once the client pressed "Duyệt" (still IN_REVIEW until the designer confirms)
+    string? ClientDecision,   // "APPROVED" once the client pressed "Duyệt" (still IN_REVIEW until the designer confirms)
+    string ReviewState,       // Plan 12 BR-48: ClientReviewStates — the one state the client sees
+    bool HasOpenChangeRequest);
 
 /// <summary>POST /api/portal/deliverables/{id}/approve.</summary>
 public sealed record PortalDeliverableDecisionDto(Guid Id, string Status, string? ClientDecision, DateTimeOffset? ClientDecisionAt);

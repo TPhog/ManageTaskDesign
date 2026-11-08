@@ -1,6 +1,8 @@
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Files;
+using FreelanceFlow.Api.Domain.Projects;
+using FreelanceFlow.Api.Domain.Requests;
 using FreelanceFlow.Api.Domain.Revisions;
 using FreelanceFlow.Api.Domain.Tasks;
 using FreelanceFlow.Api.Infrastructure.Security;
@@ -39,7 +41,15 @@ public static class PortalProjectsEndpoints
                     db.Deliverables.Count(d => d.ProjectId == p.Id && d.Status != "CANCELLED"),
                     db.Deliverables.Count(d => d.ProjectId == p.Id && d.Status == "DELIVERED"),
                     db.Deliverables.Count(d => d.ProjectId == p.Id && d.Status == "APPROVED"),
-                    db.Deliverables.Count(d => d.ProjectId == p.Id && d.Status == "IN_REVIEW")),
+                    db.Deliverables.Count(d => d.ProjectId == p.Id && d.Status == "IN_REVIEW"),
+                    // Plan 12 BR-48: same rule as ClientReviewStates.AwaitingClient, in SQL
+                    db.Deliverables.Count(d => d.ProjectId == p.Id && d.Status == "IN_REVIEW" && d.ClientDecision == null
+                        && !db.ClientRequests.Any(r => r.DeliverableId == d.Id && r.Status == RequestStatuses.New)
+                        && !(from i in db.RevisionItems
+                             join r in db.RevisionRounds on i.RoundId equals r.Id
+                             where r.DeliverableId == d.Id
+                                   && (i.WorkStatus == RevisionWorkStatuses.Todo || i.WorkStatus == RevisionWorkStatuses.InProgress)
+                             select i.Id).Any())),
                 db.Quotations.Any(q => q.ProjectId == p.Id && q.Status == "SENT" &&
                                        (q.ExpiryDate == null || q.ExpiryDate >= today)),
                 // M7b: target of the "Có báo giá mới" chip — the newest open quotation
@@ -84,20 +94,26 @@ public static class PortalProjectsEndpoints
         var taskCounts = await TaskProgress.PerDeliverable(db.Tasks.Where(t => t.ProjectId == id))
             .ToDictionaryAsync(x => x.DeliverableId);
 
+        // Plan 12 BR-48: deliverables with a NEW request or an open revision item of their rounds
+        var openChange = (await PortalReview.OpenChangeDeliverableIds(db, id).ToListAsync()).ToHashSet();
+
         var deliverableDtos = deliverables.Select(d =>
         {
             var used = usedRoundsMap.GetValueOrDefault(d.Id);
             var tasks = taskCounts.GetValueOrDefault(d.Id);
+            var hasOpenChange = openChange.Contains(d.Id);
+            var state = ClientReviewStates.Of(d.Status, d.ClientDecision, hasOpenChange);
             return new PortalDeliverableDto(d.Id, d.Name, d.Quantity, d.Status, d.IncludedRounds,
                 used, Math.Max(0, d.IncludedRounds - used), d.DueDate,
-                TaskProgress.Percent(tasks?.Total ?? 0, tasks?.Done ?? 0), d.ClientDecision);
+                TaskProgress.Percent(tasks?.Total ?? 0, tasks?.Done ?? 0), d.ClientDecision, state, hasOpenChange);
         }).ToList();
 
         var summary = new PortalDeliverableSummaryDto(
             deliverables.Count(d => d.Status != "CANCELLED"),
             deliverables.Count(d => d.Status == "DELIVERED"),
             deliverables.Count(d => d.Status == "APPROVED"),
-            deliverables.Count(d => d.Status == "IN_REVIEW"));
+            deliverables.Count(d => d.Status == "IN_REVIEW"),
+            deliverableDtos.Count(x => x.ReviewState == ClientReviewStates.AwaitingClient));
 
         // BRF-04: only the newest CONFIRMED brief is visible to the client
         var brief = await db.ProjectBriefs.AsNoTracking()

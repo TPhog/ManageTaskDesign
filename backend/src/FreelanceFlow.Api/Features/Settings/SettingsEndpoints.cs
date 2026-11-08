@@ -45,7 +45,7 @@ public static class SettingsEndpoints
             s.DisplayName, s.ContactEmail, s.ContactPhone, s.LogoFileId,
             s.BankBin, s.BankAccountNo, s.BankAccountName,
             s.QuotationPrefix, s.DefaultValidityDays, s.DefaultDepositPercent,
-            s.DefaultTerms, s.UpdatedAt, (long)xmin));
+            s.DefaultTerms, s.UpdatedAt, (long)xmin, s.PortalResponseTime));
     }
 
     private static async Task<IResult> UpdateSettings(
@@ -87,6 +87,11 @@ public static class SettingsEndpoints
         if (body.DefaultValidityDays.HasValue) settings.DefaultValidityDays = body.DefaultValidityDays.Value;
         if (body.DefaultDepositPercent.HasValue) settings.DefaultDepositPercent = body.DefaultDepositPercent.Value;
         if (body.DefaultTerms is not null) settings.DefaultTerms = body.DefaultTerms;
+        try { settings.SetPortalResponseTime(body.PortalResponseTime); }
+        catch (DomainException ex)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["portalResponseTime"] = [ex.Detail ?? ex.Code] });
+        }
         settings.UpdatedAt = clock.UtcNow;
 
         try
@@ -122,11 +127,11 @@ public static class SettingsEndpoints
         string DisplayName, string? ContactEmail, string? ContactPhone, Guid? LogoFileId,
         string? BankBin, string? BankAccountNo, string? BankAccountName,
         string QuotationPrefix, int DefaultValidityDays, int DefaultDepositPercent,
-        string DefaultTerms, DateTimeOffset UpdatedAt, long RowVersion);
+        string DefaultTerms, DateTimeOffset UpdatedAt, long RowVersion, string PortalResponseTime);
 
     private record UpdateSettingsRequest(
         string DisplayName, string? ContactEmail, string? ContactPhone, Guid? LogoFileId,
         string? BankBin, string? BankAccountNo, string? BankAccountName,
         string? QuotationPrefix, int? DefaultValidityDays, int? DefaultDepositPercent,
-        string? DefaultTerms, long RowVersion);
+        string? DefaultTerms, long RowVersion, string? PortalResponseTime = null);
 }

@@ -133,7 +133,7 @@ public static class BriefsEndpoints
             projectId: brief.ProjectId,
             data: new { version = brief.Version },
             visibleToClient: true,
-            clientMessage: $"Brief phiên bản {brief.Version} đã được xác nhận");
+            clientMessage: $"Đã chốt yêu cầu thiết kế (lần {brief.Version})");
 
         await db.SaveChangesAsync();
 
