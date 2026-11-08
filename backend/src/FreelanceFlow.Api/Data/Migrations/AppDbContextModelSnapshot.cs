@@ -1138,6 +1138,10 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<Guid?>("CreatedDeliverableId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("created_deliverable_id");
+
                     b.Property<string>("Description")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1161,6 +1165,10 @@ namespace FreelanceFlow.Api.Data.Migrations
                     b.Property<string>("ScopeOverrideReason")
                         .HasColumnType("text")
                         .HasColumnName("scope_override_reason");
+
+                    b.Property<Guid?>("ServiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_id");
 
                     b.Property<int>("SortOrder")
                         .ValueGeneratedOnAdd()
@@ -1192,8 +1200,15 @@ namespace FreelanceFlow.Api.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CreatedDeliverableId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_items_created_deliverable")
+                        .HasFilter("created_deliverable_id IS NOT NULL");
+
                     b.HasIndex("QuotationItemId")
                         .HasDatabaseName("ix_items_quotation_item");
+
+                    b.HasIndex("ServiceId");
 
                     b.HasIndex("RoundId", "SortOrder")
                         .HasDatabaseName("ix_items_round");
@@ -1202,9 +1217,13 @@ namespace FreelanceFlow.Api.Data.Migrations
                         {
                             t.HasCheckConstraint("ck_items_billing", "billing IN ('FREE_FIX','IN_QUOTA','CHARGEABLE')");
 
+                            t.HasCheckConstraint("ck_items_created_deliverable_type", "created_deliverable_id IS NULL OR type = 'NEW_DELIVERABLE'");
+
                             t.HasCheckConstraint("ck_items_description", "length(description) BETWEEN 1 AND 2000");
 
                             t.HasCheckConstraint("ck_items_quotation", "billing = 'CHARGEABLE' OR quotation_item_id IS NULL");
+
+                            t.HasCheckConstraint("ck_items_service_type", "service_id IS NULL OR type = 'NEW_DELIVERABLE'");
 
                             t.HasCheckConstraint("ck_items_type", "type IN ('MINOR','MAJOR','SCOPE_CHANGE','NEW_DELIVERABLE')");
 
@@ -1698,11 +1717,21 @@ namespace FreelanceFlow.Api.Data.Migrations
 
             modelBuilder.Entity("FreelanceFlow.Api.Domain.Requests.RevisionItem", b =>
                 {
+                    b.HasOne("FreelanceFlow.Api.Domain.Projects.Deliverable", null)
+                        .WithMany()
+                        .HasForeignKey("CreatedDeliverableId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("FreelanceFlow.Api.Domain.Requests.RevisionRound", null)
                         .WithMany()
                         .HasForeignKey("RoundId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("FreelanceFlow.Api.Domain.Catalog.Service", null)
+                        .WithMany()
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("FreelanceFlow.Api.Domain.Requests.RevisionRound", b =>

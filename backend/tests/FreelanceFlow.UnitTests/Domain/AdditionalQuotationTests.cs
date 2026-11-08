@@ -1,4 +1,5 @@
 using FluentAssertions;
+using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Quotations;
 using FreelanceFlow.Api.Domain.Revisions;
 
@@ -77,5 +78,58 @@ public class AdditionalQuotationTests
         q.Items.Select(i => i.Description).Should().Equal("Vòng sửa thứ 4 — Logo", "Thêm bản in");
         q.Total.Should().Be(200_000);
         q.Items[plan.LineIndexByItemId[items[1].ItemId]].Description.Should().Be("Thêm bản in");
+    }
+
+    private static ChargeableItem Priced(string type, string description, long? unitPrice,
+        string? serviceName = null, long servicePrice = 0) =>
+        new(Guid.NewGuid(), Round4, 4, type, description, "Logo", 200_000, serviceName, servicePrice, unitPrice);
+
+    [Theory]   // plan 09 / BR-46: typed price → service.base_price → 0
+    [InlineData("Thiết kế Banner", 500_000L, 750_000L, "Thiết kế Banner", 750_000L)]
+    [InlineData("Thiết kế Banner", 500_000L, null, "Thiết kế Banner", 500_000L)]
+    [InlineData(null, 0L, 750_000L, "Thiệp mời", 750_000L)]
+    [InlineData(null, 0L, null, "Thiệp mời", 0L)]
+    public void New_deliverable_price_is_typed_then_service_then_zero(
+        string? serviceName, long servicePrice, long? unitPrice, string description, long expected)
+    {
+        var plan = AdditionalQuotation.Plan(
+            [Priced("NEW_DELIVERABLE", "Thiệp mời", unitPrice, serviceName, servicePrice)], "P");
+
+        plan.Lines.Single().Description.Should().Be(description);
+        plan.Lines.Single().UnitPrice.Should().Be(expected);
+        plan.LineKinds.Should().Equal(AdditionalLineKinds.NewDeliverable);
+    }
+
+    [Fact]
+    public void Round_and_scope_change_lines_take_the_typed_price_over_the_suggestion()   // plan 09
+    {
+        var items = new[]
+        {
+            Priced("MINOR", "Đổi màu", null), Priced("MINOR", "Đổi font", 350_000),
+            Priced("SCOPE_CHANGE", "Bản tiếng Anh", 400_000), Priced("SCOPE_CHANGE", "Bản in", null),
+        };
+
+        var plan = AdditionalQuotation.Plan(items, "P");
+
+        plan.Lines.Select(l => (l.Description, l.UnitPrice)).Should().Equal(
+            ("Vòng sửa thứ 4 — Logo", 350_000L), ("Bản tiếng Anh", 400_000L), ("Bản in", 0L));
+        plan.LineKinds.Should().Equal(AdditionalLineKinds.Round, AdditionalLineKinds.ScopeChange, AdditionalLineKinds.ScopeChange);
+    }
+
+    [Fact]
+    public void Two_different_prices_for_one_round_line_are_rejected()   // plan 09
+    {
+        var items = new[] { Priced("MINOR", "Đổi màu", 300_000), Priced("MAJOR", "Đổi bố cục", 350_000) };
+
+        FluentActions.Invoking(() => AdditionalQuotation.Plan(items, "P"))
+            .Should().Throw<DomainException>().Which.Code.Should().Be("VALIDATION_FAILED");
+    }
+
+    [Fact]
+    public void The_same_price_on_two_items_of_a_round_is_one_price()
+    {
+        var items = new[] { Priced("MINOR", "Đổi màu", 300_000), Priced("MAJOR", "Đổi bố cục", 300_000) };
+
+        AdditionalQuotation.Plan(items, "P").Lines.Single().UnitPrice.Should().Be(300_000);
     }
 }

@@ -12,6 +12,10 @@ public class RevisionItem : IAuditable
     public string Billing { get; set; } = "";
     public string WorkStatus { get; set; } = "TODO";
     public Guid? QuotationItemId { get; set; }
+    /// <summary>Plan 09: service picked for a NEW_DELIVERABLE line in from-revisions; used when the quotation is accepted (BR-48).</summary>
+    public Guid? ServiceId { get; set; }
+    /// <summary>BR-48: deliverable created from this NEW_DELIVERABLE item when its quotation was accepted.</summary>
+    public Guid? CreatedDeliverableId { get; set; }
     public string? ScopeOverrideReason { get; set; }
     public string InternalNotes { get; set; } = "";
     public int SortOrder { get; set; }
@@ -32,9 +36,12 @@ public class RevisionItem : IAuditable
             throw new DomainException("BILLING_LOCKED",
                 "Mục đã nằm trong báo giá đã gửi/chấp nhận — tạo version báo giá mới và bỏ dòng này trước (BR-61)");
         if (!roundHasDeliverable && billing == RevisionBillings.InQuota) throw ProjectLevelInQuota();
+        if (CreatedDeliverableId is not null && type != RevisionItemTypes.NewDeliverable)
+            throw new DomainException("BUSINESS_RULE", "Mục đã thành hạng mục trong dự án — không đổi loại được (BR-48)");
         SetContent(description, type, billing);
         InternalNotes = internalNotes;
         if (Billing != RevisionBillings.Chargeable) QuotationItemId = null;
+        if (Type != RevisionItemTypes.NewDeliverable) ServiceId = null;
     }
 
     /// <summary>
@@ -71,12 +78,23 @@ public class RevisionItem : IAuditable
         return overridden;
     }
 
-    /// <summary>BR-46: link to the ADDITIONAL draft line built for this item.</summary>
-    public void LinkQuotationLine(Guid quotationItemId)
+    /// <summary>BR-46: link to the ADDITIONAL draft line built for this item; a NEW_DELIVERABLE keeps the picked service (plan 09).</summary>
+    public void LinkQuotationLine(Guid quotationItemId, Guid? serviceId = null)
     {
         if (Billing != RevisionBillings.Chargeable || QuotationItemId is not null || WorkStatus == RevisionWorkStatuses.Cancelled)
             throw new DomainException("BUSINESS_RULE", "Chỉ mục tính phí chưa báo giá mới được đưa vào báo giá phát sinh (BR-46)");
+        if (serviceId is not null && Type != RevisionItemTypes.NewDeliverable)
+            throw new DomainException("VALIDATION_FAILED", "Chỉ mục \"Hạng mục mới\" mới gắn dịch vụ");
         QuotationItemId = quotationItemId;
+        ServiceId = Type == RevisionItemTypes.NewDeliverable ? serviceId : null;
+    }
+
+    /// <summary>BR-48: the accepted NEW_DELIVERABLE line became deliverable <paramref name="deliverableId"/> — once only.</summary>
+    public void MarkDeliverableCreated(Guid deliverableId)
+    {
+        if (Type != RevisionItemTypes.NewDeliverable || CreatedDeliverableId is not null)
+            throw new DomainException("BUSINESS_RULE", "Mục này đã thành hạng mục hoặc không phải \"Hạng mục mới\" (BR-48)");
+        CreatedDeliverableId = deliverableId;
     }
 
     /// <summary>BR-47: when the next quotation version is sent, follow the copied line; a dropped line unlinks. True = moved.</summary>

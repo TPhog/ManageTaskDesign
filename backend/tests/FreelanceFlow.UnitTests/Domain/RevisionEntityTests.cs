@@ -270,4 +270,48 @@ public class RevisionItemTests
         kept.QuotationItemId.Should().Be(newLine);
         dropped.QuotationItemId.Should().BeNull();
     }
+    private static RevisionItem NewDeliverableItem() =>
+        DeliverableRound().AddItem("Sticker dán ly", "NEW_DELIVERABLE", "CHARGEABLE", 10);
+
+    [Fact]
+    public void Link_keeps_the_service_only_for_a_new_deliverable()   // plan 09
+    {
+        var service = Guid.NewGuid();
+        var item = NewDeliverableItem();
+
+        item.LinkQuotationLine(Guid.NewGuid(), service);
+
+        item.ServiceId.Should().Be(service);
+        FluentActions.Invoking(() => Chargeable().LinkQuotationLine(Guid.NewGuid(), service))
+            .Should().Throw<DomainException>().Which.Code.Should().Be("VALIDATION_FAILED");
+    }
+
+    [Fact]
+    public void A_new_deliverable_item_becomes_a_deliverable_only_once()   // BR-48
+    {
+        var item = NewDeliverableItem();
+        var deliverableId = Guid.NewGuid();
+
+        item.MarkDeliverableCreated(deliverableId);
+
+        item.CreatedDeliverableId.Should().Be(deliverableId);
+        FluentActions.Invoking(() => item.MarkDeliverableCreated(Guid.NewGuid()))
+            .Should().Throw<DomainException>().Which.Code.Should().Be("BUSINESS_RULE");
+        FluentActions.Invoking(() => Chargeable().MarkDeliverableCreated(deliverableId))
+            .Should().Throw<DomainException>().Which.Code.Should().Be("BUSINESS_RULE");
+    }
+
+    [Fact]
+    public void A_converted_item_keeps_its_type_and_leaving_new_deliverable_drops_the_service()   // BR-48
+    {
+        var converted = NewDeliverableItem();
+        converted.MarkDeliverableCreated(Guid.NewGuid());
+        FluentActions.Invoking(() => converted.Edit("Sticker dán ly", "MINOR", "CHARGEABLE", "", true, "ACCEPTED"))
+            .Should().Throw<DomainException>().Which.Code.Should().Be("BUSINESS_RULE");
+
+        var linked = NewDeliverableItem();
+        linked.LinkQuotationLine(Guid.NewGuid(), Guid.NewGuid());
+        linked.Edit("Sticker dán ly", "SCOPE_CHANGE", "CHARGEABLE", "", true, "DRAFT");
+        linked.ServiceId.Should().BeNull();
+    }
 }

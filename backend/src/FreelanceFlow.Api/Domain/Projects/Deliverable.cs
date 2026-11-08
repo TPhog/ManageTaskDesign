@@ -1,3 +1,4 @@
+using FreelanceFlow.Api.Domain.Catalog;
 using FreelanceFlow.Api.Domain.Common;
 
 namespace FreelanceFlow.Api.Domain.Projects;
@@ -25,6 +26,31 @@ public class Deliverable : IAuditable
     public DateTimeOffset? ClientDecisionAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+
+    /// <summary>Same limit as the deliverable form (zod max 200).</summary>
+    public const int MaxName = 200;
+
+    /// <summary>
+    /// BR-48: a deliverable born from an accepted NEW_DELIVERABLE quotation line — NOT_STARTED (BR-01), quota copied
+    /// from the picked service (none: 0 rounds, 0 ₫), named after the line the client accepted.
+    /// </summary>
+    public static Deliverable CreateFromAcceptedLine(Guid projectId, string lineDescription, int quantity, Service? service, int sortOrder)
+    {
+        var name = lineDescription.Trim();
+        if (name.Length == 0) throw new DomainException("VALIDATION_FAILED", "Tên hạng mục trống");
+        if (name.Length > MaxName) name = name[..(MaxName - 1)] + "…";
+        return new Deliverable
+        {
+            ProjectId = projectId,
+            ServiceId = service?.Id,
+            Name = name,
+            Quantity = Math.Max(1, quantity),
+            IncludedRounds = service?.DefaultIncludedRounds ?? 0,
+            ExtraRoundPrice = service?.ExtraRoundPrice ?? 0,
+            Status = "NOT_STARTED",
+            SortOrder = sortOrder,
+        };
+    }
 
     // BR-44: reducing below usedRounds is allowed but must warn; returns warning string or null
     public string? ValidateIncludedRoundsChange(int newIncludedRounds, int usedRounds)
