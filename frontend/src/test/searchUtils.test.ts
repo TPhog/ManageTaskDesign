@@ -24,7 +24,7 @@ describe('result helpers', () => {
   })
 
   it('links each kind to its page; clients open the filtered client list', () => {
-    expect(clientHref({ name: 'Cà Phê & Co' })).toBe('/admin/clients?q=C%C3%A0%20Ph%C3%AA%20%26%20Co')
+    expect(clientHref({ id: 'abc-1' })).toBe('/admin/clients/abc-1')
     expect(projectHref({ id: 'p1' })).toBe('/admin/projects/p1')
     expect(quotationHref({ id: 'q1' })).toBe('/admin/quotations/q1')
   })

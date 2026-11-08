@@ -15,9 +15,8 @@ export function resultCount(result: SearchResult | undefined): number {
   return result ? result.clients.length + result.projects.length + result.quotations.length : 0
 }
 
-/** There is no client detail route: open the client list filtered by name (ClientsPage reads ?q=). */
-export function clientHref(client: { name: string }): string {
-  return `/admin/clients?q=${encodeURIComponent(client.name)}`
+export function clientHref(client: { id: string }): string {
+  return `/admin/clients/${client.id}`
 }
 
 export function projectHref(project: { id: string }): string {

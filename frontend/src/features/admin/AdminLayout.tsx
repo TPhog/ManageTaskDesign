@@ -6,8 +6,9 @@ import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
-import { Inbox } from 'lucide-react'
+import { Inbox, Search } from 'lucide-react'
 import { useNewRequestCount } from '@/features/admin/revisions/useRevisions'
+import { QuickSearch, QuickSearchTrigger } from '@/features/admin/search/QuickSearch'
 
 const navItems = [
   { to: '/admin', label: 'Tổng quan', icon: LayoutDashboard, end: true },
@@ -45,9 +46,10 @@ function NewRequestsBadge() {
   )
 }
 
-function SidebarContent({ onNavigate, onLogout, loggingOut, username }: {
+function SidebarContent({ onNavigate, onLogout, onOpenSearch, loggingOut, username }: {
   onNavigate?: () => void
   onLogout: () => void
+  onOpenSearch: () => void
   loggingOut: boolean
   username?: string
 }) {
@@ -55,6 +57,9 @@ function SidebarContent({ onNavigate, onLogout, loggingOut, username }: {
     <div className="flex h-full flex-col">
       <div className="flex h-16 items-center px-5">
         <BrandMark />
+      </div>
+      <div className="px-3 pb-2">
+        <QuickSearchTrigger onClick={onOpenSearch} />
       </div>
       <nav aria-label="Điều hướng chính" className="flex-1 space-y-1 px-3 py-2">
         {navItems.map(item => (
@@ -109,6 +114,7 @@ export default function AdminLayout() {
   const location = useLocation()
   const queryClient = useQueryClient()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
 
   const { data: me } = useQuery({
     queryKey: ['me'],
@@ -128,6 +134,7 @@ export default function AdminLayout() {
 
   const sidebarProps = {
     onLogout: () => logoutMutation.mutate(),
+    onOpenSearch: () => setSearchOpen(true),
     loggingOut: logoutMutation.isPending,
     username: me?.username,
   }
@@ -151,12 +158,28 @@ export default function AdminLayout() {
           <Menu className="h-5 w-5" />
         </Button>
         <span className="font-semibold text-foreground">{current?.label ?? 'FreelanceFlow'}</span>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="ml-auto h-11 w-11"
+          aria-label="Tìm kiếm nhanh"
+          onClick={() => setSearchOpen(true)}
+        >
+          <Search className="h-5 w-5" />
+        </Button>
       </header>
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetContent side="left" className="w-72 p-0">
           <SheetTitle className="sr-only">Menu</SheetTitle>
-          <SidebarContent {...sidebarProps} onNavigate={() => setMobileOpen(false)} />
+          <SidebarContent
+            {...sidebarProps}
+            onNavigate={() => setMobileOpen(false)}
+            onOpenSearch={() => {
+              setMobileOpen(false)
+              setSearchOpen(true)
+            }}
+          />
         </SheetContent>
       </Sheet>
 
@@ -165,6 +188,8 @@ export default function AdminLayout() {
           <Outlet />
         </div>
       </main>
+
+      <QuickSearch open={searchOpen} onOpenChange={setSearchOpen} />
     </div>
   )
 }
