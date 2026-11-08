@@ -35,7 +35,7 @@ public static class TasksEndpoints
         var errors = TaskValidation.ListFilters(status, due);
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
-        page = Math.Max(page, 1);
+        page = Math.Clamp(page, 1, 100_000);
         pageSize = Math.Clamp(pageSize, 1, 100);
         var today = clock.TodayVn;
         var weekEnd = ProjectTask.EndOfWeek(today);

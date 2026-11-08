@@ -313,4 +313,16 @@ public class TasksTests(AppFactory factory) : TaskTestBase(factory)
         (await Client.GetAsync("/api/admin/tasks?due=tomorrow")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
         (await Client.GetAsync("/api/admin/tasks?status=DOING")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
+
+    [Fact]
+    public async Task List_with_huge_page_number_returns_an_empty_page_instead_of_500()
+    {
+        await LoginAsync();
+
+        var res = await Client.GetAsync($"/api/admin/tasks?page={int.MaxValue}&pageSize=100");
+
+        res.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = JsonDocument.Parse(await res.Content.ReadAsStringAsync()).RootElement;
+        body.GetProperty("items").GetArrayLength().Should().Be(0);
+    }
 }
