@@ -189,6 +189,13 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("name");
 
+                    b.Property<string>("TaskTemplateJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("task_template")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
                     b.Property<DateTimeOffset>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
@@ -202,6 +209,8 @@ namespace FreelanceFlow.Api.Data.Migrations
                             t.HasCheckConstraint("ck_services_extra_price", "extra_round_price >= 0");
 
                             t.HasCheckConstraint("ck_services_rounds", "default_included_rounds BETWEEN 0 AND 50");
+
+                            t.HasCheckConstraint("ck_services_task_template", "jsonb_typeof(task_template) = 'array' AND jsonb_array_length(task_template) <= 20");
                         });
                 });
 
@@ -392,6 +401,15 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("ClientDecision")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("client_decision");
+
+                    b.Property<DateTimeOffset?>("ClientDecisionAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("client_decision_at");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
@@ -453,6 +471,8 @@ namespace FreelanceFlow.Api.Data.Migrations
 
                     b.ToTable("deliverables", null, t =>
                         {
+                            t.HasCheckConstraint("ck_deliverables_client_decision", "client_decision IN ('APPROVED')");
+
                             t.HasCheckConstraint("ck_deliverables_extra_price", "extra_round_price >= 0");
 
                             t.HasCheckConstraint("ck_deliverables_quantity", "quantity >= 1");
@@ -1384,6 +1404,13 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("")
+                        .HasColumnName("description");
+
                     b.Property<bool>("Done")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
@@ -1409,7 +1436,46 @@ namespace FreelanceFlow.Api.Data.Migrations
 
                     b.HasIndex("TaskId");
 
-                    b.ToTable("task_checklist_items", (string)null);
+                    b.ToTable("task_checklist_items", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_checklist_description", "char_length(description) <= 5000");
+                        });
+                });
+
+            modelBuilder.Entity("FreelanceFlow.Api.Domain.Tasks.TaskNote", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("body");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("task_id");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TaskId", "CreatedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_task_notes_task");
+
+                    b.ToTable("task_notes", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_task_notes_body", "char_length(body) BETWEEN 1 AND 5000");
+                        });
                 });
 
             modelBuilder.Entity("FreelanceFlow.Api.Domain.Activity.ActivityLog", b =>
@@ -1577,6 +1643,15 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Task");
+                });
+
+            modelBuilder.Entity("FreelanceFlow.Api.Domain.Tasks.TaskNote", b =>
+                {
+                    b.HasOne("FreelanceFlow.Api.Domain.Tasks.ProjectTask", null)
+                        .WithMany()
+                        .HasForeignKey("TaskId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("FreelanceFlow.Api.Domain.Quotations.Quotation", b =>

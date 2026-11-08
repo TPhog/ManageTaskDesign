@@ -16,6 +16,7 @@ public class DeliverableConfiguration : IEntityTypeConfiguration<Deliverable>
             t.HasCheckConstraint("ck_deliverables_extra_price", "extra_round_price >= 0");
             t.HasCheckConstraint("ck_deliverables_status",
                 "status IN ('NOT_STARTED','IN_PROGRESS','IN_REVIEW','APPROVED','DELIVERED','CANCELLED')");
+            t.HasCheckConstraint("ck_deliverables_client_decision", "client_decision IN ('APPROVED')");
         });
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id");
@@ -28,6 +29,8 @@ public class DeliverableConfiguration : IEntityTypeConfiguration<Deliverable>
         b.Property(x => x.Status).HasColumnName("status").HasDefaultValue("NOT_STARTED");
         b.Property(x => x.DueDate).HasColumnName("due_date");
         b.Property(x => x.SortOrder).HasColumnName("sort_order").HasDefaultValue(0);
+        b.Property(x => x.ClientDecision).HasColumnName("client_decision").HasMaxLength(20);
+        b.Property(x => x.ClientDecisionAt).HasColumnName("client_decision_at");
         b.Property(x => x.CreatedAt).HasColumnName("created_at");
         b.Property(x => x.UpdatedAt).HasColumnName("updated_at");
 
