@@ -1,6 +1,9 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import AdminLayout from './features/admin/AdminLayout'
 import PortalLayout from './features/portal/PortalLayout'
+import PortalTokenPage from './features/portal/PortalTokenPage'
+import PortalHomePage from './features/portal/PortalHomePage'
+import PortalProjectPage from './features/portal/PortalProjectPage'
 import LoginPage from './features/admin/auth/LoginPage'
 import { ProtectedRoute } from './features/admin/ProtectedRoute'
 import NotFoundPage from './features/admin/NotFoundPage'
@@ -34,9 +37,16 @@ export const router = createBrowserRouter([
     element: <Navigate to="/admin" replace />,
   },
   {
-    path: '/p',
+    path: '/p/:token',
+    element: <PortalTokenPage />,
+  },
+  {
+    path: '/portal',
     element: <PortalLayout />,
-    children: [],
+    children: [
+      { index: true, element: <PortalHomePage /> },
+      { path: 'projects/:id', element: <PortalProjectPage /> },
+    ],
   },
   {
     path: '*',

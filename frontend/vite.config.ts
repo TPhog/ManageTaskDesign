@@ -1,9 +1,23 @@
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
+
+// 07-security §4.3: magic-link pages must not leak the token through Referer.
+// Production sets the same header in deploy/Caddyfile.
+function portalReferrerPolicy(): Plugin {
+  return {
+    name: 'portal-referrer-policy',
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        if (req.url?.startsWith('/p/')) res.setHeader('Referrer-Policy', 'no-referrer')
+        next()
+      })
+    },
+  }
+}
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [react(), tailwindcss(), portalReferrerPolicy()],
   resolve: {
     alias: {
       '@': `${import.meta.dirname}/src`,

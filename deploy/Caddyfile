@@ -10,9 +10,12 @@ https://{$DOMAIN} {
   handle /api/* {
     reverse_proxy api:8080
   }
+  # Magic-link landing is an SPA route: serve index.html, never send the token on as Referer
   handle /p/* {
     header Referrer-Policy no-referrer
-    reverse_proxy api:8080
+    root * /srv
+    rewrite * /index.html
+    file_server
   }
   handle {
     root * /srv

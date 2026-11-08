@@ -60,3 +60,21 @@ export async function createProject(page: Page, name = `E2E Project ${Date.now()
 export async function createClient(page: Page, name = `E2E Client ${Date.now()}`): Promise<string> {
   return (await apiPost(page.request, page, '/api/admin/clients', { name })).id
 }
+
+/** Create a project for a specific client; returns its id. */
+export async function createProjectForClient(page: Page, clientId: string, name: string): Promise<string> {
+  return (await apiPost(page.request, page, '/api/admin/projects', { clientId, name, designType: 'LOGO' })).id
+}
+
+/** Add a deliverable without a service; returns its id. */
+export async function createDeliverable(page: Page, projectId: string, name: string, includedRounds = 2): Promise<string> {
+  return (await apiPost(page.request, page, `/api/admin/projects/${projectId}/deliverables`,
+    { name, quantity: 1, includedRounds, extraRoundPrice: 0 })).id
+}
+
+/** Walk a deliverable through the given statuses in order. */
+export async function moveDeliverable(page: Page, deliverableId: string, ...statuses: string[]) {
+  for (const to of statuses) {
+    await apiPost(page.request, page, `/api/admin/deliverables/${deliverableId}/status`, { to })
+  }
+}
