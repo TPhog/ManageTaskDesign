@@ -71,6 +71,9 @@ builder.Services.AddSingleton(new FreelanceFlow.Api.Infrastructure.Images.ImageP
 builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = ImageLimits.MaxAdminBodyBytes);
 if (builder.Configuration.GetValue("Storage:ReconcileIntervalHours", 24) > 0)
     builder.Services.AddHostedService<StorageReconciliationService>();
+builder.Services.AddScoped<FreelanceFlow.Api.Features.Dashboard.DailyDigestService>();
+if (builder.Configuration.GetValue("Digest:CheckIntervalSeconds", 60) > 0)
+    builder.Services.AddHostedService<FreelanceFlow.Api.Features.Dashboard.DailyDigestHostedService>();
 
 // DbContext
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")

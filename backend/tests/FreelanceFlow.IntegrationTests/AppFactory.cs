@@ -86,6 +86,7 @@ public sealed class AppFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("RateLimit:PortalSessionPerMinute", "1000");
         builder.UseSetting("Notifications:Discord:WebhookUrl", ""); // never hit the network
         builder.UseSetting("Storage:ReconcileIntervalHours", "0"); // no background reconciliation in tests
+        builder.UseSetting("Digest:CheckIntervalSeconds", "0"); // digest runs only when a test calls DailyDigestService
 
         // Real queue + dispatcher, but the sender only records
         builder.ConfigureTestServices(services =>
