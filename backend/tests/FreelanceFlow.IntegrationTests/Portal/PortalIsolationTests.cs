@@ -30,6 +30,8 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
         ["GET /api/portal/images/{id:guid}/{variant}"] = "/api/portal/images/{imageA}/thumb", // M3: never "original"
         ["POST /api/portal/projects/{id:guid}/requests"] = null, // Client_B_cannot_send_a_request_to_a_project_of_A
         ["POST /api/portal/deliverables/{id:guid}/approve"] = null, // PortalDeliverableApprovalTests.Client_B_gets_404_approving_a_deliverable_of_A
+        ["POST /api/portal/quotations/{id:guid}/accept"] = null, // PortalQuotationStatementTests.Client_B_gets_404_for_statements_on_a_quotation_of_A
+        ["POST /api/portal/quotations/{id:guid}/payment-notice"] = null, // same test
     };
 
     private static readonly string[] ResourcePlaceholders = ["{projectA}", "{quotationA}", "{imageA}"];

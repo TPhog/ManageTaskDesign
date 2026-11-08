@@ -1,15 +1,20 @@
+using FreelanceFlow.Api.Common;
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Quotations;
+using FreelanceFlow.Api.Domain.Revisions;
 using FreelanceFlow.Api.Features.Quotations;
+using FreelanceFlow.Api.Infrastructure;
+using FreelanceFlow.Api.Infrastructure.Notifications;
 using FreelanceFlow.Api.Infrastructure.Security;
 using FreelanceFlow.Api.Infrastructure.VietQr;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace FreelanceFlow.Api.Features.Portal;
 
-/// <summary>POR-03: the client's quotations. Read-only — the client never accepts/rejects in the app (ADR-004).</summary>
+/// <summary>POR-03: the client's quotations. Reads + the client's statements (ADR-012): recorded only, the designer confirms (BR-01).</summary>
 public static class PortalQuotationsEndpoints
 {
     public static void MapPortalQuotationsEndpoints(this IEndpointRouteBuilder app)
@@ -20,6 +25,8 @@ public static class PortalQuotationsEndpoints
         group.MapGet("{id:guid}", GetQuotation);
         group.MapGet("{id:guid}/versions/{version:int}", GetVersion);
         group.MapGet("{id:guid}/qr/{purpose}.png", GetQrPng);
+        group.MapPost("{id:guid}/accept", Accept);
+        group.MapPost("{id:guid}/payment-notice", PaymentNotice);
     }
 
     // 07-security §4.4 + QUO-10: quotations of the client's own projects, never DRAFT (POR-06) nor SUPERSEDED.
@@ -92,6 +99,108 @@ public static class PortalQuotationsEndpoints
         return Results.File(png, "image/png", $"{snapshot.Number.Replace("-", "")}-{purpose}.png");
     }
 
+    /// <summary>Plan 12 BR-76: "Đồng ý báo giá" — client_accepted_at only; status stays SENT until the designer accepts.</summary>
+    private static async Task<IResult> Accept(
+        Guid id, [FromServices] PortalPrincipal principal, AppDbContext db, ActivityWriter activity, IClock clock,
+        INotifier notifier, IOptions<AppSettings> app, ILogger<PortalQuotationsEndpointsLog> logger)
+    {
+        if (!await Visible(db, principal).AnyAsync(x => x.Id == id)) return Results.NotFound();
+        var q = await db.Quotations.FirstAsync(x => x.Id == id);   // tracked: xmin guards a concurrent designer change
+
+        bool recorded;
+        try { recorded = q.RecordClientAcceptance(clock.TodayVn, clock.UtcNow); }
+        catch (DomainException ex) { return StatementError(ex); }
+
+        if (recorded)
+        {
+            q.UpdatedAt = clock.UtcNow;
+            activity.Write("quotation", q.Id, "quotation.client_accepted",
+                clientId: principal.ClientId, projectId: q.ProjectId, actorType: "CLIENT",
+                data: new { number = q.Number, version = q.Version },
+                visibleToClient: true,
+                clientMessage: $"Bạn đã đồng ý báo giá {q.Number} — chờ nhà thiết kế xác nhận");
+            try { await db.SaveChangesAsync(); }
+            catch (DbUpdateConcurrencyException) { return QuotationReads.Concurrency(); }
+            await NotifyDesignerAsync(db, notifier, app.Value, logger, principal.ClientId, q,
+                "Khách đồng ý báo giá", $"Khách đã bấm \"Đồng ý báo giá\" {q.Number} trên portal", []);
+        }
+        return await DetailAsync(db, principal, id, clock);
+    }
+
+    /// <summary>Plan 12 BR-77: "Tôi đã chuyển khoản" for one BR-75 option — payment_status stays as the designer set it.</summary>
+    private static async Task<IResult> PaymentNotice(
+        Guid id, PortalPaymentNoticeRequest body, [FromServices] PortalPrincipal principal, AppDbContext db,
+        ActivityWriter activity, IClock clock, INotifier notifier, IOptions<AppSettings> app,
+        ILogger<PortalQuotationsEndpointsLog> logger)
+    {
+        if (!await Visible(db, principal).AnyAsync(x => x.Id == id)) return Results.NotFound();
+        var errors = new Dictionary<string, string[]>();
+        if (body.Purpose is null || !ClientStatements.Purposes.Contains(body.Purpose))
+            errors["purpose"] = ["Chọn khoản bạn đã chuyển"];
+        if (body.Note?.Trim().Length > ClientStatements.MaxNote)
+            errors["note"] = [$"Ghi chú tối đa {ClientStatements.MaxNote} ký tự"];
+        if (errors.Count > 0) return Results.ValidationProblem(errors);
+
+        var q = await db.Quotations.FirstAsync(x => x.Id == id);
+        bool recorded;
+        try { recorded = q.RecordClientPaymentNotice(body.Purpose!, body.Note, clock.TodayVn, clock.UtcNow); }
+        catch (DomainException ex) { return StatementError(ex); }
+
+        if (recorded)
+        {
+            var notice = q.PaymentNotice()!;
+            var what = ClientStatements.PurposeText(notice.Purpose);
+            q.UpdatedAt = clock.UtcNow;
+            activity.Write("quotation", q.Id, "quotation.client_payment_notice",
+                clientId: principal.ClientId, projectId: q.ProjectId, actorType: "CLIENT",
+                data: new { number = q.Number, version = q.Version, purpose = notice.Purpose, amount = notice.Amount, hasNote = notice.Note != null },
+                visibleToClient: true,
+                clientMessage: $"Bạn báo đã chuyển {RevisionQuota.Vnd(notice.Amount)} ({what}) cho báo giá {q.Number} — chờ nhà thiết kế kiểm tra");
+            try { await db.SaveChangesAsync(); }
+            catch (DbUpdateConcurrencyException) { return QuotationReads.Concurrency(); }
+            var fields = new List<NotificationField> { new("Khoản", what), new("Số tiền", RevisionQuota.Vnd(notice.Amount)) };
+            if (notice.Note is { } note) fields.Add(new("Ghi chú", note.Length > 200 ? note[..200] + "…" : note));
+            await NotifyDesignerAsync(db, notifier, app.Value, logger, principal.ClientId, q,
+                "Khách báo đã chuyển khoản", $"Khách báo đã chuyển {RevisionQuota.Vnd(notice.Amount)} cho {q.Number} — kiểm tra tài khoản", fields);
+        }
+        return await DetailAsync(db, principal, id, clock);
+    }
+
+    private static IResult StatementError(DomainException ex) =>
+        Results.Json(new { code = ex.Code, detail = ex.Detail },
+            statusCode: ex.Code == "VALIDATION_FAILED" ? StatusCodes.Status400BadRequest : StatusCodes.Status409Conflict);
+
+    private static async Task<IResult> DetailAsync(AppDbContext db, PortalPrincipal principal, Guid id, IClock clock)
+    {
+        var fresh = await Visible(db, principal).FirstAsync(x => x.Id == id);
+        return Results.Ok(ToDetail(fresh, await ChainAsync(db, fresh), clock.TodayVn));
+    }
+
+    /// <summary>Discord alert after commit; never fails the request (pattern: PortalRequestsEndpoints.NotifyDesignerAsync).</summary>
+    private static async Task NotifyDesignerAsync(
+        AppDbContext db, INotifier notifier, AppSettings app, ILogger logger, Guid clientId, Quotation q,
+        string title, string description, List<NotificationField> extra)
+    {
+        try
+        {
+            var clientName = await db.Clients.AsNoTracking().Where(c => c.Id == clientId).Select(c => c.Name).FirstOrDefaultAsync();
+            var projectName = await db.Projects.AsNoTracking().Where(p => p.Id == q.ProjectId).Select(p => p.Name).FirstOrDefaultAsync();
+            var fields = new List<NotificationField>
+            {
+                new("Khách", clientName ?? "-"), new("Dự án", projectName ?? "-"), new("Báo giá", q.Number ?? "-"),
+            };
+            fields.AddRange(extra);
+            var url = Uri.TryCreate(app.PublicBaseUrl, UriKind.Absolute, out var baseUri)
+                ? $"{baseUri.AbsoluteUri.TrimEnd('/')}/admin/quotations/{q.Id}"
+                : null;
+            await notifier.EnqueueAsync(new Notification(title, description, url, NotificationSeverity.Info, fields));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Could not enqueue the client-statement notification ({ExceptionType})", ex.GetType().Name);
+        }
+    }
+
     /// <summary>Every non-DRAFT version sharing the number (BR-33), oldest first; same project as the visible one.</summary>
     private static Task<List<Quotation>> ChainAsync(AppDbContext db, Quotation q) =>
         db.Quotations.AsNoTracking()
@@ -105,7 +214,8 @@ public static class PortalQuotationsEndpoints
         return new PortalQuotationListItemDto(
             q.Id, q.ProjectId, s.Project.Name, s.Number, s.Version, s.Kind, s.Title,
             q.Status, q.EffectiveStatus(today), q.PaymentStatus,
-            s.Total, s.DepositAmount, s.IssueDate, s.ExpiryDate);
+            s.Total, s.DepositAmount, s.IssueDate, s.ExpiryDate,
+            q.ClientAcceptedAt, ToNotice(q.PaymentNotice()));
     }
 
     private static PortalQuotationDetailDto ToDetail(Quotation q, IReadOnlyList<Quotation> chain, DateOnly today)
@@ -118,6 +228,13 @@ public static class PortalQuotationsEndpoints
             .Select(x => new PortalQuotationVersionDto(x.Version, x.Status, x.EffectiveStatus(today)))
             .ToList();
         return new PortalQuotationDetailDto(
-            q.Id, q.ProjectId, q.Status, q.EffectiveStatus(today), q.PaymentStatus, snapshot, qr, versions);
+            q.Id, q.ProjectId, q.Status, q.EffectiveStatus(today), q.PaymentStatus, snapshot, qr, versions,
+            q.ClientAcceptedAt, ToNotice(q.PaymentNotice()));
     }
+
+    private static PortalPaymentNoticeDto? ToNotice(ClientPaymentNotice? n) =>
+        n is null ? null : new(n.Purpose, n.Amount, n.At, n.Note, n.Pending);
 }
+
+/// <summary>Logger category marker.</summary>
+public sealed class PortalQuotationsEndpointsLog;

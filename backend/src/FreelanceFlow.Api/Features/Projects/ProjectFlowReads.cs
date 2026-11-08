@@ -50,6 +50,7 @@ internal static class ProjectFlowReads
             {
                 q.ProjectId, q.Id, q.Kind, q.Status, q.Number, q.Version, q.ExpiryDate, q.PaymentStatus,
                 q.DepositPercent, q.Total, q.DepositAmount, q.CreatedAt,
+                q.ClientAcceptedAt, q.ClientPaymentNoticePurpose,
             })
             .ToListAsync();
 
@@ -104,7 +105,8 @@ internal static class ProjectFlowReads
             }).ToList(),
             quotationsByProject[p.Key].Select(q => new FlowQuotation(
                 q.Id, q.Kind, q.Status, q.Number, q.Version, q.ExpiryDate, q.PaymentStatus,
-                q.DepositPercent, q.Total, q.DepositAmount, q.CreatedAt)).ToList(),
+                q.DepositPercent, q.Total, q.DepositAmount, q.CreatedAt,
+                q.ClientAcceptedAt, q.ClientPaymentNoticePurpose)).ToList(),
             overdue.GetValueOrDefault(p.Key),
             requestsByProject[p.Key].Select(r => r.Id).ToList(),
             unquoted.GetValueOrDefault(p.Key)));

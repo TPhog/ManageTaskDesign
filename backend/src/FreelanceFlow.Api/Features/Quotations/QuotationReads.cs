@@ -125,6 +125,8 @@ internal static class QuotationReads
             q.IssueDate, q.ExpiryDate, q.SentAt,
             q.AcceptedAt, q.AcceptedNote, q.RejectedAt, q.RejectedReason,
             q.DepositPaidAt, q.PaidAt,
-            items, snapshot, QrOptions(q, snapshot, today), versions, newDeliverables);
+            items, snapshot, QrOptions(q, snapshot, today), versions, newDeliverables,
+            q.ClientAcceptedAt,
+            q.PaymentNotice() is { } n ? new ClientPaymentNoticeDto(n.Purpose, n.Amount, n.At, n.Note, n.Pending) : null);
     }
 }

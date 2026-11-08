@@ -53,6 +53,9 @@ public sealed record QuotationNewDeliverableDto(
     Guid RevisionItemId, Guid QuotationItemId, string LineDescription, Guid? ServiceId, string? ServiceName,
     Guid? CreatedDeliverableId, string? CreatedDeliverableName, string ItemDescription);
 
+/// <summary>Plan 12 BR-77: what the client reported on the portal; the designer still marks the payment (BR-70).</summary>
+public sealed record ClientPaymentNoticeDto(string Purpose, long Amount, DateTimeOffset At, string? Note, bool Pending);
+
 public sealed record QuotationDetailDto(
     Guid Id, Guid ProjectId, string ProjectName, string ClientName,
     string Kind, string? Number, int Version, Guid? PreviousVersionId,
@@ -67,4 +70,6 @@ public sealed record QuotationDetailDto(
     QuotationSnapshot? Snapshot,
     IReadOnlyList<QrOptionDto> QrOptions,
     IReadOnlyList<QuotationVersionDto> Versions,
-    IReadOnlyList<QuotationNewDeliverableDto> NewDeliverables);
+    IReadOnlyList<QuotationNewDeliverableDto> NewDeliverables,
+    DateTimeOffset? ClientAcceptedAt,
+    ClientPaymentNoticeDto? ClientPaymentNotice);

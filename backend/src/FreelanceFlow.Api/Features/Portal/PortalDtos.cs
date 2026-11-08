@@ -89,7 +89,15 @@ public sealed record PortalQuotationListItemDto(
     long Total,
     long DepositAmount,
     DateOnly IssueDate,
-    DateOnly ExpiryDate);
+    DateOnly ExpiryDate,
+    DateTimeOffset? ClientAcceptedAt,
+    PortalPaymentNoticeDto? ClientPaymentNotice);
+
+/// <summary>Plan 12 BR-77: the client's "Tôi đã chuyển khoản"; Pending = the designer has not marked that payment yet.</summary>
+public sealed record PortalPaymentNoticeDto(string Purpose, long Amount, DateTimeOffset At, string? Note, bool Pending);
+
+/// <summary>POST /api/portal/quotations/{id}/payment-notice. Purpose: deposit | full | remaining (BR-75).</summary>
+public sealed record PortalPaymentNoticeRequest(string? Purpose, string? Note);
 
 public sealed record PortalQrOptionDto(string Purpose, string Label, long Amount, string Memo, string Payload);
 
@@ -106,7 +114,9 @@ public sealed record PortalQuotationDetailDto(
     string PaymentStatus,
     QuotationSnapshot Snapshot,
     IReadOnlyList<PortalQrOptionDto> QrOptions,
-    IReadOnlyList<PortalQuotationVersionDto> Versions);
+    IReadOnlyList<PortalQuotationVersionDto> Versions,
+    DateTimeOffset? ClientAcceptedAt,
+    PortalPaymentNoticeDto? ClientPaymentNotice);
 
 // ---------- requests (docs/05 §4, REQ-01/06) ----------
 
