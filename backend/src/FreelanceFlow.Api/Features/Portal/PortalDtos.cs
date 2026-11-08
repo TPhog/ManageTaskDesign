@@ -85,3 +85,19 @@ public sealed record PortalQuotationDetailDto(
     QuotationSnapshot Snapshot,
     IReadOnlyList<PortalQrOptionDto> QrOptions,
     IReadOnlyList<PortalQuotationVersionDto> Versions);
+
+// ---------- requests (docs/05 §4, REQ-01/06) ----------
+
+public sealed record PortalRequestAttachmentDto(Guid Id, string OriginalName, string ContentType);
+
+public sealed record PortalRequestDto(
+    Guid Id,
+    Guid ProjectId,
+    string ProjectName,
+    Guid? DeliverableId,
+    string? DeliverableName,
+    DateTimeOffset CreatedAt,
+    string Content,
+    string Status,
+    string? DeclineReason,
+    IReadOnlyList<PortalRequestAttachmentDto> Attachments);

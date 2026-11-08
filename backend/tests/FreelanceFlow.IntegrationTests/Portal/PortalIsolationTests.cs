@@ -22,6 +22,8 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
         ["GET /api/portal/quotations/{id:guid}"] = "/api/portal/quotations/{quotationA}",
         ["GET /api/portal/quotations/{id:guid}/versions/{version:int}"] = "/api/portal/quotations/{quotationA}/versions/1",
         ["GET /api/portal/quotations/{id:guid}/qr/{purpose}.png"] = "/api/portal/quotations/{quotationA}/qr/deposit.png",
+        ["GET /api/portal/requests"] = "/api/portal/requests?projectId={projectA}",
+        ["POST /api/portal/projects/{id:guid}/requests"] = null, // Client_B_cannot_send_a_request_to_a_project_of_A
     };
 
     private static readonly string[] ResourcePlaceholders = ["{projectA}", "{quotationA}"];
@@ -111,6 +113,20 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
             body.Should().NotContain(forbidden);
     }
 
+    [Fact]
+    public async Task Client_B_cannot_send_a_request_to_a_project_of_A()
+    {
+        var s = await ArrangeAsync();
+
+        var resp = await s.PortalB.PostAsync($"/api/portal/projects/{s.ProjectA}/requests", RequestForm("Yêu cầu lạ của B"));
+
+        resp.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        (await resp.Content.ReadAsStringAsync()).Should().NotContain(s.ProjectAName);
+        var ofA = await s.PortalA.GetFromJsonAsync<JsonElement>($"/api/portal/requests?projectId={s.ProjectA}");
+        ofA.EnumerateArray().Select(r => r.GetProperty("content").GetString()).Should().NotContain("Yêu cầu lạ của B");
+        (await s.PortalB.GetFromJsonAsync<JsonElement>("/api/portal/requests")).GetArrayLength().Should().Be(0);
+    }
+
     private static string Fill(string template, Scenario s) => template
         .Replace("{projectA}", s.ProjectA.ToString())
         .Replace("{quotationA}", s.QuotationA.ToString());
@@ -138,6 +154,8 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
 
         var portalA = await OpenPortalSessionAsync(tokenA);
         var portalB = await OpenPortalSessionAsync(tokenB);
+        (await portalA.PostAsync($"/api/portal/projects/{projectA}/requests", RequestForm($"Yêu cầu {projectAName}")))
+            .EnsureSuccessStatusCode(); // M7b: A's request list carries projectAName
 
         return new Scenario(portalA, portalB, projectA, projectAName, deliverableAName, projectB, quotationA);
     }

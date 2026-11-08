@@ -153,4 +153,12 @@ public abstract class PortalTestBase(AppFactory factory) : IntegrationTestBase(f
         await SendQuotationAsync(id);
         return id;
     }
+
+    /// <summary>multipart body of POST /api/portal/projects/{id}/requests (docs/05 §4); a new instance per request.</summary>
+    protected static MultipartFormDataContent RequestForm(string content, Guid? deliverableId = null)
+    {
+        var form = new MultipartFormDataContent { { new StringContent(content), "content" } };
+        if (deliverableId is { } d) form.Add(new StringContent(d.ToString()), "deliverableId");
+        return form;
+    }
 }

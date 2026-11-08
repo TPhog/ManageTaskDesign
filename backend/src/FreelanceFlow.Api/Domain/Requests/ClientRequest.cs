@@ -19,6 +19,40 @@ public class ClientRequest : IAuditable
     public const int MaxContent = 5000;
     public const int MaxDeclineReason = 2000;
 
+    /// <summary>BR-54: requests a client may send from the portal per Vietnamese calendar day.</summary>
+    public const int DailyClientLimit = 20;
+
+    /// <summary>BR-21/BR-53: project statuses that still accept new requests from the portal.</summary>
+    public static readonly string[] OpenProjectStatuses = ["DRAFT", "QUOTED", "IN_PROGRESS", "ON_HOLD"];
+
+    /// <summary>
+    /// REQ-01: the client sends a request from the portal (created_by CLIENT => source PORTAL, ck_requests_portal).
+    /// <paramref name="sentToday"/> = portal requests this client already sent since <see cref="DayStartUtc"/>.
+    /// </summary>
+    public static ClientRequest CreateByClient(
+        Guid projectId, string projectStatus, Guid? deliverableId, string content, int sentToday)
+    {
+        var text = content.Trim();
+        if (text.Length is < 1 or > MaxContent) throw Invalid($"Nội dung dài 1–{MaxContent} ký tự");
+        if (!OpenProjectStatuses.Contains(projectStatus))
+            throw new DomainException("BUSINESS_RULE", "Dự án đã hoàn thành hoặc đã huỷ — không gửi yêu cầu mới được (BR-21)");
+        if (sentToday >= DailyClientLimit)
+            throw new DomainException("RATE_LIMITED", $"Mỗi ngày bạn gửi được tối đa {DailyClientLimit} yêu cầu (BR-54)");
+        return new ClientRequest
+        {
+            ProjectId = projectId,
+            DeliverableId = deliverableId,
+            Content = text,
+            Source = RequestSources.Portal,
+            CreatedBy = "CLIENT",
+            Status = RequestStatuses.New,
+        };
+    }
+
+    /// <summary>BR-06/BR-54: 00:00 of <paramref name="todayVn"/> in Asia/Ho_Chi_Minh (UTC+7, no DST) as a UTC instant (Npgsql rejects non-zero offsets).</summary>
+    public static DateTimeOffset DayStartUtc(DateOnly todayVn) =>
+        new DateTimeOffset(todayVn.ToDateTime(TimeOnly.MinValue), TimeSpan.FromHours(7)).ToUniversalTime();
+
     /// <summary>REQ-02: the designer records a request received over Zalo/email/phone on the client's behalf.</summary>
     public static ClientRequest CreateByDesigner(Guid projectId, Guid? deliverableId, string content, string source)
     {
