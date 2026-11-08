@@ -1,6 +1,7 @@
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Revisions;
+using FreelanceFlow.Api.Domain.Tasks;
 using FreelanceFlow.Api.Infrastructure.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -70,18 +71,24 @@ public static class PortalProjectsEndpoints
         var deliverables = await db.Deliverables.AsNoTracking()
             .Where(d => d.ProjectId == id)
             .OrderBy(d => d.SortOrder).ThenBy(d => d.CreatedAt)
-            .Select(d => new { d.Id, d.Name, d.Quantity, d.Status, d.IncludedRounds, d.DueDate })
+            .Select(d => new { d.Id, d.Name, d.Quantity, d.Status, d.IncludedRounds, d.DueDate, d.ClientDecision })
             .ToListAsync();
 
         // used_rounds (docs/04 §4.1): the same single query as the admin side
         var usedRoundsMap = await RevisionQuota.UsedRounds(db.RevisionRounds.Where(r => r.ProjectId == id), db.RevisionItems)
             .ToDictionaryAsync(x => x.DeliverableId, x => x.UsedRounds);
 
+        // Plan 06b: the same task-progress query as the admin side; only the percentage is exposed (TSK-05)
+        var taskCounts = await TaskProgress.PerDeliverable(db.Tasks.Where(t => t.ProjectId == id))
+            .ToDictionaryAsync(x => x.DeliverableId);
+
         var deliverableDtos = deliverables.Select(d =>
         {
             var used = usedRoundsMap.GetValueOrDefault(d.Id);
+            var tasks = taskCounts.GetValueOrDefault(d.Id);
             return new PortalDeliverableDto(d.Id, d.Name, d.Quantity, d.Status, d.IncludedRounds,
-                used, Math.Max(0, d.IncludedRounds - used), d.DueDate);
+                used, Math.Max(0, d.IncludedRounds - used), d.DueDate,
+                TaskProgress.Percent(tasks?.Total ?? 0, tasks?.Done ?? 0), d.ClientDecision);
         }).ToList();
 
         var summary = new PortalDeliverableSummaryDto(

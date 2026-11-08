@@ -31,7 +31,12 @@ public sealed record PortalDeliverableDto(
     int IncludedRounds,
     int UsedRounds,
     int RemainingRounds,
-    DateOnly? DueDate);
+    DateOnly? DueDate,
+    int? ProgressPercent,     // plan 06b: % of tasks DONE (null = no task); task titles never leave the designer side
+    string? ClientDecision);  // "APPROVED" once the client pressed "Duyệt" (still IN_REVIEW until the designer confirms)
+
+/// <summary>POST /api/portal/deliverables/{id}/approve.</summary>
+public sealed record PortalDeliverableDecisionDto(Guid Id, string Status, string? ClientDecision, DateTimeOffset? ClientDecisionAt);
 
 public sealed record PortalBriefDto(int Version, string Content, DateTimeOffset? ConfirmedAt);
 

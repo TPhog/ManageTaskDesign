@@ -25,6 +25,7 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
         ["GET /api/portal/quotations/{id:guid}/qr/{purpose}.png"] = "/api/portal/quotations/{quotationA}/qr/deposit.png",
         ["GET /api/portal/requests"] = "/api/portal/requests?projectId={projectA}",
         ["POST /api/portal/projects/{id:guid}/requests"] = null, // Client_B_cannot_send_a_request_to_a_project_of_A
+        ["POST /api/portal/deliverables/{id:guid}/approve"] = null, // PortalDeliverableApprovalTests.Client_B_gets_404_approving_a_deliverable_of_A
     };
 
     private static readonly string[] ResourcePlaceholders = ["{projectA}", "{quotationA}"];
