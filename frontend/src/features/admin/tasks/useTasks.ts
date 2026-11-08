@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tansta
 import { toast } from 'sonner'
 import { api, type ApiError } from '@/lib/api'
 import { qk } from '@/lib/queryKeys'
+import { invalidateImageQueries } from '@/features/admin/images/useImages'
 import type {
   PagedResult,
   TaskDetail,
@@ -130,6 +131,7 @@ export function useDeleteTask() {
     onSuccess: () => {
       toast.success('Đã xoá công việc')
       // task counts drive project progress and the SUBMIT_REVIEW flow action
+      invalidateImageQueries(qc)
       qc.invalidateQueries({ queryKey: qk.projects.all })
       qc.invalidateQueries({ queryKey: qk.dashboard })
       return qc.invalidateQueries({ queryKey: qk.tasks.lists })

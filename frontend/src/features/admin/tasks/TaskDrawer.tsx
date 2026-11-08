@@ -230,17 +230,20 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
 
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
         {confirmDelete ? (
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              disabled={remove.isPending}
-              onClick={() => remove.mutate(task.id, { onSuccess: onDeleted })}
-            >
-              Xác nhận xoá
-            </Button>
-            <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>Huỷ</Button>
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">Ảnh của công việc cũng bị xoá vĩnh viễn (trừ ảnh là chứng từ báo giá).</p>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={remove.isPending}
+                onClick={() => remove.mutate(task.id, { onSuccess: onDeleted })}
+              >
+                Xác nhận xoá
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmDelete(false)}>Huỷ</Button>
+            </div>
           </div>
         ) : (
           <Button

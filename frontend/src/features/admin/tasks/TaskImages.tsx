@@ -7,7 +7,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { ImageGrid } from '@/components/ImageGrid'
 import { ImageLightbox } from '@/components/ImageLightbox'
 import { ImagePicker } from '@/components/ImagePicker'
-import { MAX_ADMIN_IMAGES, imageErrorMessage, isStorageFull } from '@/lib/images'
+import { MAX_ADMIN_IMAGES, duplicateNotice, imageErrorMessage, isStorageFull } from '@/lib/images'
 import type { LightboxImage } from '@/lib/imageTypes'
 import { useDeleteImage, useSetImageVisibility, useTaskImages, useUploadTaskImages } from '@/features/admin/images/useImages'
 
@@ -28,7 +28,11 @@ export function TaskImages({ taskId }: { taskId: string }) {
 
   function onFiles(files: File[]) {
     upload.mutate({ files, visibleToClient: shareNew }, {
-      onSuccess: list => toast.success(`Đã tải ${list.length} ảnh`),
+      onSuccess: list => {
+        toast.success(`Đã tải ${list.length} ảnh`)
+        const duplicate = duplicateNotice(list)
+        if (duplicate) toast.warning(duplicate)
+      },
       onError: err => toast.error(imageErrorMessage(err), isStorageFull(err)
         ? { action: { label: 'Mở Dung lượng', onClick: () => navigate('/admin/settings/storage') } }
         : undefined),

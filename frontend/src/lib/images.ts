@@ -1,4 +1,6 @@
 import type { ApiError } from './api'
+import { formatDate } from './format'
+import type { AdminImage, ImageDuplicate } from './imageTypes'
 
 export const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp'
 export const MAX_IMAGE_MB = 20
@@ -56,4 +58,25 @@ export function toImageForm(files: File[], fields: Record<string, string> = {}):
   for (const [key, value] of Object.entries(fields)) form.append(key, value)
   for (const f of files) form.append('files', f)
   return form
+}
+
+function duplicateSource(d: ImageDuplicate): string {
+  switch (d.ownerType) {
+    case 'TASK': return d.taskTitle ? `Công việc: ${d.taskTitle}` : 'Công việc đã xoá'
+    case 'PROGRESS_UPDATE': return 'Cập nhật tiến độ'
+    case 'CLIENT_REQUEST': return 'Ảnh khách gửi'
+    case 'DELIVERABLE': return 'Bàn giao'
+  }
+}
+
+/** P10 duplicate warning after a designer upload (same SHA-256 in the project); the images are stored anyway. */
+export function duplicateNotice(images: Pick<AdminImage, 'originalName' | 'duplicateOf'>[]): string | null {
+  const dups = images.filter(i => i.duplicateOf)
+  if (dups.length === 0) return null
+  const tail = 'Ảnh vẫn được lưu — xoá bản thừa nếu không cần.'
+  if (dups.length > 1) return `${dups.length} ảnh trùng với ảnh đã có trong dự án. ${tail}`
+  const { originalName, duplicateOf } = dups[0]
+  const d = duplicateOf!
+  if (d.sameUpload) return `Ảnh "${originalName}" bị chọn hai lần trong cùng lần tải. ${tail}`
+  return `Ảnh "${originalName}" trùng với ảnh đã có (${duplicateSource(d)} · ${formatDate(d.createdAt)}). ${tail}`
 }

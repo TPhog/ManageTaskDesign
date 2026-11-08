@@ -1,4 +1,6 @@
-import { formatBytes, imageErrorMessage, isStorageFull, toImageForm, validateImageFiles } from '@/lib/images'
+import { duplicateNotice, formatBytes, imageErrorMessage, isStorageFull, toImageForm, validateImageFiles } from '@/lib/images'
+import { formatDate } from '@/lib/format'
+import type { ImageDuplicate } from '@/lib/imageTypes'
 
 const file = (name: string, type: string, size = 10) => new File([new Uint8Array(size)], name, { type })
 
@@ -49,5 +51,29 @@ describe('toImageForm', () => {
     const form = toImageForm([file('a.png', 'image/png'), file('b.png', 'image/png')], { message: 'Đã xong' })
     expect(form.get('message')).toBe('Đã xong')
     expect(form.getAll('files').map(f => (f as File).name)).toEqual(['a.png', 'b.png'])
+  })
+})
+
+describe('duplicateNotice', () => {
+  const dup = (over: Partial<ImageDuplicate> = {}): ImageDuplicate => ({
+    id: 'd', ownerType: 'TASK', ownerId: 't', taskTitle: 'Logo chính', createdAt: '2026-11-10T08:00:00Z', sameUpload: false, ...over,
+  })
+  const tail = 'Ảnh vẫn được lưu — xoá bản thừa nếu không cần.'
+
+  it('is silent without duplicates', () => {
+    expect(duplicateNotice([{ originalName: 'a.png', duplicateOf: null }])).toBeNull()
+  })
+
+  it('names the earlier copy, a batch twin or a count', () => {
+    expect(duplicateNotice([{ originalName: 'ban-sao.png', duplicateOf: dup() }]))
+      .toBe(`Ảnh "ban-sao.png" trùng với ảnh đã có (Công việc: Logo chính · ${formatDate('2026-11-10T08:00:00Z')}). ${tail}`)
+    expect(duplicateNotice([{ originalName: 'x.png', duplicateOf: dup({ ownerType: 'PROGRESS_UPDATE', taskTitle: null }) }]))
+      .toContain('(Cập nhật tiến độ · ')
+    expect(duplicateNotice([{ originalName: 'x.png', duplicateOf: dup({ taskTitle: null }) }])).toContain('(Công việc đã xoá · ')
+    expect(duplicateNotice([{ originalName: 'x.png', duplicateOf: dup({ sameUpload: true, taskTitle: null }) }]))
+      .toBe(`Ảnh "x.png" bị chọn hai lần trong cùng lần tải. ${tail}`)
+    expect(duplicateNotice([
+      { originalName: 'a.png', duplicateOf: dup() }, { originalName: 'b.png', duplicateOf: dup() }, { originalName: 'c.png', duplicateOf: null },
+    ])).toBe(`2 ảnh trùng với ảnh đã có trong dự án. ${tail}`)
   })
 })

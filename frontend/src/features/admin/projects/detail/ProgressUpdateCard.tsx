@@ -10,7 +10,7 @@ import { ImageLightbox } from '@/components/ImageLightbox'
 import { ImagePicker } from '@/components/ImagePicker'
 import type { ApiError } from '@/lib/api'
 import { formatDatetime } from '@/lib/format'
-import { MAX_ADMIN_IMAGES, imageErrorMessage, isStorageFull } from '@/lib/images'
+import { MAX_ADMIN_IMAGES, duplicateNotice, imageErrorMessage, isStorageFull } from '@/lib/images'
 import type { LightboxImage } from '@/lib/imageTypes'
 import { errorText } from '@/features/admin/revisions/revisionUtils'
 import { useClientTimeline, usePostProgressUpdate } from '@/features/admin/revisions/useRevisions'
@@ -47,7 +47,13 @@ export function ProgressUpdateCard({ projectId }: { projectId: string }) {
     const text = message.trim()
     if (!text) return
     post.mutate({ message: text, files }, {
-      onSuccess: () => { setMessage(''); setFiles([]); toast.success('Đã gửi cập nhật cho khách') },
+      onSuccess: result => {
+        setMessage('')
+        setFiles([])
+        toast.success('Đã gửi cập nhật cho khách')
+        const duplicate = duplicateNotice(result.images ?? [])
+        if (duplicate) toast.warning(duplicate)
+      },
       onError: err => files.length > 0
         ? toast.error(imageErrorMessage(err), isStorageFull(err)
           ? { action: { label: 'Mở Dung lượng', onClick: () => navigate('/admin/settings/storage') } }
