@@ -137,6 +137,9 @@ public class RequestsTests(AppFactory factory) : RevisionTestBase(factory)
             a.Action == "request.triaged" && a.Visible && a.Message == "Yêu cầu của bạn đã được tiếp nhận");
         (await ActivityRowsAsync(round.GetProperty("id").GetGuid())).Should().ContainSingle(a =>
             a.Action == "revision_round.created" && a.Data.Contains("\"usedRoundsBefore\": 0") && a.Data.Contains("\"usedRoundsAfter\": 1"));
+        foreach (var item in items)
+            (await ActivityRowsAsync(item.GetProperty("id").GetGuid())).Should().ContainSingle(a =>
+                a.Action == "revision_item.created" && a.Data.Contains("\"usedRoundsAfter\": 1"));
     }
 
     [Fact]

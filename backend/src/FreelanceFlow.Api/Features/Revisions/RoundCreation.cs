@@ -54,16 +54,27 @@ internal static class RoundCreation
 
             var round = RevisionRound.Create(project.Id, d?.Id, roundNo, body.ReceivedAt ?? today, sourceRequestId);
             db.RevisionRounds.Add(round);
+            var roundItems = new List<RevisionItem>();
             for (var index = 0; index < body.Items!.Length; index++)
             {
                 var input = body.Items[index];
                 var item = round.AddItem(input.Description!, input.Type!, plan.Items[index].Billing, (index + 1) * 10);
                 db.RevisionItems.Add(item);
+                roundItems.Add(item);
                 suggestions[item.Id] = new BillingSuggestion(plan.Items[index].SuggestedBilling, plan.Items[index].SuggestionReason);
             }
 
             var usedAfter = usedBefore + (d is not null && plan.Counted ? 1 : 0);
             if (d is not null) used[d.Id] = usedAfter;
+            foreach (var item in roundItems)
+                activity.Write("revision_item", item.Id, "revision_item.created",
+                    clientId: project.ClientId, projectId: project.Id,
+                    data: new
+                    {
+                        roundId = round.Id, type = item.Type, billing = item.Billing, deliverableId = d?.Id,
+                        usedRoundsBefore = d is null ? (int?)null : usedBefore,
+                        usedRoundsAfter = d is null ? (int?)null : usedAfter,
+                    });
             activity.Write("revision_round", round.Id, "revision_round.created",
                 clientId: project.ClientId, projectId: project.Id,
                 data: new

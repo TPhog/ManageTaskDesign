@@ -51,6 +51,8 @@ public class RevisionsTests(AppFactory factory) : RevisionTestBase(factory)
         round2.GetProperty("items")[0].GetProperty("billing").GetString().Should().Be("CHARGEABLE");
         round2.GetProperty("items")[0].GetProperty("suggestionReason").GetString()
             .Should().Be("Logo đã dùng 1/1 vòng → Tính phí 200.000 ₫/vòng");
+        (await ActivityRowsAsync(round2.GetProperty("items")[0].GetProperty("id").GetGuid())).Should().ContainSingle(a =>
+            a.Action == "revision_item.created" && a.Data.Contains("\"usedRoundsBefore\": 1") && a.Data.Contains("\"usedRoundsAfter\": 1"));
 
         var round1Id = (await GetRevisionsAsync(projectId)).GetProperty("deliverables")[0].GetProperty("rounds")[0].GetProperty("id").GetGuid();
         var added = await Client.PostAsJsonAsync($"/api/admin/rounds/{round1Id}/items",
