@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test'
 import { apiPost, createClient, createProjectForClient, expectToast, moveDeliverable } from './helpers'
-import { configureBank, issuePortalLink, openAsClient, sendQuotation } from './portalHelpers'
+import { configureBank, issuePortalLink, openAsClient, sendQuotation, apiPut } from './portalHelpers'
 
 interface QuotedProject {
   clientId: string
@@ -21,6 +21,8 @@ async function quotedProject(page: Page, stamp: number): Promise<QuotedProject> 
   const deliverable = await apiPost(page.request, page, `/api/admin/projects/${projectId}/deliverables`,
     { name: 'Logo E2E', quantity: 1, serviceId: service.id })
   const detail = await (await page.request.get(`/api/admin/projects/${projectId}`)).json()
+  // an empty brief can no longer be confirmed (422) — give it content first
+  await apiPut(page, `/api/admin/briefs/${detail.brief.id}`, { content: 'Brief E2E: logo tối giản, tông ấm.' })
   await apiPost(page.request, page, `/api/admin/briefs/${detail.brief.id}/confirm`, {})
   const quotation = await sendQuotation(page, projectId, 'SECRET-FULL-FLOW')
   const q = await (await page.request.get(`/api/admin/quotations/${quotation.id}`)).json()
