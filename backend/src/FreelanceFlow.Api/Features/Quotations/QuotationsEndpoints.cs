@@ -239,7 +239,18 @@ public static class QuotationsEndpoints
         activity.Write("quotation", q.Id, "quotation.deleted",
             clientId: await QuotationReads.ClientIdOfAsync(db, q.ProjectId), projectId: q.ProjectId,
             data: new { title = q.Title, version = q.Version, total = q.Total });
-        await db.SaveChangesAsync();
+        try
+        {
+            await db.SaveChangesAsync();
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return QuotationReads.Concurrency();
+        }
+        catch (DbUpdateException e) when (QuotationReads.IsLockViolation(e))
+        {
+            return QuotationReads.Locked();
+        }
 
         return Results.NoContent();
     }

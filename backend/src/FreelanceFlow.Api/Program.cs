@@ -208,6 +208,7 @@ app.MapBriefsEndpoints();
 app.MapDeliverablesEndpoints();
 app.MapTasksEndpoints();
 app.MapQuotationsEndpoints();
+app.MapQuotationWorkflowEndpoints();
 app.MapPortalSessionEndpoints();
 app.MapPortalProjectsEndpoints();
 

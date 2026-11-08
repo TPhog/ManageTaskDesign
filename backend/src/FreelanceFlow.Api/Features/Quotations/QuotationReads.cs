@@ -23,6 +23,13 @@ internal static class QuotationReads
     public static IResult Concurrency() =>
         Results.Conflict(new { code = "CONCURRENCY_CONFLICT", detail = "Dữ liệu đã thay đổi, vui lòng tải lại" });
 
+    public static IResult Locked() =>
+        Results.Conflict(new { code = "QUOTATION_LOCKED", detail = "Báo giá đã gửi bị khóa — tạo version mới để sửa" });
+
+    /// <summary>The DB lock trigger raises check_violation (23514) when a non-DRAFT row is modified.</summary>
+    public static bool IsLockViolation(DbUpdateException e) =>
+        e.InnerException is Npgsql.PostgresException { SqlState: Npgsql.PostgresErrorCodes.CheckViolation };
+
     public static IResult BusinessRule(string detail) =>
         Results.Json(new { code = "BUSINESS_RULE", detail }, statusCode: StatusCodes.Status422UnprocessableEntity);
 
