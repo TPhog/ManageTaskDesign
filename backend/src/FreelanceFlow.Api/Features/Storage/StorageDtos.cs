@@ -20,6 +20,7 @@ public sealed record StorageImageDto(
     string UploadedBy,
     DateTimeOffset CreatedAt,
     string ThumbUrl,
-    string PreviewUrl);
+    string PreviewUrl,
+    DateTimeOffset? OriginalDeletedAt);
 
 public sealed record StorageImagePageDto(IReadOnlyList<StorageImageDto> Items, int Page, int PageSize, int Total, long TotalBytes);

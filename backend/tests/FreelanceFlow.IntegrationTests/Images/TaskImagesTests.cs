@@ -59,7 +59,7 @@ public class TaskImagesTests(AppFactory factory) : ImageTestBase(factory)
         thumb.Content.Headers.ContentType!.MediaType.Should().Be("image/webp");
         thumb.Headers.GetValues("X-Content-Type-Options").Should().Contain("nosniff");
         thumb.Headers.CacheControl!.Private.Should().BeTrue();
-        thumb.Headers.CacheControl.MaxAge.Should().Be(TimeSpan.FromSeconds(600));
+        thumb.Headers.CacheControl.MaxAge.Should().Be(TimeSpan.FromDays(365));
         var etag = thumb.Headers.ETag!;
         etag.Tag.Should().Be($"\"{id:N}-thumb\"");
         using (var conditional = new HttpRequestMessage(HttpMethod.Get, $"/api/admin/images/{id}/thumb"))
@@ -175,7 +175,7 @@ public class TaskImagesTests(AppFactory factory) : ImageTestBase(factory)
         var id = (await UploadTaskImagesAsync(Client, taskId, TestImages.Png(40, 40)))[0].GetProperty("id").GetGuid();
         var ok = await Client.GetAsync($"/api/admin/images/{id}/thumb");
         ok.StatusCode.Should().Be(HttpStatusCode.OK);
-        ok.Headers.CacheControl!.MaxAge.Should().Be(TimeSpan.FromMinutes(10));
+        ok.Headers.CacheControl!.MaxAge.Should().Be(TimeSpan.FromDays(365));
 
         File.Delete(VariantPath(projectId, id, "thumb"));
         var missing = await Client.GetAsync($"/api/admin/images/{id}/thumb");

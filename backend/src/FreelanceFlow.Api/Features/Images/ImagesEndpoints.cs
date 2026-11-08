@@ -67,7 +67,7 @@ public static class ImagesEndpoints
         }
 
         await storageAlerts.EvaluateSafelyAsync(CancellationToken.None);
-        return Results.Json(images.Select(ImageDtos.ToAdmin).ToList(), statusCode: StatusCodes.Status201Created);
+        return Results.Json(images.Select(i => ImageDtos.ToAdmin(i) with { DuplicateOf = uploader.DuplicateOf(i.Id) }).ToList(), statusCode: StatusCodes.Status201Created);
     }
 
     private static async Task<IResult> ListTaskImages(Guid taskId, AppDbContext db, CancellationToken ct)

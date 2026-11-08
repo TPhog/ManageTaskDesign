@@ -68,7 +68,8 @@ public static class StorageEndpoints
             r.File.Id, r.File.ProjectId!.Value, r.ProjectName, r.ProjectStatus, r.ClientName, r.File.OwnerType!, r.File.OwnerId!.Value,
             r.TaskTitle, r.File.OriginalName, r.File.Width ?? 0, r.File.Height ?? 0, r.File.SizeBytes, r.File.VisibleToClient,
             r.File.UploadedBy, r.File.CreatedAt,
-            ImageDtos.AdminUrl(r.File.Id, ImageVariants.Thumb), ImageDtos.AdminUrl(r.File.Id, ImageVariants.Preview))).ToList();
+            ImageDtos.AdminUrl(r.File.Id, ImageVariants.Thumb), ImageDtos.AdminUrl(r.File.Id, ImageVariants.Preview),
+            r.File.OriginalDeletedAt)).ToList();
         return Results.Ok(new StorageImagePageDto(items, page, pageSize, total, totalBytes));
     }
 }

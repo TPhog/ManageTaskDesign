@@ -96,6 +96,6 @@ public static class ProgressUpdatesEndpoints
 
         if (images.Count > 0) await storageAlerts.EvaluateSafelyAsync(CancellationToken.None);
         return Results.Created($"/api/admin/projects/{projectId}/activity",
-            new ProgressUpdateDto(updateId, clock.UtcNow, text, images.Select(ImageDtos.ToAdmin).ToList()));
+            new ProgressUpdateDto(updateId, clock.UtcNow, text, images.Select(i => ImageDtos.ToAdmin(i) with { DuplicateOf = uploader.DuplicateOf(i.Id) }).ToList()));
     }
 }
