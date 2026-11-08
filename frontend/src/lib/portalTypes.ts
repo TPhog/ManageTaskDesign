@@ -136,3 +136,37 @@ export interface PortalRequest {
   declineReason: string | null
   attachments: PortalRequestAttachment[]
 }
+
+export type PortalBilling = 'FREE_FIX' | 'IN_QUOTA' | 'CHARGEABLE'
+export type PortalWorkStatus = 'TODO' | 'IN_PROGRESS' | 'DONE' | 'CANCELLED'
+
+/** GET /api/portal/projects/{id}/revisions — no internal notes, scope overrides or quotation links (REV-07). */
+export interface PortalRevisionItem {
+  id: string
+  description: string
+  type: string
+  billing: PortalBilling
+  workStatus: PortalWorkStatus
+}
+
+export interface PortalRound {
+  id: string
+  roundNo: number
+  receivedAt: string
+  items: PortalRevisionItem[]
+}
+
+export interface PortalDeliverableRevisions {
+  id: string
+  name: string
+  includedRounds: number
+  usedRounds: number
+  remainingRounds: number
+  rounds: PortalRound[]
+}
+
+export interface PortalRevisions {
+  deliverables: PortalDeliverableRevisions[]
+  /** rounds not tied to a deliverable (never IN_QUOTA — BR-41) */
+  projectRounds: PortalRound[]
+}

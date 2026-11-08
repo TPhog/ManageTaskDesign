@@ -55,3 +55,17 @@ export const portalQuotationKind: Record<string, string> = {
   INITIAL: 'Báo giá',
   ADDITIONAL: 'Báo giá phát sinh',
 }
+
+// docs/08 §3.3: "Miễn phí / Trong số lần sửa / Tính phí" instead of FREE_FIX / IN_QUOTA / CHARGEABLE
+export const portalBilling: Record<string, string> = {
+  FREE_FIX: 'Miễn phí',
+  IN_QUOTA: 'Trong số lần sửa',
+  CHARGEABLE: 'Tính phí',
+}
+
+export const portalWorkStatus: Record<string, string> = {
+  TODO: 'Chờ làm',
+  IN_PROGRESS: 'Đang sửa',
+  DONE: 'Đã xong',
+  CANCELLED: 'Đã huỷ',
+}

@@ -54,5 +54,6 @@ export const qk = {
     quotation: (id: string) => ['portal', 'quotations', 'detail', id] as const,
     quotationVersion: (id: string, version: number) => ['portal', 'quotations', 'detail', id, 'version', version] as const,
     requests: (projectId?: string) => ['portal', 'requests', projectId ?? 'all'] as const,
+    revisions: (id: string) => ['portal', 'projects', id, 'revisions'] as const,
   },
 } as const

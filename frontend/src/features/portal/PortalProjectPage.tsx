@@ -17,7 +17,8 @@ import { cn } from '@/lib/utils'
 import { PortalQuotationList } from './PortalQuotationList'
 import { PortalRequestList } from './PortalRequestList'
 import { acceptsRequests } from './requests'
-import { usePortalQuotations, usePortalRequests } from './usePortal'
+import { usePortalQuotations, usePortalRequests, usePortalRevisions } from './usePortal'
+import { PortalRevisionsView } from './PortalRevisionsView'
 
 const panelClass = 'rounded-xl border bg-card p-4 shadow-card sm:p-5'
 
@@ -39,6 +40,7 @@ export default function PortalProjectPage() {
 
   const { data: quotations } = usePortalQuotations(id, !!project)
   const { data: requests } = usePortalRequests(id, !!project)
+  const { data: revisions } = usePortalRevisions(id, !!project)
 
   if (isLoading) {
     return (
@@ -178,6 +180,11 @@ export default function PortalProjectPage() {
         {!canRequest && (
           <p className="mt-3 text-xs text-muted-foreground">Dự án đã kết thúc nên không nhận yêu cầu mới.</p>
         )}
+      </section>
+
+      <section aria-labelledby="portal-revisions" className={panelClass}>
+        <h2 id="portal-revisions" className="text-sm font-semibold text-foreground">Lần sửa</h2>
+        {!revisions ? <Skeleton className="mt-3 h-16 w-full" /> : <PortalRevisionsView data={revisions} />}
       </section>
 
       <section aria-labelledby="portal-brief" className={panelClass}>

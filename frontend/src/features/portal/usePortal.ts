@@ -8,6 +8,7 @@ import type {
   PortalQuotationDetail,
   PortalQuotationListItem,
   PortalRequest,
+  PortalRevisions,
 } from '@/lib/portalTypes'
 import { toRequestForm, type RequestFormValues } from './requests'
 
@@ -64,5 +65,13 @@ export function useSendPortalRequest() {
     mutationFn: (values: RequestFormValues) =>
       api.postForm<PortalRequest>(`/portal/projects/${values.projectId}/requests`, toRequestForm(values)),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['portal', 'requests'] }),
+  })
+}
+
+export function usePortalRevisions(projectId: string, enabled = true) {
+  return useQuery({
+    queryKey: qk.portal.revisions(projectId),
+    queryFn: () => api.get<PortalRevisions>(`/portal/projects/${projectId}/revisions`),
+    enabled: enabled && !!projectId,
   })
 }
