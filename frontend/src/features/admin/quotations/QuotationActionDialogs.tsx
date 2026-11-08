@@ -35,12 +35,13 @@ export function AcceptDialog({ quotation, open, onClose }: DialogProps) {
   const [note, setNote] = useState('')
   const pending = (quotation.newDeliverables ?? []).filter(n => !n.createdDeliverableId)
   // what accept does depends on the project status (quotation detail has none) — only needed with new deliverables to add
-  const { data: project } = useQuery({
+  const { data: project, isError: projectError } = useQuery({
     queryKey: qk.projects.detail(quotation.projectId),
     queryFn: () => api.get<ProjectDetail>(`/admin/projects/${quotation.projectId}`),
     enabled: open && pending.length > 0,
   })
-  const outcome = acceptOutcome(project?.status)
+  // the outcome is only known once the project status is; until then say nothing about what will be created
+  const outcome = project ? acceptOutcome(project.status) : null
 
   function close() {
     setNote('')
@@ -52,7 +53,7 @@ export function AcceptDialog({ quotation, open, onClose }: DialogProps) {
       { action: 'accept', body: { acceptedAt: date, note: note.trim() || null, rowVersion: quotation.rowVersion } },
       {
         onSuccess: () => {
-          toast.success(pending.length > 0 && outcome.creates
+          toast.success(pending.length > 0 && outcome?.creates
             ? `Đã đánh dấu chấp nhận · thêm ${pending.length} hạng mục mới`
             : 'Đã đánh dấu chấp nhận')
           close()
@@ -73,9 +74,11 @@ export function AcceptDialog({ quotation, open, onClose }: DialogProps) {
           {pending.length > 0 && (
             <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
               <p className="font-medium">
-                {outcome.creates
-                  ? `Sẽ thêm ${pending.length} hạng mục mới vào dự án:`
-                  : `${pending.length} hạng mục mới sẽ không được tạo:`}
+                {!outcome
+                  ? `Có ${pending.length} hạng mục mới trong báo giá này:`
+                  : outcome.creates
+                    ? `Sẽ thêm ${pending.length} hạng mục mới vào dự án:`
+                    : `${pending.length} hạng mục mới sẽ không được tạo:`}
               </p>
               <ul className="mt-1 list-disc pl-5">
                 {pending.map(n => (
@@ -85,7 +88,9 @@ export function AcceptDialog({ quotation, open, onClose }: DialogProps) {
                   </li>
                 ))}
               </ul>
-              {project && <p className="mt-2 text-xs">{outcome.text}</p>}
+              <p className="mt-2 text-xs">
+                {outcome ? outcome.text : projectError ? 'Không xác định được trạng thái dự án.' : 'Đang kiểm tra trạng thái dự án…'}
+              </p>
             </div>
           )}
           <div className="space-y-2">

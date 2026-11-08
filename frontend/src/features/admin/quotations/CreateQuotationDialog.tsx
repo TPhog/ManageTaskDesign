@@ -149,6 +149,9 @@ export function CreateQuotationDialog({ project, open, onClose }: { project: Pro
                   <Label htmlFor={`price-${d.id}`} className="font-normal">{d.name}{d.quantity > 1 ? ` × ${d.quantity}` : ''}</Label>
                   <MoneyInput id={`price-${d.id}`} aria-label={`Đơn giá ${d.name}`} value={prices[d.id] ?? 0}
                     onChange={n => setPrices(p => ({ ...p, [d.id]: n }))} />
+                  {linePriceError(prices[d.id] ?? 0) && (
+                    <p className="text-xs text-destructive sm:col-span-2">{linePriceError(prices[d.id] ?? 0)}</p>
+                  )}
                 </div>
               ))}
               <p className="text-xs text-muted-foreground">Để trống = 0 ₫, bạn nhập sau trong bản nháp.</p>

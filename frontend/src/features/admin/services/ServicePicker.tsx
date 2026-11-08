@@ -39,11 +39,19 @@ interface Props {
 
 /** Plan 09: searchable service list showing the base price; the caller decides what a pick fills in. */
 export function ServicePicker({ id, value, selectedLabel, onPick, placeholder, clearLabel, ariaLabel, className }: Props) {
-  const { data: services = [], isLoading } = useActiveServices()
+  const { data: services = [], isLoading, error, refetch } = useActiveServices()
   const [search, setSearch] = useState('')
   const options = services
     .filter(s => fold(s.name).includes(fold(search.trim())))
     .map(s => ({ value: s.id, label: s.name, hint: formatVnd(s.basePrice) }))
+  if (error) {
+    return (
+      <p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
+        Không tải được dịch vụ.
+        <button type="button" className="text-primary underline-offset-2 hover:underline" onClick={() => refetch()}>Thử lại</button>
+      </p>
+    )
+  }
   return (
     <SearchCombobox
       id={id}

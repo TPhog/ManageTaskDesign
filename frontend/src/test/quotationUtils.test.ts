@@ -100,13 +100,12 @@ describe('quotationErrorMessage', () => {
 })
 
 describe('quoteTargetWarnings (QA D-02/D-03)', () => {
-  it('lists deliverables without a service and those already on a live quotation', () => {
+  it('lists deliverables already on a live quotation', () => {
     const w = quoteTargetWarnings([
       { name: 'Logo', serviceId: 's1', quotedIn: [{ quotationId: 'q', number: 'BG-2026-0028', version: 1, status: 'SENT', kind: 'INITIAL' }] },
       { name: 'Menu A4', serviceId: null, quotedIn: [{ quotationId: 'd', number: null, version: 1, status: 'DRAFT', kind: 'INITIAL' }] },
       { name: 'Banner', serviceId: 's2' },
     ])
-    expect(w.noPrice).toEqual(['Menu A4'])
     expect(w.alreadyQuoted.map(a => a.name)).toEqual(['Logo'])
     expect(w.alreadyQuoted[0].refs[0].number).toBe('BG-2026-0028')
   })

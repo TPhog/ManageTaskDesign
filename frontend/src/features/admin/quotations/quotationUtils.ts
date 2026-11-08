@@ -55,8 +55,6 @@ export function groupChains(items: QuotationListItem[]): QuotationChain[] {
 export const isFinishedDeliverable = (status: DeliverableStatus) => status === 'APPROVED' || status === 'DELIVERED'
 
 export interface QuoteTargetWarnings {
-  /** names of deliverables without a service → their line starts at 0 ₫ (QUO-01) */
-  noPrice: string[]
   /** deliverables already on a sent/accepted quotation → quoting them again bills twice */
   alreadyQuoted: { name: string; refs: DeliverableQuoteRef[] }[]
 }
@@ -64,7 +62,6 @@ export interface QuoteTargetWarnings {
 /** QA D-02/D-03: what to warn about before creating a draft from these deliverables. */
 export function quoteTargetWarnings(targets: Pick<Deliverable, 'name' | 'serviceId' | 'quotedIn'>[]): QuoteTargetWarnings {
   return {
-    noPrice: targets.filter(d => !d.serviceId).map(d => d.name),
     alreadyQuoted: targets
       .map(d => ({ name: d.name, refs: liveQuoteRefs(d.quotedIn) }))
       .filter(x => x.refs.length > 0),
@@ -86,7 +83,7 @@ export const deliverablePricesBody = (
   targets.filter(d => !d.serviceId && (prices[d.id] ?? 0) > 0).map(d => ({ deliverableId: d.id, unitPrice: prices[d.id] }))
 
 /** What accepting does with NEW_DELIVERABLE lines, by project status (server: AcceptedNewDeliverables). */
-export function acceptOutcome(status: ProjectStatus | undefined): { creates: boolean; text: string } {
+export function acceptOutcome(status: ProjectStatus): { creates: boolean; text: string } {
   if (status === 'CANCELLED') return { creates: false, text: 'Dự án đã huỷ nên sẽ không tạo hạng mục nào.' }
   if (status === 'IN_PROGRESS' || status === 'ON_HOLD')
     return { creates: true, text: 'Dự án đang chạy nên hạng mục mới ở trạng thái Đang làm, kèm công việc từ các bước mẫu của dịch vụ.' }

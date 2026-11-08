@@ -35,6 +35,8 @@ const kindLabel: Record<AdditionalLineKind, string> = {
   SCOPE_CHANGE: 'Đổi phạm vi',
 }
 
+const lineKey = (p: PricedLine) => p.line.revisionItemIds.join('-')
+
 interface Props {
   projectId: string
   revisionItemIds: string[]
@@ -50,12 +52,21 @@ export function AdditionalQuotationDialog({ projectId, revisionItemIds, open, on
   const create = useCreateAdditionalQuotation(projectId)
   const [priced, setPriced] = useState<PricedLine[]>([])
 
+  // Reset on close; on a refetch / new selection keep what was typed for lines that are still there (matched by their items).
   useEffect(() => {
-    if (open && preview.data) setPriced(pricedLinesFromPreview(preview.data))
+    if (!open) { setPriced([]); return }
+    const data = preview.data
+    if (!data) return
+    setPriced(prev => pricedLinesFromPreview(data).map(fresh => {
+      const old = prev.find(p => lineKey(p) === lineKey(fresh))
+      return old ? { ...fresh, serviceId: old.serviceId, serviceName: old.serviceName, unitPrice: old.unitPrice } : fresh
+    }))
   }, [open, preview.data])
 
   const update = (i: number, next: PricedLine) => setPriced(ps => ps.map((p, j) => (j === i ? next : p)))
-  const zeroNames = zeroPricedLineNames(priced)
+  // never show rows from an earlier selection or while the preview is failing
+  const rows = open && preview.data && !preview.error ? priced : []
+  const zeroNames = zeroPricedLineNames(rows)
   const previewError = preview.error as ApiError | null
 
   function submit() {
@@ -90,15 +101,15 @@ export function AdditionalQuotationDialog({ projectId, revisionItemIds, open, on
           </p>
         )}
 
-        {priced.length > 0 && (
+        {rows.length > 0 && (
           <>
             <ol className="space-y-3">
-              {priced.map((p, i) => {
+              {rows.map((p, i) => {
                 const { line } = p
                 const error = linePriceError(p.unitPrice)
                 return (
                   <li
-                    key={line.revisionItemIds.join('-')}
+                    key={lineKey(p)}
                     className={`space-y-3 rounded-lg border p-3 ${p.unitPrice === 0 ? 'border-amber-300 bg-amber-50/40' : ''}`}
                   >
                     <div className="min-w-0">
@@ -152,7 +163,7 @@ export function AdditionalQuotationDialog({ projectId, revisionItemIds, open, on
               })}
             </ol>
             <p className="text-sm">
-              Tạm tính (chưa giảm giá/VAT): <span className="font-medium"><MoneyText amount={priced.reduce((s, p) => s + p.unitPrice, 0)} /></span>
+              Tạm tính (chưa giảm giá/VAT): <span className="font-medium"><MoneyText amount={rows.reduce((s, p) => s + p.unitPrice, 0)} /></span>
             </p>
             {zeroNames.length > 0 && (
               <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
@@ -167,8 +178,8 @@ export function AdditionalQuotationDialog({ projectId, revisionItemIds, open, on
           <Button variant="outline" onClick={onClose}>Huỷ</Button>
           <Button
             onClick={submit}
-            disabled={preview.isLoading || !!preview.error || priced.length === 0
-              || priced.some(p => linePriceError(p.unitPrice)) || create.isPending}
+            disabled={preview.isLoading || !!preview.error || rows.length === 0
+              || rows.some(p => linePriceError(p.unitPrice)) || create.isPending}
           >
             {create.isPending ? 'Đang tạo…' : 'Tạo báo giá nháp'}
           </Button>
