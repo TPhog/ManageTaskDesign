@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -36,7 +36,12 @@ const paymentOptions: { value: PaymentStatus; label: string }[] = [
 
 /** docs/08 §2.2 "/admin/quotations": every quotation, filterable by effective status, payment and client. */
 export default function QuotationsPage() {
-  const [status, setStatus] = useState(ALL)
+  const [searchParams] = useSearchParams()
+  // Dashboard counters link here with ?status=SENT|ACCEPTED (docs/08 §2.2 "danh sách đã lọc")
+  const [status, setStatus] = useState<string>(() => {
+    const fromUrl = searchParams.get('status')
+    return statusOptions.some(o => o.value === fromUrl) ? fromUrl! : ALL
+  })
   const [payment, setPayment] = useState(ALL)
   const [clientId, setClientId] = useState(ALL)
   const [page, setPage] = useState(1)

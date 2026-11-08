@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, List, GanttChartSquare, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -31,7 +32,12 @@ const statusOptions: { value: string; label: string }[] = [
 export default function ProjectsPage() {
   const [view, setView] = useState<ViewMode>('list')
   const [q, setQ] = useState('')
-  const [status, setStatus] = useState<string>(ALL)
+  const [searchParams] = useSearchParams()
+  // Dashboard counters link here with ?status=IN_PROGRESS|ON_HOLD (docs/08 §2.2 "danh sách đã lọc")
+  const [status, setStatus] = useState<string>(() => {
+    const fromUrl = searchParams.get('status')
+    return statusOptions.some(o => o.value === fromUrl) ? fromUrl! : ALL
+  })
   const [createOpen, setCreateOpen] = useState(false)
 
   const params = new URLSearchParams()
