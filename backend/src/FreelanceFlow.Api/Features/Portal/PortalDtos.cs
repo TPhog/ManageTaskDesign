@@ -1,3 +1,5 @@
+using FreelanceFlow.Api.Domain.Quotations;
+
 namespace FreelanceFlow.Api.Features.Portal;
 
 // Portal DTOs are separate from admin DTOs on purpose (07-security §4.4):
@@ -18,7 +20,8 @@ public sealed record PortalProjectListItemDto(
     string Status,
     DateOnly? DueDate,
     PortalDeliverableSummaryDto DeliverableSummary,
-    bool HasOpenQuotation);
+    bool HasOpenQuotation,
+    Guid? OpenQuotationId);
 
 public sealed record PortalDeliverableDto(
     Guid Id,
@@ -47,3 +50,38 @@ public sealed record PortalProjectDetailDto(
 public sealed record PortalTimelineItemDto(DateTimeOffset OccurredAt, string Message);
 
 public sealed record PortalPagedDto<T>(IReadOnlyList<T> Items, int Page, int PageSize, int Total);
+
+// ---------- quotations (docs/05 §4): rendered from the immutable snapshot only (BR-39) ----------
+
+public sealed record PortalQuotationListItemDto(
+    Guid Id,
+    Guid ProjectId,
+    string ProjectName,
+    string Number,
+    int Version,
+    string Kind,
+    string Title,
+    string Status,
+    string EffectiveStatus,
+    string PaymentStatus,
+    long Total,
+    long DepositAmount,
+    DateOnly IssueDate,
+    DateOnly ExpiryDate);
+
+public sealed record PortalQrOptionDto(string Purpose, string Label, long Amount, string Memo, string Payload);
+
+public sealed record PortalQuotationVersionDto(int Version, string Status, string EffectiveStatus);
+
+/// <summary>
+/// The snapshot is portal-safe by construction: it carries no internal notes (Domain/Quotations/QuotationSnapshot).
+/// </summary>
+public sealed record PortalQuotationDetailDto(
+    Guid Id,
+    Guid ProjectId,
+    string Status,
+    string EffectiveStatus,
+    string PaymentStatus,
+    QuotationSnapshot Snapshot,
+    IReadOnlyList<PortalQrOptionDto> QrOptions,
+    IReadOnlyList<PortalQuotationVersionDto> Versions);

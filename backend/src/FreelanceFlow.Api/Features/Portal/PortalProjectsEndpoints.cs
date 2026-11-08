@@ -1,6 +1,5 @@
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
-using FreelanceFlow.Api.Domain.Projects;
 using FreelanceFlow.Api.Domain.Revisions;
 using FreelanceFlow.Api.Infrastructure.Security;
 using Microsoft.AspNetCore.Mvc;
@@ -19,17 +18,13 @@ public static class PortalProjectsEndpoints
         group.MapGet("{id:guid}/timeline", GetTimeline);
     }
 
-    // 07-security §4.4: every portal query starts from the signed-in client's own, non-archived projects.
-    private static IQueryable<Project> OwnProjects(AppDbContext db, PortalPrincipal principal) =>
-        db.Projects.AsNoTracking().Where(p => p.ClientId == principal.ClientId && p.ArchivedAt == null);
-
     private static async Task<IResult> ListProjects(
         [FromServices] PortalPrincipal principal,
         AppDbContext db,
         IClock clock)
     {
         var today = clock.TodayVn;
-        var items = await OwnProjects(db, principal)
+        var items = await PortalScope.OwnProjects(db, principal)
             .OrderByDescending(p => p.CreatedAt)
             .Select(p => new PortalProjectListItemDto(
                 p.Id,
@@ -42,7 +37,14 @@ public static class PortalProjectsEndpoints
                     db.Deliverables.Count(d => d.ProjectId == p.Id && d.Status == "DELIVERED"),
                     db.Deliverables.Count(d => d.ProjectId == p.Id && d.Status == "APPROVED")),
                 db.Quotations.Any(q => q.ProjectId == p.Id && q.Status == "SENT" &&
-                                       (q.ExpiryDate == null || q.ExpiryDate >= today))))
+                                       (q.ExpiryDate == null || q.ExpiryDate >= today)),
+                // M7b: target of the "Có báo giá mới" chip — the newest open quotation
+                db.Quotations
+                    .Where(q => q.ProjectId == p.Id && q.Status == "SENT" &&
+                                (q.ExpiryDate == null || q.ExpiryDate >= today))
+                    .OrderByDescending(q => q.SentAt)
+                    .Select(q => (Guid?)q.Id)
+                    .FirstOrDefault()))
             .ToListAsync();
 
         return Results.Ok(items);
@@ -53,7 +55,7 @@ public static class PortalProjectsEndpoints
         [FromServices] PortalPrincipal principal,
         AppDbContext db)
     {
-        var project = await OwnProjects(db, principal)
+        var project = await PortalScope.OwnProjects(db, principal)
             .Where(p => p.Id == id)
             .Select(p => new
             {
@@ -113,7 +115,7 @@ public static class PortalProjectsEndpoints
         int page = 1,
         int pageSize = 20)
     {
-        if (!await OwnProjects(db, principal).AnyAsync(p => p.Id == id)) return Results.NotFound();
+        if (!await PortalScope.OwnProjects(db, principal).AnyAsync(p => p.Id == id)) return Results.NotFound();
 
         page = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);

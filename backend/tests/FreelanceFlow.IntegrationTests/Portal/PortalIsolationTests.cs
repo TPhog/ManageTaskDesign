@@ -8,8 +8,8 @@ namespace FreelanceFlow.IntegrationTests.Portal;
 public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
 {
     // docs/09-test-plan.md §4 — EVERY /api/portal route must be listed here, keyed "METHOD pattern".
-    // Value: URL probed with GET ("{projectA}" = a project of client A), or null when the route is
-    // public / carries no resource (covered by PortalSessionTests).
+    // Value: URL probed with GET ("{projectA}" / "{quotationA}" = a resource of client A), or null when the
+    // route is public / carries no resource (PortalSessionTests) or is a POST covered by a dedicated test below.
     private static readonly Dictionary<string, string?> RouteTable = new()
     {
         ["POST /api/portal/session"] = null,
@@ -18,13 +18,21 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
         ["GET /api/portal/projects"] = "/api/portal/projects",
         ["GET /api/portal/projects/{id:guid}"] = "/api/portal/projects/{projectA}",
         ["GET /api/portal/projects/{id:guid}/timeline"] = "/api/portal/projects/{projectA}/timeline",
+        ["GET /api/portal/quotations"] = "/api/portal/quotations?projectId={projectA}",
+        ["GET /api/portal/quotations/{id:guid}"] = "/api/portal/quotations/{quotationA}",
+        ["GET /api/portal/quotations/{id:guid}/versions/{version:int}"] = "/api/portal/quotations/{quotationA}/versions/1",
+        ["GET /api/portal/quotations/{id:guid}/qr/{purpose}.png"] = "/api/portal/quotations/{quotationA}/qr/deposit.png",
     };
+
+    private static readonly string[] ResourcePlaceholders = ["{projectA}", "{quotationA}"];
 
     public static IEnumerable<object[]> GetUrls() =>
         RouteTable.Values.OfType<string>().Select(u => new object[] { u });
 
     public static IEnumerable<object[]> IdUrls() =>
-        RouteTable.Values.OfType<string>().Where(u => u.Contains("{projectA}")).Select(u => new object[] { u });
+        RouteTable.Values.OfType<string>()
+            .Where(u => ResourcePlaceholders.Any(p => u.Contains(p)))
+            .Select(u => new object[] { u });
 
     [Fact]
     public void Every_portal_route_is_declared_in_the_isolation_table()
@@ -45,7 +53,7 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
     public async Task Client_B_gets_404_for_resources_of_client_A(string template)
     {
         var s = await ArrangeAsync();
-        var url = template.Replace("{projectA}", s.ProjectA.ToString());
+        var url = Fill(template, s);
 
         (await s.PortalA.GetAsync(url)).StatusCode.Should().Be(HttpStatusCode.OK, "control: A reads its own resource");
         var resp = await s.PortalB.GetAsync(url);
@@ -66,13 +74,25 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
         ids.Should().Contain(s.ProjectB).And.NotContain(s.ProjectA);
     }
 
+    [Fact]
+    public async Task Quotation_list_of_B_contains_nothing_of_A()
+    {
+        var s = await ArrangeAsync();
+
+        var ofB = await s.PortalB.GetFromJsonAsync<JsonElement>("/api/portal/quotations");
+        var ofA = await s.PortalA.GetFromJsonAsync<JsonElement>("/api/portal/quotations");
+
+        ofB.EnumerateArray().Select(q => q.GetProperty("id").GetGuid()).Should().NotContain(s.QuotationA);
+        ofA.EnumerateArray().Select(q => q.GetProperty("id").GetGuid()).Should().Contain(s.QuotationA);
+    }
+
     [Theory]
     [MemberData(nameof(GetUrls))]
     public async Task Portal_route_rejects_designer_cookie(string template)
     {
         var s = await ArrangeAsync(); // leaves the designer signed in on Client
 
-        var resp = await Client.GetAsync(template.Replace("{projectA}", s.ProjectA.ToString()));
+        var resp = await Client.GetAsync(Fill(template, s));
 
         resp.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
@@ -83,7 +103,7 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
     {
         var s = await ArrangeAsync();
 
-        var resp = await s.PortalA.GetAsync(template.Replace("{projectA}", s.ProjectA.ToString()));
+        var resp = await s.PortalA.GetAsync(Fill(template, s));
 
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         var body = await resp.Content.ReadAsStringAsync();
@@ -91,12 +111,18 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
             body.Should().NotContain(forbidden);
     }
 
+    private static string Fill(string template, Scenario s) => template
+        .Replace("{projectA}", s.ProjectA.ToString())
+        .Replace("{quotationA}", s.QuotationA.ToString());
+
     private sealed record Scenario(
-        HttpClient PortalA, HttpClient PortalB, Guid ProjectA, string ProjectAName, string DeliverableAName, Guid ProjectB);
+        HttpClient PortalA, HttpClient PortalB, Guid ProjectA, string ProjectAName, string DeliverableAName, Guid ProjectB,
+        Guid QuotationA);
 
     private async Task<Scenario> ArrangeAsync()
     {
         await LoginAsync();
+        await ConfigureBankAsync();
         var (clientA, tokenA) = await CreateClientWithPortalLinkAsync();
         var (clientB, tokenB) = await CreateClientWithPortalLinkAsync();
 
@@ -107,11 +133,12 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
         await ChangeProjectStatusAsync(projectA, new { to = "IN_PROGRESS", confirmWarnings = true }); // A gets a timeline entry
         (await Client.PostAsJsonAsync($"/api/admin/projects/{projectA}/progress-updates",
             new { message = $"Tiến độ {projectAName}" })).EnsureSuccessStatusCode(); // M5: designer progress update on A's timeline
+        var quotationA = await CreateSentQuotationAsync(projectA); // M7b: snapshot carries projectAName; internal note SECRET-INTERNAL-QUOTE
         var projectB = await CreateProjectAsync(clientB, "ISOLATION-B-" + Guid.NewGuid().ToString("N"));
 
-        return new Scenario(
-            await OpenPortalSessionAsync(tokenA),
-            await OpenPortalSessionAsync(tokenB),
-            projectA, projectAName, deliverableAName, projectB);
+        var portalA = await OpenPortalSessionAsync(tokenA);
+        var portalB = await OpenPortalSessionAsync(tokenB);
+
+        return new Scenario(portalA, portalB, projectA, projectAName, deliverableAName, projectB, quotationA);
     }
 }

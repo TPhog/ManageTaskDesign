@@ -1,6 +1,9 @@
 using System.Net;
 using System.Text.Json;
+using FreelanceFlow.Api.Data;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FreelanceFlow.IntegrationTests.Portal;
 
@@ -40,10 +43,13 @@ public abstract class PortalTestBase(AppFactory factory) : IntegrationTestBase(f
     protected Task<HttpResponseMessage> PostSessionAsync(string token) =>
         CreateBareClient().PostAsJsonAsync("/api/portal/session", new { token });
 
-    /// <summary>Exchanges the token; the returned client sends ff_portal + ff_csrf, X-CSRF-Token and Origin.</summary>
-    protected async Task<HttpClient> OpenPortalSessionAsync(string token)
+    /// <summary>
+    /// Exchanges the token; the returned client sends ff_portal + ff_csrf, X-CSRF-Token and Origin.
+    /// Pass <paramref name="portal"/> to open the session on another host (e.g. one with a fixed IClock).
+    /// </summary>
+    protected async Task<HttpClient> OpenPortalSessionAsync(string token, HttpClient? portal = null)
     {
-        var portal = CreateBareClient();
+        portal ??= CreateBareClient();
         var resp = await portal.PostAsJsonAsync("/api/portal/session", new { token });
         resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
 
@@ -86,4 +92,65 @@ public abstract class PortalTestBase(AppFactory factory) : IntegrationTestBase(f
     protected async Task<Guid> GetLatestBriefIdAsync(Guid projectId) =>
         (await Client.GetFromJsonAsync<JsonElement>($"/api/admin/projects/{projectId}"))
             .GetProperty("brief").GetProperty("id").GetGuid();
+
+    protected const string QuoteTitle = "Báo giá thiết kế logo";
+
+    /// <summary>Sets the receiving account directly in settings (send needs one — AC-B17).</summary>
+    protected async Task ConfigureBankAsync(string accountNo = "0123456789")
+    {
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var settings = await db.Settings.FirstAsync();
+        settings.BankBin = "970436";
+        settings.BankAccountNo = accountNo;
+        settings.BankAccountName = "NGUYEN VAN A";
+        await db.SaveChangesAsync();
+    }
+
+    /// <summary>DRAFT with one manual line (2.000.000 ₫ by default), deposit 50% and an internal note.</summary>
+    protected async Task<Guid> CreateDraftQuotationAsync(
+        Guid projectId, long unitPrice = 2_000_000, string internalNotes = "SECRET-INTERNAL-QUOTE")
+    {
+        var create = await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/quotations",
+            new { kind = "INITIAL", fromDeliverables = false });
+        create.StatusCode.Should().Be(HttpStatusCode.Created, await create.Content.ReadAsStringAsync());
+        var id = (await create.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var draft = await Client.GetFromJsonAsync<JsonElement>($"/api/admin/quotations/{id}");
+        var put = await Client.PutAsJsonAsync($"/api/admin/quotations/{id}", new
+        {
+            title = QuoteTitle,
+            validityDays = 7,
+            discountAmount = 0L,
+            vatPercent = 0,
+            depositPercent = 50,
+            terms = "Thanh toán trong 7 ngày",
+            notesToClient = "Cảm ơn anh/chị",
+            internalNotes,
+            items = new[]
+            {
+                new { id = (Guid?)null, description = "Thiết kế logo", details = "3 phương án", quantity = 1, unitPrice,
+                      sourceType = "MANUAL", sourceId = (Guid?)null },
+            },
+            rowVersion = draft.GetProperty("rowVersion").GetUInt32(),
+        });
+        put.StatusCode.Should().Be(HttpStatusCode.OK, await put.Content.ReadAsStringAsync());
+        return id;
+    }
+
+    protected async Task SendQuotationAsync(Guid id)
+    {
+        var rowVersion = (await Client.GetFromJsonAsync<JsonElement>($"/api/admin/quotations/{id}"))
+            .GetProperty("rowVersion").GetUInt32();
+        var resp = await Client.PostAsJsonAsync($"/api/admin/quotations/{id}/send", new { rowVersion });
+        resp.StatusCode.Should().Be(HttpStatusCode.OK, await resp.Content.ReadAsStringAsync());
+    }
+
+    /// <summary>Draft + send; needs <see cref="ConfigureBankAsync"/> first.</summary>
+    protected async Task<Guid> CreateSentQuotationAsync(Guid projectId, long unitPrice = 2_000_000)
+    {
+        var id = await CreateDraftQuotationAsync(projectId, unitPrice);
+        await SendQuotationAsync(id);
+        return id;
+    }
 }
