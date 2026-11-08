@@ -1,11 +1,14 @@
+using FreelanceFlow.Api.Common;
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Requests;
 using FreelanceFlow.Api.Features.Revisions;
 using FreelanceFlow.Api.Infrastructure;
+using FreelanceFlow.Api.Infrastructure.Notifications;
 using FreelanceFlow.Api.Infrastructure.Security;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace FreelanceFlow.Api.Features.Portal;
 
@@ -56,7 +59,10 @@ public static class PortalRequestsEndpoints
         [FromServices] PortalPrincipal principal,
         AppDbContext db,
         ActivityWriter activity,
-        IClock clock)
+        IClock clock,
+        INotifier notifier,
+        IOptions<AppSettings> appSettings,
+        ILogger<PortalRequestsEndpointsLog> logger)
     {
         var project = await PortalScope.OwnProjects(db, principal)
             .Where(p => p.Id == id)
@@ -131,8 +137,41 @@ public static class PortalRequestsEndpoints
             data: new { source = request.Source, createdBy = request.CreatedBy, deliverableId = request.DeliverableId });
         await db.SaveChangesAsync();
 
+        await NotifyDesignerAsync(db, notifier, appSettings.Value, logger, request, project.Name, principal.ClientId);
+
         var dto = (await ToDtosAsync(db, [(request, project.Name)])).Single();
         return Results.Json(dto, statusCode: StatusCodes.Status201Created);
+    }
+
+    /// <summary>Discord alert for the designer; runs after commit and must never fail the request.</summary>
+    private static async Task NotifyDesignerAsync(
+        AppDbContext db, INotifier notifier, AppSettings app, ILogger logger,
+        ClientRequest request, string projectName, Guid clientId)
+    {
+        try
+        {
+            var clientName = await db.Clients.AsNoTracking().Where(c => c.Id == clientId).Select(c => c.Name).FirstOrDefaultAsync();
+            var fields = new List<NotificationField>
+            {
+                new("Khách", clientName ?? "-"),
+                new("Dự án", projectName),
+            };
+            if (request.DeliverableId is { } did)
+            {
+                var deliverable = await db.Deliverables.AsNoTracking().Where(d => d.Id == did).Select(d => d.Name).FirstOrDefaultAsync();
+                if (deliverable is not null) fields.Add(new("Hạng mục", deliverable));
+            }
+            var oneLine = string.Join(' ', request.Content.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            var excerpt = oneLine.Length > 200 ? oneLine[..200] + "…" : oneLine;
+            var url = Uri.TryCreate(app.PublicBaseUrl, UriKind.Absolute, out var baseUri)
+                ? $"{baseUri.AbsoluteUri.TrimEnd('/')}/admin/requests?id={request.Id}"
+                : null;
+            await notifier.EnqueueAsync(new Notification("Yêu cầu mới từ khách", excerpt, url, NotificationSeverity.Info, fields));
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Could not enqueue the client-request notification ({ExceptionType})", ex.GetType().Name);
+        }
     }
 
     private static IResult TooLarge() =>
@@ -170,3 +209,6 @@ public static class PortalRequestsEndpoints
             attachments[x.Request.Id].ToList())).ToList();
     }
 }
+
+/// <summary>Logger category for PortalRequestsEndpoints (static classes cannot be type arguments).</summary>
+internal sealed class PortalRequestsEndpointsLog;

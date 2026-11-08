@@ -1,9 +1,38 @@
 using DotNet.Testcontainers.Builders;
+using System.Collections.Concurrent;
+using FreelanceFlow.Api.Infrastructure.Notifications;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Testcontainers.PostgreSql;
 
 namespace FreelanceFlow.IntegrationTests;
+
+public sealed class RecordingNotificationSender : INotificationSender
+{
+    private readonly ConcurrentQueue<Notification> _sent = new();
+    public IReadOnlyCollection<Notification> Sent => _sent.ToArray();
+
+    public Task SendAsync(Notification n, CancellationToken ct)
+    {
+        _sent.Enqueue(n);
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Waits until at least one notification matching the predicate arrived (or 5s).</summary>
+    public async Task<List<Notification>> WaitForAsync(Func<Notification, bool> match, int expectedAtLeast = 1)
+    {
+        for (var i = 0; i < 50; i++)
+        {
+            var hits = Sent.Where(match).ToList();
+            if (hits.Count >= expectedAtLeast) return hits;
+            await Task.Delay(100);
+        }
+        return Sent.Where(match).ToList();
+    }
+}
 
 public sealed class AppFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
@@ -34,7 +63,19 @@ public sealed class AppFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("App:PublicBaseUrl", "http://localhost");
         builder.UseSetting("RateLimit:LoginPerMinute", "1000");
         builder.UseSetting("RateLimit:PortalSessionPerMinute", "1000");
+        builder.UseSetting("Notifications:Discord:WebhookUrl", ""); // never hit the network
+
+        // Real queue + dispatcher, but the sender only records
+        builder.ConfigureTestServices(services =>
+        {
+            services.RemoveAll<INotificationSender>();
+            services.AddSingleton(Notifications);
+            services.AddSingleton<INotificationSender>(Notifications);
+        });
     }
+
+    /// <summary>Everything the notification dispatcher delivered (shared by all tests of the factory).</summary>
+    public RecordingNotificationSender Notifications { get; } = new();
 
     public async Task InitializeAsync() => await _db.StartAsync();
 

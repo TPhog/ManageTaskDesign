@@ -14,6 +14,7 @@ using FreelanceFlow.Api.Features.Services;
 using FreelanceFlow.Api.Features.Settings;
 using FreelanceFlow.Api.Features.Tasks;
 using FreelanceFlow.Api.Infrastructure;
+using FreelanceFlow.Api.Infrastructure.Notifications;
 using FreelanceFlow.Api.Infrastructure.Security;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
@@ -40,6 +41,18 @@ builder.Services.AddMemoryCache();
 // Config
 builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("App"));
 builder.Services.Configure<SeedSettings>(builder.Configuration.GetSection("Seed"));
+
+// Notifications (Discord webhook; Noop when the URL is empty)
+builder.Services.Configure<NotificationsSettings>(builder.Configuration.GetSection("Notifications"));
+builder.Services.AddSingleton<NotificationQueue>();
+builder.Services.AddSingleton<INotifier>(sp => sp.GetRequiredService<NotificationQueue>());
+builder.Services.AddHttpClient("discord-webhook");
+builder.Services.AddSingleton<INotificationSender>(sp =>
+    string.IsNullOrWhiteSpace(sp.GetRequiredService<IOptions<NotificationsSettings>>().Value.Discord.WebhookUrl)
+        ? new NoopNotificationSender()
+        : ActivatorUtilities.CreateInstance<DiscordWebhookSender>(sp,
+            sp.GetRequiredService<IHttpClientFactory>().CreateClient("discord-webhook")));
+builder.Services.AddHostedService<NotificationDispatcher>();
 
 // DbContext
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
