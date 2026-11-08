@@ -1,11 +1,8 @@
+import { PORTAL_INVITE_TEMPLATE, renderTemplate } from './messageTemplates'
+
 /** Vietnamese message the designer pastes into Zalo together with the magic link. */
 export function portalInviteMessage(clientName: string, url: string): string {
-  return [
-    `Chào ${clientName},`,
-    `Mình gửi bạn link theo dõi tiến độ dự án: ${url}`,
-    'Bạn mở link để xem trạng thái, các hạng mục và tiến trình công việc, không cần đăng nhập.',
-    'Link dành riêng cho bạn, vui lòng không chuyển tiếp cho người khác nhé.',
-  ].join('\n')
+  return renderTemplate(PORTAL_INVITE_TEMPLATE, { 'tên': clientName, 'link portal': url })
 }
 
 export type PortalLinkStatus = 'NONE' | 'ACTIVE' | 'DISABLED'

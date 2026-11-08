@@ -1,7 +1,5 @@
 import type { ApiError } from '@/lib/api'
-import { formatDate, formatVnd } from '@/lib/format'
-import type { FlowActionKind, FlowStage, FlowStageState, FlowState, FlowTarget } from '@/lib/flowTypes'
-import type { QuotationDetail } from '@/lib/quotationTypes'
+import type { FlowAction, FlowActionKind, FlowStage, FlowStageState, FlowState, FlowTarget } from '@/lib/flowTypes'
 
 export const FLOW_STAGES: FlowStage[] = ['PREPARE', 'QUOTE', 'EXECUTE', 'REVIEW', 'CLOSE']
 
@@ -42,36 +40,29 @@ export function actionHref(kind: FlowActionKind, projectId: string, target: Flow
   }
 }
 
-type QuotationRef = Pick<QuotationDetail, 'number' | 'version'>
+/** START_PROJECT / COMPLETE_PROJECT open a dialog that needs the project detail — NextStepCard owns those dialogs. */
+export type FlowDialogKind = Extract<FlowActionKind, 'START_PROJECT' | 'COMPLETE_PROJECT'>
 
-const quotationRef = (q: QuotationRef) => (q.number ? ` ${q.number} (v${q.version})` : '')
-
-/** COPY_QUOTATION_MESSAGE: text the designer pastes into Zalo. */
-export function quotationMessage(
-  q: QuotationRef & Pick<QuotationDetail, 'clientName' | 'projectName' | 'total' | 'expiryDate'>,
-): string {
-  return [
-    `Chào ${q.clientName},`,
-    `Mình gửi bạn báo giá${quotationRef(q)} cho dự án ${q.projectName}, tổng ${formatVnd(q.total)}.`,
-    q.expiryDate ? `Báo giá có hiệu lực đến ${formatDate(q.expiryDate)}.` : null,
-    'Bạn xem chi tiết và mã QR thanh toán trong trang theo dõi dự án nhé. Cảm ơn bạn!',
-  ]
-    .filter((line): line is string => line !== null)
-    .join('\n')
+export function isDialogAction(kind: FlowActionKind): kind is FlowDialogKind {
+  return kind === 'START_PROJECT' || kind === 'COMPLETE_PROJECT'
 }
 
-/** COPY_PAYMENT_REMINDER (F4): the deposit while nothing is paid, otherwise what is still due (BR-73). */
-export function paymentReminderMessage(
-  q: QuotationRef &
-    Pick<QuotationDetail, 'clientName' | 'projectName' | 'paymentStatus' | 'depositPercent' | 'depositAmount' | 'outstanding'>,
-): string {
-  const deposit = q.paymentStatus === 'UNPAID' && q.depositPercent > 0
-  const what = deposit ? `tiền cọc ${formatVnd(q.depositAmount)}` : `số tiền còn lại ${formatVnd(q.outstanding)}`
-  return [
-    `Chào ${q.clientName},`,
-    `Mình nhắc nhẹ ${what} của báo giá${quotationRef(q)} (dự án ${q.projectName}).`,
-    'Bạn quét mã QR trong trang theo dõi dự án hoặc chuyển khoản theo thông tin trên báo giá giúp mình nhé. Cảm ơn bạn!',
-  ].join('\n')
+/** Outside the project page (dashboard "Việc cần làm") a dialog step is a link; NextStepCard opens it from ?step=. */
+export function stepHref(projectId: string, kind: FlowDialogKind): string {
+  return `/admin/projects/${projectId}?step=${kind}`
+}
+
+export function stepFromParam(value: string | null): FlowDialogKind | null {
+  return value === 'START_PROJECT' || value === 'COMPLETE_PROJECT' ? value : null
+}
+
+export function isCopyAction(kind: FlowActionKind): boolean {
+  return kind === 'COPY_QUOTATION_MESSAGE' || kind === 'COPY_PAYMENT_REMINDER'
+}
+
+/** Stable React key: one action kind per target. */
+export function flowActionKey(a: FlowAction): string {
+  return `${a.kind}-${a.target.deliverableId ?? a.target.quotationId ?? a.target.requestId ?? ''}`
 }
 
 export function flowErrorText(err: Pick<ApiError, 'code' | 'detail' | 'errors'>, fallback: string): string {

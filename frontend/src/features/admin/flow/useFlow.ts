@@ -5,7 +5,8 @@ import { qk } from '@/lib/queryKeys'
 import type { DeliverableStatus } from '@/lib/types'
 import type { QuotationDetail } from '@/lib/quotationTypes'
 import type { FlowState, StartPreviewItem, StartProjectBody, StartProjectResult } from '@/lib/flowTypes'
-import { flowErrorText, paymentReminderMessage, quotationMessage } from './flowUtils'
+import { paymentReminderMessage, quotationSentMessage } from '@/lib/messageTemplates'
+import { flowErrorText } from './flowUtils'
 
 /** Flow, project detail (deliverable progress), task lists and revisions all derive from the same rows. */
 function useRefreshProjectData() {
@@ -112,7 +113,7 @@ export function useCopyQuotationText() {
         queryKey: qk.quotations.detail(quotationId),
         queryFn: () => api.get<QuotationDetail>(`/admin/quotations/${quotationId}`),
       })
-      await navigator.clipboard.writeText(kind === 'COPY_QUOTATION_MESSAGE' ? quotationMessage(q) : paymentReminderMessage(q))
+      await navigator.clipboard.writeText(kind === 'COPY_QUOTATION_MESSAGE' ? quotationSentMessage(q, null) : paymentReminderMessage(q))
       toast.success('Đã sao chép tin nhắn — dán vào Zalo cho khách')
     } catch {
       toast.error('Không sao chép được — mở báo giá để sao chép thủ công')

@@ -4,6 +4,8 @@ export const qk = {
   settings:  ['settings']  as const,
   banks:     ['banks']     as const,
   services:  ['services']  as const,
+  dashboard: ['dashboard'] as const,
+  search:    (q: string) => ['search', q] as const,
 
   clients: {
     all:    ['clients']                           as const,

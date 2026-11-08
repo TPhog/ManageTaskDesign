@@ -1,12 +1,14 @@
 import {
   actionHref,
+  flowActionKey,
   flowErrorText,
-  paymentReminderMessage,
-  quotationMessage,
+  isCopyAction,
+  isDialogAction,
   stageLabel,
+  stepFromParam,
+  stepHref,
   stepperSummary,
 } from '@/features/admin/flow/flowUtils'
-import { formatDate, formatVnd } from '@/lib/format'
 
 const none = { deliverableId: null, quotationId: null, requestId: null }
 
@@ -47,30 +49,28 @@ describe('actionHref', () => {
   })
 })
 
-describe('messages for the client', () => {
-  const q = {
-    clientName: 'Chị Lan', projectName: 'Logo ABC', number: 'BG-2026-0007', version: 2, total: 3_000_000,
-    expiryDate: '2026-11-15', paymentStatus: 'UNPAID' as const, depositPercent: 50, depositAmount: 1_500_000, outstanding: 3_000_000,
-  }
-
-  it('presents the quotation with its total and validity', () => {
-    const m = quotationMessage(q)
-    expect(m.startsWith('Chào Chị Lan,')).toBe(true)
-    expect(m).toContain('BG-2026-0007 (v2)')
-    expect(m).toContain('Logo ABC')
-    expect(m).toContain(formatVnd(3_000_000))
-    expect(m).toContain(formatDate('2026-11-15'))
+describe('dialog steps and action helpers', () => {
+  it('knows which actions open a dialog on the project page', () => {
+    expect(isDialogAction('START_PROJECT')).toBe(true)
+    expect(isDialogAction('COMPLETE_PROJECT')).toBe(true)
+    expect(isDialogAction('DELIVER')).toBe(false)
   })
 
-  it('asks for the deposit first', () => {
-    expect(paymentReminderMessage(q)).toContain(`tiền cọc ${formatVnd(1_500_000)}`)
+  it('deep-links a dialog step to the project page', () => {
+    expect(stepHref('p1', 'START_PROJECT')).toBe('/admin/projects/p1?step=START_PROJECT')
   })
 
-  it('asks for the rest once the deposit is paid or when there is no deposit', () => {
-    expect(paymentReminderMessage({ ...q, paymentStatus: 'DEPOSIT_PAID', outstanding: 1_500_000 }))
-      .toContain(`số tiền còn lại ${formatVnd(1_500_000)}`)
-    expect(paymentReminderMessage({ ...q, depositPercent: 0, depositAmount: 0 }))
-      .toContain(`số tiền còn lại ${formatVnd(3_000_000)}`)
+  it('reads only known steps from the URL', () => {
+    expect(stepFromParam('COMPLETE_PROJECT')).toBe('COMPLETE_PROJECT')
+    expect(stepFromParam('DELIVER')).toBeNull()
+    expect(stepFromParam(null)).toBeNull()
+  })
+
+  it('marks copy actions and keys actions by their target', () => {
+    expect(isCopyAction('COPY_PAYMENT_REMINDER')).toBe(true)
+    expect(isCopyAction('SEND_QUOTATION')).toBe(false)
+    expect(flowActionKey({ kind: 'SUBMIT_REVIEW', label: 'x', primary: false, target: { ...none, deliverableId: 'd1' } }))
+      .toBe('SUBMIT_REVIEW-d1')
   })
 })
 
