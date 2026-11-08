@@ -11,6 +11,14 @@ public sealed partial class LocalFileStorage : IFileStorage
 {
     private const string TempMarker = ".tmp-";
 
+    /// <summary>Recursive walk that skips folders the app user cannot read (e.g. lost+found on a mounted volume).</summary>
+    private static readonly EnumerationOptions Recursive = new()
+    {
+        RecurseSubdirectories = true,
+        IgnoreInaccessible = true,
+        AttributesToSkip = 0,
+    };
+
     public LocalFileStorage(IOptions<StorageOptions> options, IHostEnvironment env)
     {
         var root = options.Value.Local.RootPath;
@@ -84,7 +92,7 @@ public sealed partial class LocalFileStorage : IFileStorage
     {
         var folder = prefix.Length == 0 ? RootPath : PathOf(prefix.TrimEnd('/'));
         if (!Directory.Exists(folder)) return Task.FromResult(0L);
-        var total = new DirectoryInfo(folder).EnumerateFiles("*", SearchOption.AllDirectories)
+        var total = new DirectoryInfo(folder).EnumerateFiles("*", Recursive)
             .Where(f => !f.Name.Contains(TempMarker, StringComparison.Ordinal))
             .Sum(f => f.Length);
         return Task.FromResult(total);
@@ -95,7 +103,7 @@ public sealed partial class LocalFileStorage : IFileStorage
         var folder = prefix.Length == 0 ? RootPath : PathOf(prefix.TrimEnd('/'));
         if (!Directory.Exists(folder)) return Task.FromResult<IReadOnlyList<StoredObject>>([]);
         var objects = new List<StoredObject>();
-        foreach (var file in new DirectoryInfo(folder).EnumerateFiles("*", SearchOption.AllDirectories))
+        foreach (var file in new DirectoryInfo(folder).EnumerateFiles("*", Recursive))
         {
             ct.ThrowIfCancellationRequested();
             if (file.Name.Contains(TempMarker, StringComparison.Ordinal)) continue;
@@ -129,7 +137,7 @@ public sealed partial class LocalFileStorage : IFileStorage
         var cutoff = olderThan.UtcDateTime;
         var root = new DirectoryInfo(RootPath);
         var removed = 0;
-        foreach (var temp in root.EnumerateFiles("*" + TempMarker + "*", SearchOption.AllDirectories).ToList())
+        foreach (var temp in root.EnumerateFiles("*" + TempMarker + "*", Recursive).ToList())
         {
             ct.ThrowIfCancellationRequested();
             if (temp.LastWriteTimeUtc >= cutoff) continue;
@@ -144,7 +152,7 @@ public sealed partial class LocalFileStorage : IFileStorage
             }
         }
         // Empty image folders (projects/{p}/{f}); deepest first; never the root, "projects" or a project folder
-        var folders = root.EnumerateDirectories("*", SearchOption.AllDirectories)
+        var folders = root.EnumerateDirectories("*", Recursive)
             .Where(d => Path.GetRelativePath(RootPath, d.FullName).Split(Path.DirectorySeparatorChar).Length >= 3)
             .OrderByDescending(d => d.FullName.Length)
             .ToList();
@@ -155,7 +163,7 @@ public sealed partial class LocalFileStorage : IFileStorage
                 folder.Refresh();
                 if (folder.Exists && folder.LastWriteTimeUtc < cutoff && !folder.EnumerateFileSystemInfos().Any()) folder.Delete();
             }
-            catch (IOException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 // a concurrent write re-used the folder — leave it
             }

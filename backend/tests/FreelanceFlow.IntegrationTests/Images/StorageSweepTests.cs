@@ -68,6 +68,7 @@ public class StorageSweepTests(AppFactory factory) : ImageTestBase(factory)
         report.MissingObjects.Should().Be(1);
         report.UnknownObjects.Should().Be(1);
         report.FailedDeletes.Should().Be(0);
+        report.Errors.Should().Be(0);
         report.FreedBytes.Should().BeGreaterThan(3);
         foreach (var variant in new[] { "original", "preview", "thumb" })
         {
@@ -96,6 +97,11 @@ public class StorageSweepTests(AppFactory factory) : ImageTestBase(factory)
         var again = await SweepAsync();
         (again.OrphansDeleted + again.DeletedImagesPurged + again.StrayVariantsDeleted + again.IncompleteWritesDeleted).Should().Be(0);
         again.MissingObjects.Should().Be(1);
+        again.UnknownObjects.Should().Be(1);
         File.Exists(PathOf(freshOrphan)).Should().BeTrue();
+        using (var scope = Factory.Services.CreateScope())
+            (await scope.ServiceProvider.GetRequiredService<AppDbContext>().ActivityLogs.AsNoTracking()
+                .CountAsync(a => a.Action == "storage.reconciled"))
+                .Should().Be(1, "nothing was done and the same findings were already recorded");
     }
 }

@@ -29,7 +29,15 @@ public sealed class StorageReconciliationService(
     private async Task RunOnceAsync(CancellationToken ct)
     {
         using var scope = scopes.CreateScope();
-        await scope.ServiceProvider.GetRequiredService<StorageSweeper>().RunAsync(ct);
+        try
+        {
+            await scope.ServiceProvider.GetRequiredService<StorageSweeper>().RunAsync(ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            // the threshold re-check below still runs
+            logger.LogError("Storage sweep failed ({ExceptionType})", ex.GetType().Name);
+        }
         await scope.ServiceProvider.GetRequiredService<StorageAlertService>().EvaluateAsync(ct);
     }
 }
