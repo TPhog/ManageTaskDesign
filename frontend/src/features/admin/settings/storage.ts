@@ -1,4 +1,6 @@
-import type { StorageImage, StorageImageParams, StorageLevel, StorageUsage } from '@/lib/imageTypes'
+import { formatDate } from '@/lib/format'
+import { formatBytes, imageErrorMessage } from '@/lib/images'
+import type { OriginalCleanupPreview, StorageImage, StorageImageParams, StorageLevel, StorageProject, StorageUsage } from '@/lib/imageTypes'
 
 /** Spec §2 thresholds, drawn as markers on the usage bar. */
 export const STORAGE_MARKERS = [50, 70, 85, 90, 95] as const
@@ -75,4 +77,33 @@ export function readStorageParams(search: URLSearchParams): Required<Omit<Storag
     sort: SORTS.includes(sort as (typeof SORTS)[number]) ? (sort as (typeof SORTS)[number]) : 'size',
     page: Number.isInteger(page) && page > 1 ? page : 1,
   }
+}
+
+/** P10 "Xoá bản gốc của dự án đã hoàn thành cũ hơn N tháng" — choices on the page (API accepts 1–120). */
+export const CLEANUP_MONTHS = [3, 6, 12, 24] as const
+export const DEFAULT_CLEANUP_MONTHS = 6
+
+export function cleanupSummary(p: Pick<OriginalCleanupPreview, 'imageCount' | 'projectCount' | 'freedBytes'>): string {
+  if (p.imageCount === 0) return 'Không có bản gốc nào để xoá.'
+  return `Có thể giải phóng ${formatBytes(p.freedBytes)}: ${p.imageCount} bản gốc ở ${p.projectCount} dự án.`
+}
+
+export function completedLabel(completedAt: string | null): string | null {
+  return completedAt ? `Hoàn thành ${formatDate(completedAt)}` : null
+}
+
+export function projectUsageLine(p: Pick<StorageProject, 'imageCount' | 'originalBytes' | 'originalsDeleted'>): string {
+  const parts = [`${p.imageCount} ảnh`, `bản gốc ${formatBytes(p.originalBytes)}`]
+  if (p.originalsDeleted > 0) parts.push(`đã xoá ${p.originalsDeleted} bản gốc`)
+  return parts.join(' · ')
+}
+
+/** 409 = the candidate set changed since the preview; the page refreshes the preview and asks for a re-check. */
+export function isCleanupStale(err: unknown): boolean {
+  return (err as { code?: string } | null)?.code === 'CONCURRENCY_CONFLICT'
+}
+
+export function cleanupErrorMessage(err: unknown): string {
+  if (isCleanupStale(err)) return 'Danh sách đã thay đổi, xem lại'
+  return imageErrorMessage(err)
 }

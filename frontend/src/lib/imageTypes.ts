@@ -4,6 +4,16 @@ import type { ProjectStatus } from './types'
 export type ImageOwnerType = 'TASK' | 'PROGRESS_UPDATE' | 'CLIENT_REQUEST' | 'DELIVERABLE'
 export type StorageLevel = 'OK' | 'NOTICE' | 'WARNING' | 'BLOCKED' | 'CRITICAL'
 
+/** P10: an earlier image in the project with the same content (SHA-256). */
+export interface ImageDuplicate {
+  id: string
+  ownerType: ImageOwnerType
+  ownerId: string
+  taskTitle: string | null
+  createdAt: string
+  sameUpload: boolean
+}
+
 export interface AdminImage {
   id: string
   projectId: string
@@ -19,6 +29,8 @@ export interface AdminImage {
   thumbUrl: string
   previewUrl: string
   originalUrl: string
+  originalDeletedAt: string | null
+  duplicateOf: ImageDuplicate | null
 }
 
 /** Portal image: no original, file name, owner or task (TSK-05). */
@@ -69,6 +81,7 @@ export interface StorageImage {
   createdAt: string
   thumbUrl: string
   previewUrl: string
+  originalDeletedAt: string | null
 }
 
 export interface StorageImagePage {
@@ -108,4 +121,43 @@ export interface LightboxImage {
   thumbSrc: string
   alt: string
   caption?: string
+}
+
+/** P10 — Settings › Dung lượng › Theo dự án. completedAt only for COMPLETED projects. */
+export interface StorageProject {
+  projectId: string
+  projectName: string
+  clientName: string
+  projectStatus: ProjectStatus
+  completedAt: string | null
+  imageCount: number
+  totalBytes: number
+  /** originals still stored that a cleanup could free */
+  originalBytes: number
+  originalsDeleted: number
+}
+
+export interface OriginalCleanupProject {
+  projectId: string
+  projectName: string
+  completedAt: string
+  imageCount: number
+  freedBytes: number
+}
+
+export interface OriginalCleanupPreview {
+  olderThanMonths: number
+  cutoff: string
+  projectCount: number
+  imageCount: number
+  freedBytes: number
+  /** SHA-256 of the candidate id set; echoed back on the run so it acts only on what was previewed */
+  digest: string
+  projects: OriginalCleanupProject[]
+}
+
+export interface OriginalCleanupResult {
+  projectCount: number
+  imageCount: number
+  freedBytes: number
 }

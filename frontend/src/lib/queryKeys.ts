@@ -74,6 +74,8 @@ export const qk = {
     all:    ['storage']                                       as const,
     usage:  ['storage', 'usage']                              as const,
     images: (params: object) => ['storage', 'images', params] as const,
+    projects: ['storage', 'projects']                         as const,
+    originalCleanup: (months: number) => ['storage', 'original-cleanup', months] as const,
   },
 
   watermark: ['settings', 'watermark'] as const,

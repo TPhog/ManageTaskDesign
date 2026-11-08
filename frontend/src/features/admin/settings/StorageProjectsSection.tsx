@@ -1,0 +1,48 @@
+import { Link } from 'react-router-dom'
+import { ImageOff } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
+import { EmptyState } from '@/components/EmptyState'
+import { StatusBadge } from '@/components/StatusBadge'
+import { formatBytes } from '@/lib/images'
+import { completedLabel, projectUsageLine } from './storage'
+import { useStorageProjects } from './useStorage'
+
+/** P10: usage per project, largest first; "Xem ảnh" filters the image list below. */
+export function StorageProjectsSection({ onSelect }: { onSelect: (projectId: string) => void }) {
+  const { data, isLoading, isError } = useStorageProjects()
+  return (
+    <section aria-label="Dung lượng theo dự án" className="rounded-xl border bg-card shadow-card">
+      <h2 className="border-b px-5 py-3 font-semibold text-foreground">Theo dự án</h2>
+      {isLoading ? (
+        <div className="space-y-2 p-5"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
+      ) : isError ? (
+        <p className="p-5 text-sm text-muted-foreground">Không tải được dung lượng theo dự án.</p>
+      ) : !data || data.length === 0 ? (
+        <EmptyState icon={ImageOff} title="Chưa có ảnh nào" description="Ảnh công việc, tiến độ và ảnh khách gửi sẽ hiện ở đây." />
+      ) : (
+        <ul className="divide-y">
+          {data.map(p => (
+            <li key={p.projectId} className="flex flex-wrap items-center gap-3 px-5 py-3">
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <p className="truncate text-sm font-medium text-foreground">
+                  <Link to={`/admin/projects/${p.projectId}`} className="hover:underline">{p.projectName}</Link>
+                </p>
+                <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span className="truncate">{p.clientName}</span>
+                  {completedLabel(p.completedAt) ?? <StatusBadge status={p.projectStatus} />}
+                </p>
+                <p className="text-xs text-muted-foreground">{projectUsageLine(p)}</p>
+              </div>
+              <p className="text-sm font-medium tabular-nums text-foreground">{formatBytes(p.totalBytes)}</p>
+              <Button type="button" variant="outline" size="sm" className="min-h-11"
+                aria-label={`Xem ảnh của ${p.projectName}`} onClick={() => onSelect(p.projectId)}>
+                Xem ảnh
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}

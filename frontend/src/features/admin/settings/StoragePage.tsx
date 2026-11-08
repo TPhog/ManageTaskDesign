@@ -16,6 +16,8 @@ import { formatBytes, imageErrorMessage } from '@/lib/images'
 import type { LightboxImage, StorageImageParams } from '@/lib/imageTypes'
 import { qk } from '@/lib/queryKeys'
 import type { PagedResult, ProjectListItem } from '@/lib/types'
+import { OriginalCleanupSection } from './OriginalCleanupSection'
+import { StorageProjectsSection } from './StorageProjectsSection'
 import { StorageUsageBar } from './StorageUsageBar'
 import { CLEANUP_SUGGESTION, clampPage, ownerLabel, readStorageParams, selectedBytes, toStorageQuery } from './storage'
 import { useBulkDeleteImages, useStorageImages, useStorageUsage } from './useStorage'
@@ -103,6 +105,9 @@ export default function StoragePage() {
           : <p className="text-sm text-muted-foreground">Không tải được dung lượng.</p>}
       </section>
 
+      <StorageProjectsSection onSelect={projectId => update({ projectId })} />
+      <OriginalCleanupSection />
+
       <section aria-label="Bộ lọc" className="space-y-4 rounded-xl border bg-card p-5 shadow-card">
         <div className="grid gap-4 sm:grid-cols-4">
           <div className="space-y-1.5 sm:col-span-2">
@@ -181,6 +186,9 @@ export default function StoragePage() {
                     <Link to={`/admin/projects/${img.projectId}`} className="hover:underline">{img.projectName}</Link>
                     {` · ${img.clientName} · ${ownerLabel(img)}`}
                   </p>
+                  {img.originalDeletedAt && (
+                    <p className="text-xs text-amber-700">Đã xoá bản gốc · {formatDate(img.originalDeletedAt)}</p>
+                  )}
                 </div>
                 <div className="text-right text-xs tabular-nums text-muted-foreground">
                   <p className="font-medium text-foreground">{formatBytes(img.sizeBytes)}</p>
