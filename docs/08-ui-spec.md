@@ -32,7 +32,7 @@ Sidebar: **Tổng quan** · **Yêu cầu** (badge NEW) · **Dự án** · **Côn
 | Route | Màn hình | Nội dung chính | Hành động |
 |---|---|---|---|
 | `/admin/login` | Đăng nhập | Email, mật khẩu | Đăng nhập |
-| `/admin` | Tổng quan | 3 khối: **Cần xử lý**, **Dự án**, **Tiền** (DSH-01..04) | Click từng chỉ số → danh sách đã lọc |
+| `/admin` | Tổng quan | 3 khối cũ (DSH-01..04): **Cần xử lý** (Việc cần làm), **Dự án**, **Tiền** + biểu đồ 6 tháng. P11 thêm các khối (region có tên): **Bắt đầu thiết lập** (checklist 6 mục, chỉ khi chưa xong/chưa ẩn), **Lịch làm việc 7 ngày** (nhóm **Quá hạn** nổi bật, mỗi ngày một nhóm, tick xong có Hoàn tác, tiêu đề mở TaskDrawer), **Sức khỏe dự án** (tiến độ, hạn, quota, huy hiệu rủi ro, tối đa 12 dòng), **Tiền đã thu và công nợ** (chọn tháng/quý/năm, so kỳ trước, công nợ có tuổi nợ, Copy nhắc thanh toán, mở báo giá và QR), **Hoạt động của khách**, **Dung lượng ảnh** (link tới Dung lượng). Ở 390px mọi bảng/thanh có bản chữ và không tràn ngang | Click từng chỉ số → danh sách đã lọc |
 | `/admin/requests` | Hộp thư yêu cầu | Tab NEW / Đã xử lý / Từ chối; card: khách, dự án, nội dung, ảnh thumbnail, thời gian | Mở triage |
 | `/admin/requests/:id` | Triage | Trái: nội dung + file gốc. Phải: trình tạo round — chọn deliverable, thêm item (mô tả, type), hiển thị **billing gợi ý + lý do**, cho đổi | "Lưu & tạo round", "Từ chối", sau khi lưu: "Tạo báo giá phát sinh" nếu có CHARGEABLE |
 | `/admin/projects` | Danh sách dự án | Bảng: tên, khách, loại, trạng thái, deadline (đỏ nếu quá), tiến độ deliverable, chờ thu | Lọc, sort, tạo |
@@ -51,7 +51,7 @@ Sidebar: **Tổng quan** · **Yêu cầu** (badge NEW) · **Dự án** · **Côn
 | `/admin/clients` | Khách hàng | Bảng: tên, công ty, SĐT, số dự án, đã chốt, chờ thu, portal on/off | Tạo, tìm |
 | `/admin/clients/:id` | Chi tiết khách | Thông tin, dự án, tiền, timeline; khối **Portal**: trạng thái, ngày tạo link | **Tạo link** → dialog hiển thị URL + nút Copy + cảnh báo "Link chỉ hiển thị 1 lần; tạo link mới sẽ vô hiệu link cũ"; Bật/Tắt portal |
 | `/admin/services` | Dịch vụ | Bảng giá | CRUD, ẩn/hiện |
-| `/admin/settings` | Cài đặt | Hồ sơ, ngân hàng (select tìm kiếm theo tên/BIN) + **QR thử** 10.000 ₫ để designer tự quét kiểm tra, mặc định báo giá, đổi mật khẩu | Lưu |
+| `/admin/settings` | Cài đặt | Hồ sơ, ngân hàng (select tìm kiếm theo tên/BIN) + **QR thử** 10.000 ₫ để designer tự quét kiểm tra, mặc định báo giá, **Nhắc việc hằng ngày** (bật/tắt, giờ gửi giờ VN, cảnh báo khi chưa có Discord webhook), đổi mật khẩu | Lưu |
 
 ### 2.3 Luồng triage → báo giá (chi tiết tương tác)
 

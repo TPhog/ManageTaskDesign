@@ -230,6 +230,78 @@ Liên kết revision ↔ báo giá qua các version (BR-47):
 }
 ```
 
+Các endpoint dashboard bổ sung (P11) đều là `GET` thuần đọc, cookie `Designer`, projection `AsNoTracking`; chỉ `setup/dismiss` ghi dữ liệu.
+
+| Method | Path | Ghi chú |
+|---|---|---|
+| GET | `/api/admin/dashboard/schedule` | Lịch 7 ngày (BR-91) |
+| GET | `/api/admin/dashboard/project-health` | Sức khỏe dự án (BR-92) |
+| GET | `/api/admin/dashboard/money?period=month\|quarter\|year` | Tiền đã thu và công nợ (BR-93); giá trị khác → `400` ProblemDetails `errors.period` |
+| GET | `/api/admin/dashboard/client-activity?limit=10` | Hoạt động của khách; `limit` kẹp 1..30 |
+| GET | `/api/admin/dashboard/setup` | Checklist thiết lập (BR-96) |
+| POST | `/api/admin/dashboard/setup/dismiss` | Ẩn checklist; idempotent; `204`; ghi activity `settings.setup_dismissed` lần đầu; cần CSRF |
+
+`GET /api/admin/dashboard/schedule` →
+
+```json
+{
+  "today": "2026-11-09",
+  "undatedOpenTasks": 4,
+  "overdue": { "total": 12, "items": [ { "id": "…", "title": "Chốt màu", "status": "TODO", "priority": "HIGH", "dueDate": "2026-11-07", "sortOrder": 1024.0, "projectId": "…", "projectName": "Logo Cà phê", "clientName": "Gió" } ] },
+  "days": [ { "date": "2026-11-09", "tasks": [ /* như overdue.items, tối đa 20 */ ], "hiddenTasks": 0,
+              "deadlines": [ { "kind": "PROJECT", "id": "…", "projectId": "…", "name": "Logo Cà phê", "projectName": "Logo Cà phê", "clientName": "Gió", "date": "2026-11-09" } ] } ]
+}
+```
+
+`overdue.items` tối đa 10, cũ nhất trước; `days` luôn đủ 7 phần tử; `deadlines[].kind` là `PROJECT` hoặc `DELIVERABLE`.
+
+`GET /api/admin/dashboard/project-health` chấm điểm mọi dự án trong phạm vi BR-92, sắp theo rủi ro rồi cắt tối đa 12 dòng; `total` là số dự án trong phạm vi, `hidden = total − số dòng trả về`:
+
+```json
+{
+  "total": 15, "hidden": 3,
+  "items": [ { "projectId": "…", "projectName": "…", "clientId": "…", "clientName": "…", "status": "IN_PROGRESS", "stage": "EXECUTE",
+               "dueDate": "2026-11-05", "daysToDeadline": -4, "progressPercent": 40, "quotaUsed": 2, "quotaTotal": 4,
+               "risks": ["LATE", "TASKS_OVERDUE"], "riskScore": 6 } ]
+}
+```
+
+`GET /api/admin/dashboard/money?period=month` →
+
+```json
+{
+  "period": "month", "periodStart": "2026-11-01", "periodEnd": "2026-11-30",
+  "current": { "start": "2026-11-01", "endExclusive": "2026-11-10" },
+  "previous": { "start": "2026-10-01", "endExclusive": "2026-10-10" },
+  "collected": { "current": 6000000, "previous": 4000000, "deltaPercent": 50.0, "currentDeposits": 4000000, "currentRemainders": 2000000 },
+  "accepted": { "current": 12500000, "previous": 9000000, "deltaPercent": 38.9 },
+  "receivables": { "total": 5400000, "hiddenItems": 0,
+    "items": [ { "quotationId": "…", "number": "BG-2026-0007", "version": 1, "kind": "INITIAL", "clientId": "…", "clientName": "…", "projectId": "…", "projectName": "…",
+                 "paymentStatus": "DEPOSIT_PAID", "total": 8000000, "depositPercent": 50, "depositAmount": 4000000, "outstanding": 4000000,
+                 "agingFrom": "2026-10-20", "agingDays": 20, "agingBucket": "8-30" } ],
+    "byClient": [ { "clientId": "…", "clientName": "…", "outstanding": 4000000, "count": 1 } ] }
+}
+```
+
+`deltaPercent` là `null` khi kỳ trước bằng 0. `receivables.items` tối đa 20, `byClient` tối đa 10; `receivables.total` bằng `money.outstanding` của `GET /api/admin/dashboard`.
+
+`GET /api/admin/dashboard/client-activity` chỉ gồm `REQUEST_CREATED`, `DELIVERABLE_APPROVED` (do khách thực hiện) và `QUOTATION_ACCEPTED`; `href` do server dựng:
+
+```json
+{ "items": [ { "id": 981, "occurredAt": "2026-11-09T02:10:00+00:00", "kind": "REQUEST_CREATED", "text": "…", "clientName": "…", "projectName": "…", "href": "/admin/requests/…" } ] }
+```
+
+Endpoint này dùng một số truy vấn cố định, nhỏ (feed, dự án, khách), không phụ thuộc số dòng trả về; chỉ mục `ix_activity_occurred` phục vụ sắp xếp.
+
+`GET /api/admin/dashboard/setup` →
+
+```json
+{ "dismissed": false, "complete": false, "doneCount": 2, "total": 6,
+  "items": [ { "key": "STUDIO", "label": "Điền thông tin studio", "hint": "…", "done": true, "href": "/admin/settings" } ] }
+```
+
+`items[].key` ∈ `STUDIO, BANK, SERVICE, TASK_TEMPLATE, WATERMARK, CLIENT` (xem BR-96).
+
 ### 3.13 Endpoint bổ sung (Search, Flow, Images, Storage, Watermark, Notes)
 
 Tất cả dưới `/api/admin/*`, cookie `Designer`; POST/PUT/PATCH/DELETE cần CSRF header.
@@ -252,6 +324,7 @@ Tất cả dưới `/api/admin/*`, cookie `Designer`; POST/PUT/PATCH/DELETE cầ
 | GET | `/api/admin/images/{id}/{variant}` | Stream ảnh theo biến thể |
 | GET | `/api/admin/storage/usage` | Dung lượng đã dùng / hạn mức |
 | GET | `/api/admin/storage/images` | Liệt kê ảnh theo dung lượng để dọn |
+| GET/PUT | `/api/admin/settings/digest` | Nhắc việc hằng ngày (BR-94): GET trả `{ enabled, hourVn, channelConfigured }`; PUT nhận `{ enabled, hourVn }`, `hourVn` ngoài 0..23 → `400` (`errors.hourVn`); `channelConfigured` chỉ cho biết đã có Discord webhook hay chưa, không trả URL; ghi activity `settings.digest_updated`; policy `DesignerOnly` |
 | GET/PUT | `/api/admin/settings/watermark` | Cấu hình watermark ảnh (`enabled`, `text`, `opacityPercent`); policy `DesignerOnly` |
 
 ## 4. Portal API

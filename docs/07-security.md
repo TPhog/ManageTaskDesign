@@ -112,6 +112,13 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 - Data Protection keys trong volume `/data/keys`, có trong backup.
 - PostgreSQL không mở port ra Internet (chỉ network nội bộ Docker).
 
+### 7.1 Dashboard và digest (P11)
+
+- Mọi endpoint `/api/admin/dashboard/*` và `/api/admin/settings/digest` nằm sau cookie `Designer`; không có endpoint nào ở Portal. Các `GET` thuần đọc; `POST dashboard/setup/dismiss` và `PUT settings/digest` cần CSRF header.
+- Tin digest không chứa webhook URL, token portal, thông tin tài khoản ngân hàng hay nội dung brief; chỉ tiêu đề task, tên dự án, số báo giá, hạn và tổng công nợ.
+- `GET /api/admin/settings/digest` chỉ trả `channelConfigured` (boolean), không bao giờ trả webhook URL; webhook không được log.
+- `client-activity` dựng `href` ở server từ id nội bộ, frontend không ghép đường dẫn từ dữ liệu khách nhập.
+
 ## 8. Dữ liệu cá nhân
 
 - Chỉ thu thập: tên, công ty, SĐT, email, kênh liên hệ của khách — do designer nhập.

@@ -73,8 +73,23 @@ CREATE TABLE settings (
     default_validity_days    int  NOT NULL DEFAULT 7  CHECK (default_validity_days BETWEEN 1 AND 365),
     default_deposit_percent  int  NOT NULL DEFAULT 50 CHECK (default_deposit_percent BETWEEN 0 AND 100),
     default_terms            text NOT NULL DEFAULT '',
+    digest_enabled           boolean NOT NULL DEFAULT true,          -- P11 BR-94
+    digest_hour_vn           int NOT NULL DEFAULT 8 CHECK (digest_hour_vn BETWEEN 0 AND 23),
     updated_at               timestamptz NOT NULL
 );
+
+-- P11 (migration 20261112110000): trạng thái chạy của dashboard, tách khỏi settings.
+-- Digest chạy nền ghi digest_last_run_date mỗi ngày; nếu ghi vào settings sẽ làm đổi xmin của settings
+-- và gây xung đột concurrency giả cho designer đang lưu Cài đặt.
+CREATE TABLE dashboard_state (
+    id                    smallint PRIMARY KEY CHECK (id = 1),      -- singleton, seed 1 hàng
+    digest_last_run_date  date NULL,                                -- ngày VN đã claim digest
+    setup_dismissed_at    timestamptz NULL                          -- đã ẩn checklist thiết lập
+);
+INSERT INTO dashboard_state (id) VALUES (1);
+
+-- feed hoạt động của khách trên dashboard (ORDER BY occurred_at DESC LIMIT n)
+CREATE INDEX ix_activity_occurred ON activity_logs (occurred_at DESC);
 
 -- ============ Catalog ============
 CREATE TABLE services (

@@ -91,6 +91,21 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
 | AC-R6 | Upload `.html` / `.svg` / `.jpg` thực chất là exe | POST | `415` |
 | AC-R7 | File 21 MB | POST | `413` |
 
+### AC-DSH — Dashboard nâng cấp (P11)
+
+| ID | Tiêu chí | Kiểm bằng |
+|---|---|---|
+| AC-DSH-01 | `dashboard/schedule` trả đủ 7 ngày từ hôm nay; quá hạn tách riêng, cũ nhất trước; loại task DONE và dự án CANCELLED; cắt 20/ngày; sắp theo ưu tiên | `DashboardScheduleTests` |
+| AC-DSH-02 | Tick DONE tại chỗ làm task biến mất ngay (optimistic), lỗi thì hoàn lại, có "Hoàn tác" | `scheduleBlock.test.tsx`, e2e |
+| AC-DSH-03 | Sức khỏe dự án: rủi ro, điểm, thứ tự, dự án COMPLETED còn nợ có mặt, đã thu đủ thì không; chấm điểm mọi dự án trong phạm vi rồi mới cắt 12 dòng (`hidden`) | `DashboardProjectHealthTests`, `ProjectHealthTests` |
+| AC-DSH-04 | Đã thu theo kỳ = cọc theo `DepositPaidAt` + phần còn lại theo `PaidAt`; so sánh cùng số ngày kỳ trước; `period` sai → 400 | `DashboardMoneyInsightsTests`, `DashboardPeriodsTests` |
+| AC-DSH-05 | `receivables.total` = `money.outstanding`; tuổi nợ và bucket đúng; copy nhắc thanh toán đúng nội dung | `DashboardMoneyInsightsTests`, `moneyInsightsBlock.test.tsx` |
+| AC-DSH-06 | Feed hoạt động chỉ gồm sự kiện do khách + báo giá được chấp nhận; link do server dựng; số truy vấn cố định | `DashboardClientActivityTests` |
+| AC-DSH-07 | Checklist: 6 mục, hoàn thành theo dữ liệu thật (STUDIO cần tên khác tên mẫu và có SĐT/email; SERVICE cần dịch vụ có giá được tạo/sửa sau seed), tắt idempotent, ẩn khi xong | `DashboardSetupTests`, `setupChecklist.test.tsx` |
+| AC-DSH-08 | Digest gửi tối đa 1 lần/ngày VN (kể cả chạy đồng thời), đúng giờ cấu hình, tắt thì im lặng, không có gì để báo thì không gửi; lỗi trước commit thì ngày được thử lại | `DailyDigestTests`, `DailyDigestMessageTests` |
+| AC-DSH-09 | Cấu hình digest lưu/validate 0–23, cảnh báo khi chưa có webhook | `DigestSettingsTests`, `digestSection.test.tsx` |
+| AC-DSH-10 | Không tràn ngang ở 390px; bảng/thanh có bản đọc được bằng chữ | e2e `dashboard-upgrade.spec.ts` + kiểm tay |
+
 ## 3. Luồng E2E (Playwright)
 
 1. **Onboarding:** đăng nhập → cấu hình ngân hàng → tạo dịch vụ → tạo khách → tạo link portal.
@@ -101,6 +116,7 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
    khách thấy báo giá + QR đúng số tiền.
 4. **Version báo giá:** báo giá SENT → tạo version mới, sửa giá → gửi → portal hiển thị v2, v1 ở lịch sử.
 5. **Thu hồi link:** designer tạo link mới → session khách cũ bị 401 → link mới vào được.
+6. **Dashboard nâng cấp (P11, `dashboard-upgrade.spec.ts`):** tick task quá hạn từ lịch 7 ngày rồi Hoàn tác; mở TaskDrawer từ lịch; đổi kỳ tiền đã thu và copy nhắc thanh toán; widget dung lượng dẫn tới trang Dung lượng; ẩn checklist (bỏ qua nếu DB dev đã xong/đã ẩn); lưu giờ digest; không tràn ngang ở 390px.
 
 ## 4. Test cô lập Portal (bắt buộc, tự động sinh)
 
