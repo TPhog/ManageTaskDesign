@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ImageOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -8,9 +9,13 @@ import { formatBytes } from '@/lib/images'
 import { completedLabel, projectUsageLine } from './storage'
 import { useStorageProjects } from './useStorage'
 
+const SHOWN_PROJECTS = 10
+
 /** P10: usage per project, largest first; "Xem ảnh" filters the image list below. */
 export function StorageProjectsSection({ onSelect }: { onSelect: (projectId: string) => void }) {
   const { data, isLoading, isError } = useStorageProjects()
+  const [showAll, setShowAll] = useState(false)
+  const shown = showAll ? data : data?.slice(0, SHOWN_PROJECTS)
   return (
     <section aria-label="Dung lượng theo dự án" className="rounded-xl border bg-card shadow-card">
       <h2 className="border-b px-5 py-3 font-semibold text-foreground">Theo dự án</h2>
@@ -22,7 +27,7 @@ export function StorageProjectsSection({ onSelect }: { onSelect: (projectId: str
         <EmptyState icon={ImageOff} title="Chưa có ảnh nào" description="Ảnh công việc, tiến độ và ảnh khách gửi sẽ hiện ở đây." />
       ) : (
         <ul className="divide-y">
-          {data.map(p => (
+          {(shown ?? []).map(p => (
             <li key={p.projectId} className="flex flex-wrap items-center gap-3 px-5 py-3">
               <div className="min-w-0 flex-1 space-y-0.5">
                 <p className="truncate text-sm font-medium text-foreground">
@@ -42,6 +47,13 @@ export function StorageProjectsSection({ onSelect }: { onSelect: (projectId: str
             </li>
           ))}
         </ul>
+      )}
+      {data && !showAll && data.length > SHOWN_PROJECTS && (
+        <div className="border-t px-5 py-3">
+          <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => setShowAll(true)}>
+            {`Hiện thêm (${data.length - SHOWN_PROJECTS})`}
+          </Button>
+        </div>
       )}
     </section>
   )

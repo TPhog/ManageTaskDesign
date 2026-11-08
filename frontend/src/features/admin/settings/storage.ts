@@ -105,5 +105,6 @@ export function isCleanupStale(err: unknown): boolean {
 
 export function cleanupErrorMessage(err: unknown): string {
   if (isCleanupStale(err)) return 'Danh sách đã thay đổi, xem lại'
-  return imageErrorMessage(err)
+  const e = (err ?? {}) as { status?: number }
+  return e.status === 400 || e.status === 409 ? imageErrorMessage(err) : 'Không xoá được bản gốc. Vui lòng thử lại.'
 }

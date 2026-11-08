@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import type { OriginalCleanupPreview } from '@/lib/imageTypes'
 import { Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatBytes } from '@/lib/images'
-import { CLEANUP_MONTHS, DEFAULT_CLEANUP_MONTHS, cleanupErrorMessage, cleanupSummary, completedLabel, isCleanupStale } from './storage'
+import { CLEANUP_MONTHS, DEFAULT_CLEANUP_MONTHS, cleanupErrorMessage, cleanupSummary, completedLabel } from './storage'
 import { OriginalCleanupDialog } from './OriginalCleanupDialog'
 import { useOriginalCleanup, useOriginalCleanupPreview } from './useStorage'
 
@@ -13,28 +14,28 @@ const SHOWN_PROJECTS = 5
 /** P10 (BR-89): "Xoá bản gốc của dự án đã hoàn thành cũ hơn N tháng, giữ bản xem/thumbnail" — preview, confirm, never automatic. */
 export function OriginalCleanupSection() {
   const [months, setMonths] = useState<number>(DEFAULT_CLEANUP_MONTHS)
-  const [confirming, setConfirming] = useState(false)
+  // snapshot of the preview the designer is confirming: numbers under the ticked checkbox cannot change
+  const [confirming, setConfirming] = useState<OriginalCleanupPreview | null>(null)
   const preview = useOriginalCleanupPreview(months)
   const cleanup = useOriginalCleanup()
   const data = preview.data
 
   function run() {
-    if (!data) return
+    if (!confirming) return
     cleanup.mutate(
       {
-        olderThanMonths: months,
-        expectedImageCount: data.imageCount,
-        expectedFreedBytes: data.freedBytes,
-        expectedDigest: data.digest,
+        olderThanMonths: confirming.olderThanMonths,
+        expectedImageCount: confirming.imageCount,
+        expectedFreedBytes: confirming.freedBytes,
+        expectedDigest: confirming.digest,
       },
       {
         onSuccess: r => {
-          setConfirming(false)
+          setConfirming(null)
           toast.success(`Đã xoá ${r.imageCount} bản gốc, giải phóng ${formatBytes(r.freedBytes)}`)
         },
         onError: err => {
-          setConfirming(false)
-          if (isCleanupStale(err)) preview.refetch()
+          setConfirming(null)
           toast.error(cleanupErrorMessage(err))
         },
       },
@@ -79,15 +80,15 @@ export function OriginalCleanupSection() {
               )}
             </ul>
           )}
-          <Button type="button" variant="destructive" className="min-h-11" disabled={data.imageCount === 0}
-            onClick={() => setConfirming(true)}>
+          <Button type="button" variant="destructive" className="min-h-11" disabled={data.imageCount === 0 || preview.isFetching || cleanup.isPending}
+            onClick={() => setConfirming(data)}>
             <Trash2 aria-hidden="true" />
             Xoá bản gốc…
           </Button>
         </div>
       )}
-      {confirming && data && (
-        <OriginalCleanupDialog open onOpenChange={setConfirming} preview={data} pending={cleanup.isPending} onConfirm={run} />
+      {confirming && (
+        <OriginalCleanupDialog open onOpenChange={() => setConfirming(null)} preview={confirming} pending={cleanup.isPending} onConfirm={run} />
       )}
     </section>
   )

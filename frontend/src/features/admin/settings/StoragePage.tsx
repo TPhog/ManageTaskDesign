@@ -59,6 +59,12 @@ export default function StoragePage() {
     setSearch(new URLSearchParams(toStorageQuery({ ...params, page: 1, ...next })))
   }
 
+  function focusImageList() {
+    const el = document.getElementById('storage-image-list')
+    el?.scrollIntoView({ block: 'start' })
+    el?.focus({ preventScroll: true })
+  }
+
   function toggle(id: string) {
     setSelected(current => {
       const next = new Set(current)
@@ -105,7 +111,7 @@ export default function StoragePage() {
           : <p className="text-sm text-muted-foreground">Không tải được dung lượng.</p>}
       </section>
 
-      <StorageProjectsSection onSelect={projectId => update({ projectId })} />
+      <StorageProjectsSection onSelect={projectId => { update({ projectId }); focusImageList() }} />
       <OriginalCleanupSection />
 
       <section aria-label="Bộ lọc" className="space-y-4 rounded-xl border bg-card p-5 shadow-card">
@@ -151,7 +157,7 @@ export default function StoragePage() {
         </div>
       </section>
 
-      <section aria-label="Danh sách ảnh" className="rounded-xl border bg-card shadow-card">
+      <section id="storage-image-list" tabIndex={-1} aria-label="Danh sách ảnh" className="rounded-xl border bg-card shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-3">
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" className="h-4 w-4 accent-primary" checked={allOnPage} disabled={items.length === 0}

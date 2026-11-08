@@ -16,7 +16,7 @@ interface Props {
 export function OriginalCleanupDialog({ open, onOpenChange, preview, pending, onConfirm }: Props) {
   const [understood, setUnderstood] = useState(false)
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={next => { if (!pending) onOpenChange(next) }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{`Xoá bản gốc của ${preview.imageCount} ảnh?`}</DialogTitle>
@@ -32,8 +32,8 @@ export function OriginalCleanupDialog({ open, onOpenChange, preview, pending, on
           Tôi hiểu bản gốc sẽ bị xoá vĩnh viễn
         </label>
         <DialogFooter className="gap-2">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Huỷ</Button>
-          <Button type="button" variant="destructive" disabled={!understood || pending} onClick={onConfirm}>
+          <Button type="button" variant="outline" disabled={pending} onClick={() => onOpenChange(false)}>Huỷ</Button>
+          <Button type="button" variant="destructive" disabled={!understood || pending || preview.imageCount === 0} onClick={onConfirm}>
             {pending ? 'Đang xoá…' : 'Xoá vĩnh viễn bản gốc'}
           </Button>
         </DialogFooter>

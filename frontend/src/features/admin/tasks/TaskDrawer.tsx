@@ -18,6 +18,7 @@ import { api } from '@/lib/api'
 import { qk } from '@/lib/queryKeys'
 import type { ProjectDetail, TaskDetail } from '@/lib/types'
 import { TaskChecklist } from './TaskChecklist'
+import { useTaskImages } from '@/features/admin/images/useImages'
 import { TaskImages } from './TaskImages'
 import { TaskNotes } from './TaskNotes'
 import { TASK_PRIORITIES, TASK_STATUSES, taskPriorityLabel, taskStatusLabel } from './taskUtils'
@@ -121,6 +122,7 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
   const update = useUpdateTask(task.id)
   const remove = useDeleteTask()
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const imageCount = useTaskImages(task.id).data?.length ?? 0
 
   const { data: project } = useQuery({
     queryKey: qk.projects.detail(task.projectId),
@@ -231,13 +233,18 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
         {confirmDelete ? (
           <div className="space-y-1.5">
-            <p className="text-xs text-muted-foreground">Ảnh của công việc cũng bị xoá vĩnh viễn (trừ ảnh là chứng từ báo giá).</p>
+            {imageCount > 0 && (
+              <p id="task-delete-images-warning" className="text-xs text-muted-foreground">
+                {`${imageCount} ảnh của công việc cũng bị xoá vĩnh viễn (trừ ảnh là chứng từ báo giá).`}
+              </p>
+            )}
             <div className="flex items-center gap-2">
               <Button
                 type="button"
                 variant="destructive"
                 size="sm"
                 disabled={remove.isPending}
+                aria-describedby={imageCount > 0 ? 'task-delete-images-warning' : undefined}
                 onClick={() => remove.mutate(task.id, { onSuccess: onDeleted })}
               >
                 Xác nhận xoá

@@ -85,6 +85,6 @@ describe('original cleanup helpers', () => {
 
   it('explains a stale preview', () => {
     expect(cleanupErrorMessage({ status: 409, code: 'CONCURRENCY_CONFLICT' })).toBe('Danh sách đã thay đổi, xem lại')
-    expect(cleanupErrorMessage({ status: 500 })).toBe('Không tải được ảnh. Vui lòng thử lại.')
+    expect(cleanupErrorMessage({ status: 500 })).toBe('Không xoá được bản gốc. Vui lòng thử lại.')
   })
 })
