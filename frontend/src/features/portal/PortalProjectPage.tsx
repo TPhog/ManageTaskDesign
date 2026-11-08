@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/StatusBadge'
 import { EmptyState } from '@/components/EmptyState'
 import { api } from '@/lib/api'
-import { formatDate, formatDatetime } from '@/lib/format'
+import { formatDate } from '@/lib/format'
 import { qk } from '@/lib/queryKeys'
 import type { PagedResult } from '@/lib/types'
 import type { PortalProjectDetail, PortalTimelineItem } from '@/lib/portalTypes'
@@ -14,6 +14,7 @@ import { designTypeLabel, portalDeliverableStatus, portalProjectStatus } from '.
 import { ProgressBar } from './ProgressBar'
 import { DeliverableReview } from './DeliverableReview'
 import { deliveredText, progressOf, remainingRoundsText } from './progress'
+import { groupTimeline, timeOfDay } from './timeline'
 import { cn } from '@/lib/utils'
 import { PortalQuotationList } from './PortalQuotationList'
 import { PortalRequestList } from './PortalRequestList'
@@ -75,7 +76,7 @@ export default function PortalProjectPage() {
 
   return (
     <div className={cn('space-y-4', canRequest && 'pb-20')}>
-      <Link to="/portal" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link to="/portal" className="-ml-1 inline-flex min-h-11 items-center gap-1 px-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         Tất cả dự án
       </Link>
@@ -113,15 +114,25 @@ export default function PortalProjectPage() {
             <span className="text-muted-foreground">{deliveredText(project.deliverableSummary)}</span>
           </div>
           <ProgressBar summary={project.deliverableSummary} />
-          <div className="flex gap-4 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-emerald-500" aria-hidden="true" />
-              Đã bàn giao
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-teal-300" aria-hidden="true" />
-              Bạn đã duyệt
-            </span>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            {project.deliverableSummary.delivered > 0 && (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-600" aria-hidden="true" />
+                {project.deliverableSummary.delivered} đã bàn giao
+              </span>
+            )}
+            {project.deliverableSummary.approved > 0 && (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-sky-400" aria-hidden="true" />
+                {project.deliverableSummary.approved} bạn đã duyệt
+              </span>
+            )}
+            {project.deliverableSummary.inReview > 0 && (
+              <span className="inline-flex items-center gap-1.5 font-medium text-amber-800">
+                <span className="h-2 w-2 rounded-full border-2 border-amber-500" aria-hidden="true" />
+                {project.deliverableSummary.inReview} chờ bạn duyệt
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -137,7 +148,7 @@ export default function PortalProjectPage() {
                 <div className="min-w-0">
                   <p className="font-medium text-foreground">
                     {d.name}
-                    {d.quantity > 1 && <span className="font-normal text-muted-foreground"> × {d.quantity}</span>}
+                    {d.quantity > 1 && <span className="font-normal text-muted-foreground"> · Số lượng {d.quantity}</span>}
                   </p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {remainingRoundsText(d)}
@@ -149,6 +160,12 @@ export default function PortalProjectPage() {
               </li>
             ))}
           </ul>
+        )}
+        {project.deliverables.some(d => d.includedRounds > 0) && (
+          <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            Mỗi lần bạn gửi góp ý cho một hạng mục được tính là 1 lần sửa (dù có nhiều ý). Lỗi do nhà thiết kế thì không tính.
+            Hết lần sửa miễn phí, nhà thiết kế sẽ báo giá trước khi sửa tiếp.
+          </p>
         )}
       </section>
 
@@ -190,18 +207,21 @@ export default function PortalProjectPage() {
       </section>
 
       <section aria-labelledby="portal-brief" className={panelClass}>
-        <h2 id="portal-brief" className="text-sm font-semibold text-foreground">Brief</h2>
+        <h2 id="portal-brief" className="text-sm font-semibold text-foreground">Yêu cầu thiết kế (brief)</h2>
         {project.brief ? (
-          <details className="mt-2">
-            <summary className="cursor-pointer text-sm text-muted-foreground">
-              Phiên bản {project.brief.version} · xác nhận {formatDate(project.brief.confirmedAt)}
+          <details className="mt-1" open>
+            <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-primary">
+              Nội dung đã thống nhất · phiên bản {project.brief.version} · xác nhận {formatDate(project.brief.confirmedAt)}
             </summary>
-            <div className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-              {project.brief.content || 'Brief chưa có nội dung'}
+            <div className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
+              {project.brief.content || 'Chưa có nội dung'}
             </div>
+            {canRequest && (
+              <p className="mt-3 text-xs text-slate-600">Muốn đổi yêu cầu thiết kế? Bấm “Gửi yêu cầu chỉnh sửa”.</p>
+            )}
           </details>
         ) : (
-          <p className="mt-2 text-sm text-muted-foreground">Brief chưa được xác nhận.</p>
+          <p className="mt-2 text-sm text-muted-foreground">Nhà thiết kế chưa chốt yêu cầu thiết kế.</p>
         )}
       </section>
 
@@ -212,20 +232,35 @@ export default function PortalProjectPage() {
         ) : timeline.items.length === 0 ? (
           <p className="mt-2 text-sm text-muted-foreground">Chưa có cập nhật nào.</p>
         ) : (
-          <ol className="mt-4 space-y-4 border-l border-slate-200 pl-5">
-            {timeline.items.map((t, i) => (
-              <li key={`${t.occurredAt}-${i}`} className="relative">
-                <span
-                  className="absolute -left-[25.5px] top-1.5 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-white"
-                  aria-hidden="true"
-                />
-                <p className="text-sm text-foreground">{t.message}</p>
-                <time dateTime={t.occurredAt} className="text-xs text-muted-foreground">
-                  {formatDatetime(t.occurredAt)}
-                </time>
-              </li>
+          <div className="mt-4 space-y-5">
+            {groupTimeline(timeline.items).map(day => (
+              <div key={day.day}>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">{day.label}</h3>
+                <ol className="mt-2 space-y-3 border-l border-slate-200 pl-5">
+                  {day.items.map((t, i) => (
+                    <li key={`${t.occurredAt}-${i}`} className="relative">
+                      <span
+                        className={cn(
+                          'absolute -left-[25.5px] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-white',
+                          t.kind === 'MESSAGE' ? 'bg-amber-500' : 'bg-primary',
+                        )}
+                        aria-hidden="true"
+                      />
+                      {t.kind === 'MESSAGE' ? (
+                        <div className="rounded-lg bg-amber-50 px-3 py-2">
+                          <p className="text-xs font-medium text-amber-800">Nhà thiết kế nhắn</p>
+                          <p className="mt-0.5 whitespace-pre-wrap text-sm text-foreground">{t.message}</p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-foreground">{t.message}</p>
+                      )}
+                      <time dateTime={t.occurredAt} className="text-xs text-muted-foreground">{timeOfDay(t.occurredAt)}</time>
+                    </li>
+                  ))}
+                </ol>
+              </div>
             ))}
-          </ol>
+          </div>
         )}
       </section>
 

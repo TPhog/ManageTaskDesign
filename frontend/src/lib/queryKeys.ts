@@ -57,6 +57,7 @@ export const qk = {
 
   portal: {
     me:       ['portal', 'me']                                         as const,
+    studio:   ['portal', 'studio']                                     as const,
     projects: ['portal', 'projects']                                   as const,
     project:  (id: string) => ['portal', 'projects', id]               as const,
     timeline: (id: string) => ['portal', 'projects', id, 'timeline']   as const,

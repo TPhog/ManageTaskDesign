@@ -25,6 +25,8 @@ export interface PortalDeliverableSummary {
   total: number
   delivered: number
   approved: number
+  /** IN_REVIEW — waiting for the client (QA C-06) */
+  inReview: number
 }
 
 export interface PortalProjectListItem {
@@ -85,6 +87,8 @@ export interface PortalProjectDetail {
 export interface PortalTimelineItem {
   occurredAt: string
   message: string
+  /** MESSAGE = the designer's progress update, EVENT = an automatic status line (QA C-12) */
+  kind: 'MESSAGE' | 'EVENT'
 }
 
 /** GET /api/portal/quotations — every figure comes from the snapshot (BR-39); never DRAFT or SUPERSEDED. */
@@ -181,4 +185,11 @@ export interface PortalRevisions {
   deliverables: PortalDeliverableRevisions[]
   /** rounds not tied to a deliverable (never IN_QUOTA — BR-41) */
   projectRounds: PortalRound[]
+}
+
+/** GET /api/portal/studio — public, for pages without a portal session */
+export interface PortalStudio {
+  displayName: string
+  contactPhone: string | null
+  contactEmail: string | null
 }

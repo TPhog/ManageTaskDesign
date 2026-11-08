@@ -15,3 +15,8 @@ export function remainingRoundsText(d: { includedRounds: number; remainingRounds
     ? 'Không gồm lần sửa miễn phí'
     : `Còn ${d.remainingRounds}/${d.includedRounds} lần sửa miễn phí`
 }
+
+/** QA C-06/C-07: what waits for the client, e.g. '1 hạng mục chờ bạn duyệt'; '' when nothing does. */
+export function waitingText(s: PortalDeliverableSummary): string {
+  return s.inReview > 0 ? `${s.inReview} hạng mục chờ bạn duyệt` : ''
+}

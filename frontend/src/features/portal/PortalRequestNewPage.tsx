@@ -59,7 +59,7 @@ export default function PortalRequestNewPage() {
         <EmptyState
           icon={CircleCheck}
           title="Đã gửi yêu cầu"
-          description="Cảm ơn bạn! Designer sẽ xem và phản hồi sớm. Bạn theo dõi trạng thái trong mục Yêu cầu của tôi."
+          description="Cảm ơn bạn! Nhà thiết kế sẽ xem và phản hồi sớm. Bạn theo dõi trạng thái trong mục Yêu cầu của tôi."
           action={
             <div className="flex flex-wrap justify-center gap-2">
               <Button asChild>
@@ -91,7 +91,7 @@ export default function PortalRequestNewPage() {
           <EmptyState
             icon={FolderOpen}
             title="Chưa có dự án nhận yêu cầu"
-            description="Dự án đã hoàn thành hoặc đã huỷ không nhận yêu cầu mới. Vui lòng liên hệ trực tiếp designer."
+            description="Dự án đã hoàn thành hoặc đã huỷ không nhận yêu cầu mới. Vui lòng liên hệ trực tiếp nhà thiết kế."
           />
         </div>
       ) : (
@@ -141,7 +141,7 @@ export default function PortalRequestNewPage() {
               {...register('content')}
             />
             <p id="request-content-hint" className="text-xs text-muted-foreground">
-              Mỗi ý một dòng giúp designer xử lý nhanh hơn. Đính kèm ảnh sẽ có ở bản cập nhật sau.
+              Mỗi ý một dòng giúp nhà thiết kế xử lý nhanh hơn. Góp ý cho một hạng mục được tính là 1 lần sửa của hạng mục đó. Đính kèm ảnh sẽ có ở bản cập nhật sau.
             </p>
             {errors.content && (
               <p id="request-content-error" className="text-sm text-destructive">{errors.content.message}</p>

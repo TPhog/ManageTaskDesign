@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { CalendarDays, FolderOpen, Sparkles } from 'lucide-react'
+import { CalendarDays, Clock, FolderOpen, Sparkles } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/StatusBadge'
 import { EmptyState } from '@/components/EmptyState'
@@ -11,19 +11,23 @@ import { cn } from '@/lib/utils'
 import type { PortalProjectListItem } from '@/lib/portalTypes'
 import { designTypeLabel, portalProjectStatus } from './labels'
 import { ProgressBar } from './ProgressBar'
-import { deliveredText } from './progress'
+import { deliveredText, waitingText } from './progress'
 
 export default function PortalHomePage() {
-  const { data: projects, isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: qk.portal.projects,
     queryFn: () => api.get<PortalProjectListItem[]>('/portal/projects'),
   })
+  // QA C-06: projects that wait for the client come first; the rest keep the server's order
+  const projects = data
+    ? [...data].sort((a, b) => Number(b.deliverableSummary.inReview > 0) - Number(a.deliverableSummary.inReview > 0))
+    : undefined
 
   return (
     <div className="space-y-4">
       <div>
         <h1 className="text-xl font-semibold tracking-tight text-foreground">Dự án của bạn</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Theo dõi tiến độ và các hạng mục designer đang thực hiện.</p>
+        <p className="mt-1 text-sm text-slate-600">Theo dõi tiến độ và các hạng mục nhà thiết kế đang thực hiện.</p>
       </div>
 
       {isLoading ? (
@@ -37,12 +41,14 @@ export default function PortalHomePage() {
           <EmptyState
             icon={FolderOpen}
             title="Chưa có dự án nào"
-            description="Khi designer tạo dự án cho bạn, dự án sẽ hiện ở đây."
+            description="Khi nhà thiết kế tạo dự án cho bạn, dự án sẽ hiện ở đây."
           />
         </div>
       ) : (
         <ul className="space-y-3">
-          {projects.map(p => (
+          {projects.map(p => {
+            const waiting = waitingText(p.deliverableSummary)
+            return (
             <li key={p.id} className="relative">
               <Link
                 to={`/portal/projects/${p.id}`}
@@ -53,7 +59,8 @@ export default function PortalHomePage() {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate font-semibold text-foreground">{p.name}</p>
+                    {/* QA C-08: long names wrap to two lines instead of being cut */}
+                    <p className="line-clamp-2 font-semibold text-foreground">{p.name}</p>
                     <p className="mt-0.5 text-xs text-muted-foreground">{designTypeLabel[p.designType] ?? p.designType}</p>
                   </div>
                   <StatusBadge status={p.status} label={portalProjectStatus[p.status]} />
@@ -70,6 +77,12 @@ export default function PortalHomePage() {
                     )}
                   </div>
                 </div>
+                {waiting && (
+                  <p className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 ring-1 ring-inset ring-amber-200">
+                    <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+                    {waiting}
+                  </p>
+                )}
               </Link>
               {/* A sibling of the card link (links cannot nest), placed inside the card's bottom padding */}
               {p.hasOpenQuotation && (
@@ -83,7 +96,8 @@ export default function PortalHomePage() {
                 </Link>
               )}
             </li>
-          ))}
+            )
+          })}
         </ul>
       )}
     </div>

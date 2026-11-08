@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { Link2Off, Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'
 import { PortalMessage } from './PortalMessage'
+import { PublicStudioContact } from './StudioContact'
 import { sessionFailureKind, type PortalSessionFailure } from './errors'
 
 /** /p/:token — exchanges the magic-link token for a portal session (07-security §4.2). */
@@ -31,7 +32,8 @@ export default function PortalTokenPage() {
       <PortalMessage
         icon={Link2Off}
         title="Bạn thử lại sau 1 phút nhé"
-        description="Có quá nhiều lần thử mở link. Chờ một lát rồi mở lại link designer đã gửi."
+        description="Có quá nhiều lần thử mở link. Chờ một lát rồi mở lại link nhà thiết kế đã gửi."
+        action={<PublicStudioContact />}
       />
     )
   }
@@ -41,7 +43,8 @@ export default function PortalTokenPage() {
       <PortalMessage
         icon={Link2Off}
         title="Liên kết không hợp lệ hoặc đã hết hạn"
-        description="Vui lòng liên hệ designer để nhận link mới."
+        description="Vui lòng liên hệ nhà thiết kế để nhận link mới."
+        action={<PublicStudioContact />}
       />
     )
   }
