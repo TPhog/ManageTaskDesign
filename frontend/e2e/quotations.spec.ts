@@ -86,6 +86,32 @@ test.describe('Quotations', () => {
     await expect(page.getByTestId('qr-memo')).toHaveText(/^[A-Z]+\d{8} CONLAI$/)
   })
 
+  test('an older version shows SUPERSEDED without a reload once v2 is sent', async ({ page }) => {
+    const stamp = Date.now()
+    const svc = await createService(page, `E2E Ver ${stamp}`, 1_000_000)
+    const projectId = await createProject(page, `E2E Version ${stamp}`)
+    await addDeliverable(page, projectId, 'Logo', svc)
+
+    await page.goto(`/admin/projects/${projectId}`)
+    await page.getByRole('tab', { name: 'Báo giá' }).click()
+    await page.getByRole('button', { name: 'Tạo báo giá' }).first().click()
+    await page.getByRole('dialog', { name: 'Tạo báo giá' }).getByRole('button', { name: 'Tạo nháp' }).click()
+    await expectToast(page, 'Đã tạo báo giá nháp')
+    await sendFromEditor(page)
+    await expect(page.getByRole('button', { name: 'Đánh dấu đã chấp nhận' })).toBeVisible()
+
+    // v1 (SENT, now cached) → new version → send v2
+    await page.getByRole('button', { name: 'Tạo version mới' }).click()
+    await expect(page.getByRole('heading', { name: 'Soạn báo giá' })).toBeVisible()
+    await sendFromEditor(page)
+
+    // back to the cached v1 page (SPA navigation, no reload): must be refreshed, not stale SENT
+    await page.goBack()
+    await expect(page.getByText('Đã thay thế').first()).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Đánh dấu đã chấp nhận' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Tạo version mới' })).toHaveCount(0)
+  })
+
   test('quotes only the selected finished deliverables with its own QR', async ({ page }) => {
     const stamp = Date.now()
     const logo = await createService(page, `E2E Logo ${stamp}`, 2_000_000)

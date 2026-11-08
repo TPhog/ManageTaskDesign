@@ -121,6 +121,7 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
   async function saveAndSend() {
     try {
       const saved = await update.mutateAsync(body())
+      adopt(saved)   // keep new rows' ids even if the send below fails
       const sent = await command.mutateAsync({ action: 'send', body: { rowVersion: saved.rowVersion } })
       toast.success(`Đã gửi báo giá ${sent.number}`)
     } catch (err) {

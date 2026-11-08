@@ -25,8 +25,10 @@ function useOnQuotationChanged() {
   const qc = useQueryClient()
   return (detail?: QuotationDetail) => {
     if (detail) qc.setQueryData(qk.quotations.detail(detail.id), detail)
+    // Other versions' details (SENT → SUPERSEDED, draft links…) go stale too; only the just-seeded detail is fresh.
     qc.invalidateQueries({
-      predicate: q => q.queryKey[0] === 'quotations' && (q.queryKey[1] === 'list' || q.queryKey[1] === 'search'),
+      queryKey: qk.quotations.all,
+      predicate: q => !detail || q.queryKey[1] !== detail.id,
     })
     qc.invalidateQueries({ queryKey: qk.projects.all })
   }
@@ -72,10 +74,14 @@ export function useUpdateQuotation(id: string) {
 }
 
 export function useDeleteQuotation(id: string) {
+  const qc = useQueryClient()
   const changed = useOnQuotationChanged()
   return useMutation({
     mutationFn: () => api.delete<void>(`/admin/quotations/${id}`),
-    onSuccess: () => changed(),
+    onSuccess: () => {
+      qc.removeQueries({ queryKey: qk.quotations.detail(id) })   // gone: don't refetch a 404
+      changed()
+    },
   })
 }
 

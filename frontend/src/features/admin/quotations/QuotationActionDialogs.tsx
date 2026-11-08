@@ -31,13 +31,18 @@ export function AcceptDialog({ quotation, open, onClose }: DialogProps) {
   const [date, setDate] = useState(todayVn())
   const [note, setNote] = useState('')
 
+  function close() {
+    setNote('')
+    onClose()
+  }
+
   function submit() {
     command.mutate(
       { action: 'accept', body: { acceptedAt: date, note: note.trim() || null, rowVersion: quotation.rowVersion } },
       {
         onSuccess: () => {
           toast.success('Đã đánh dấu chấp nhận')
-          onClose()
+          close()
         },
         onError: failed,
       },
@@ -45,7 +50,7 @@ export function AcceptDialog({ quotation, open, onClose }: DialogProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
+    <Dialog open={open} onOpenChange={v => { if (!v) close() }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Đánh dấu đã chấp nhận</DialogTitle>
@@ -62,7 +67,7 @@ export function AcceptDialog({ quotation, open, onClose }: DialogProps) {
           </div>
         </div>
         <DialogFooter className="gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>Huỷ</Button>
+          <Button type="button" variant="outline" onClick={close}>Huỷ</Button>
           <Button type="button" disabled={!date || command.isPending} onClick={submit}>Xác nhận</Button>
         </DialogFooter>
       </DialogContent>
@@ -76,13 +81,18 @@ export function RejectDialog({ quotation, open, onClose }: DialogProps) {
   const [date, setDate] = useState(todayVn())
   const [reason, setReason] = useState('')
 
+  function close() {
+    setReason('')
+    onClose()
+  }
+
   function submit() {
     command.mutate(
       { action: 'reject', body: { rejectedAt: date, reason: reason.trim(), rowVersion: quotation.rowVersion } },
       {
         onSuccess: () => {
           toast.success('Đã ghi nhận từ chối')
-          onClose()
+          close()
         },
         onError: failed,
       },
@@ -90,7 +100,7 @@ export function RejectDialog({ quotation, open, onClose }: DialogProps) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
+    <Dialog open={open} onOpenChange={v => { if (!v) close() }}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Từ chối báo giá</DialogTitle>
@@ -107,7 +117,7 @@ export function RejectDialog({ quotation, open, onClose }: DialogProps) {
           </div>
         </div>
         <DialogFooter className="gap-2">
-          <Button type="button" variant="outline" onClick={onClose}>Huỷ</Button>
+          <Button type="button" variant="outline" onClick={close}>Huỷ</Button>
           <Button type="button" variant="destructive" disabled={!reason.trim() || command.isPending} onClick={submit}>Từ chối</Button>
         </DialogFooter>
       </DialogContent>
