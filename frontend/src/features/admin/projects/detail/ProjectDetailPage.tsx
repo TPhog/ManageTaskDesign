@@ -21,6 +21,9 @@ import { DeliverablesTab } from './DeliverablesTab'
 import { TasksTab } from './TasksTab'
 import { RevisionsTab } from './RevisionsTab'
 import { ProgressUpdateCard } from './ProgressUpdateCard'
+import { FlowStepper } from './FlowStepper'
+import { NextStepCard } from './NextStepCard'
+import { useProjectFlow } from '@/features/admin/flow/useFlow'
 import type { ProjectDetail, ProjectStatus } from '@/lib/types'
 
 const designTypeLabel: Record<string, string> = {
@@ -65,8 +68,10 @@ function InfoItem({ label, value }: { label: string; value: string }) {
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
-  // ?tab=tasks deep-links into a tab (used by the all-tasks page)
-  const [searchParams] = useSearchParams()
+  // ?tab=… deep-links into a tab (all-tasks page, NextStepCard links) and follows tab clicks
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = searchParams.get('tab') ?? 'overview'
+  const flow = useProjectFlow(id)
 
   const { data: project, isLoading, error } = useQuery({
     queryKey: ['projects', id],
@@ -173,8 +178,20 @@ export default function ProjectDetailPage() {
         </div>
       </div>
 
+      {flow.data && <FlowStepper flow={flow.data} />}
+      <NextStepCard project={project} flow={flow.data} isLoading={flow.isLoading} isError={flow.isError} />
+
       {/* tabs */}
-      <Tabs defaultValue={searchParams.get('tab') ?? 'overview'}>
+      <Tabs
+        value={tab}
+        onValueChange={value =>
+          setSearchParams(prev => {
+            const next = new URLSearchParams(prev)
+            next.set('tab', value)
+            return next
+          }, { replace: true })
+        }
+      >
         <TabsList className="h-auto w-full justify-start overflow-x-auto sm:w-auto">
           <TabsTrigger value="overview">Tổng quan</TabsTrigger>
           <TabsTrigger value="deliverables">Deliverables ({project.deliverables.length})</TabsTrigger>

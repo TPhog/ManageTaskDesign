@@ -1,7 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { MoreHorizontal, Package, Pencil, Plus } from 'lucide-react'
-import { toast } from 'sonner'
+import { CheckCircle2, MoreHorizontal, Package, Pencil, Plus, Send, Truck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -12,9 +10,9 @@ import {
 import { EmptyState } from '@/components/EmptyState'
 import { QuotaMeter } from '@/components/QuotaMeter'
 import { StatusBadge } from '@/components/StatusBadge'
-import { api, type ApiError } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 import type { Deliverable, DeliverableStatus, ProjectDetail } from '@/lib/types'
+import { useConfirmApproval, useDeliverableStatus, useSubmitReview } from '@/features/admin/flow/useFlow'
 import { DeliverableDialog } from './DeliverableDialog'
 
 // Mirrors Deliverable.ValidateStatusTransition in the backend domain
@@ -32,25 +30,19 @@ const transitions: Record<DeliverableStatus, { to: DeliverableStatus; label: str
 }
 
 export function DeliverablesTab({ project }: { project: ProjectDetail }) {
-  const qc = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<Deliverable | null>(null)
+  const submitReview = useSubmitReview()
+  const confirmApproval = useConfirmApproval()
+  const statusMutation = useDeliverableStatus()
+  const busy = submitReview.isPending || confirmApproval.isPending || statusMutation.isPending
 
-  const statusMutation = useMutation({
-    mutationFn: ({ id, to }: { id: string; to: DeliverableStatus }) =>
-      api.post(`/admin/deliverables/${id}/status`, { to }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['projects', project.id] })
-      qc.invalidateQueries({ queryKey: ['revisions'] })
-      toast.success('Đã cập nhật trạng thái')
-    },
-    onError: (err: ApiError) =>
-      toast.error(
-        err.code === 'INVALID_TRANSITION'
-          ? 'Chuyển trạng thái không hợp lệ'
-          : (err.detail ?? 'Không thể cập nhật trạng thái'),
-      ),
-  })
+  /** IN_REVIEW goes through submit-review (client message), APPROVED through confirm-approval (clears the portal decision). */
+  function changeStatus(d: Deliverable, to: DeliverableStatus) {
+    if (to === 'IN_REVIEW') submitReview.mutate({ deliverableId: d.id })
+    else if (to === 'APPROVED') confirmApproval.mutate(d.id)
+    else statusMutation.mutate({ deliverableId: d.id, to })
+  }
 
   function openCreate() {
     setEditing(null)
@@ -85,16 +77,76 @@ export function DeliverablesTab({ project }: { project: ProjectDetail }) {
         <ul className="divide-y">
           {items.map(d => {
             const next = transitions[d.status] ?? []
+            const approvedOnPortal = d.status === 'IN_REVIEW' && d.clientDecision === 'APPROVED'
             return (
               <li key={d.id} className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-4">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-foreground">{d.name}</p>
                   <p className="text-xs text-muted-foreground">Số lượng: {d.quantity}</p>
+                  {d.progressPercent !== null && d.progressPercent !== undefined && (
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <div
+                        role="progressbar"
+                        aria-label={`Tiến độ công việc ${d.name}`}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={d.progressPercent}
+                        className="h-1.5 w-28 overflow-hidden rounded-full bg-muted"
+                      >
+                        <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${d.progressPercent}%` }} />
+                      </div>
+                      <span className="text-xs tabular-nums text-muted-foreground">
+                        {d.taskDone}/{d.taskTotal} việc · {d.progressPercent}%
+                      </span>
+                    </div>
+                  )}
+                  {approvedOnPortal && (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700 ring-1 ring-inset ring-teal-200">
+                        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        Khách đã duyệt trên portal
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7"
+                        aria-label={`Xác nhận duyệt ${d.name}`}
+                        disabled={busy}
+                        onClick={() => confirmApproval.mutate(d.id)}
+                      >
+                        Xác nhận
+                      </Button>
+                    </div>
+                  )}
                 </div>
                 <div className="w-full sm:w-40">
                   <QuotaMeter used={d.usedRounds} total={d.includedRounds} label="vòng" />
                 </div>
                 <div className="flex items-center justify-between gap-3 sm:justify-end">
+                  {d.status === 'IN_PROGRESS' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      aria-label={`Gửi duyệt ${d.name}`}
+                      disabled={busy}
+                      onClick={() => submitReview.mutate({ deliverableId: d.id })}
+                    >
+                      <Send aria-hidden="true" />
+                      Gửi duyệt
+                    </Button>
+                  )}
+                  {d.status === 'APPROVED' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      aria-label={`Bàn giao ${d.name}`}
+                      disabled={busy}
+                      onClick={() => statusMutation.mutate({ deliverableId: d.id, to: 'DELIVERED' })}
+                    >
+                      <Truck aria-hidden="true" />
+                      Bàn giao
+                    </Button>
+                  )}
                   <StatusBadge status={d.status} />
                   <span className="w-24 text-right text-xs tabular-nums text-muted-foreground">{formatDate(d.dueDate)}</span>
                   <div className="flex items-center">
@@ -113,7 +165,7 @@ export function DeliverablesTab({ project }: { project: ProjectDetail }) {
                             variant="ghost"
                             size="icon"
                             aria-label={`Đổi trạng thái ${d.name}`}
-                            disabled={statusMutation.isPending}
+                            disabled={busy}
                           >
                             <MoreHorizontal aria-hidden="true" />
                           </Button>
@@ -123,7 +175,7 @@ export function DeliverablesTab({ project }: { project: ProjectDetail }) {
                             <DropdownMenuItem
                               key={t.to}
                               className={t.to === 'CANCELLED' ? 'text-red-700 focus:text-red-700' : undefined}
-                              onClick={() => statusMutation.mutate({ id: d.id, to: t.to })}
+                              onClick={() => changeStatus(d, t.to)}
                             >
                               {t.label}
                             </DropdownMenuItem>
