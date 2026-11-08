@@ -36,6 +36,7 @@ function onTaskSaved(qc: QueryClient, task: TaskDetail | undefined) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: qk.tasks.lists }),
     qc.invalidateQueries({ queryKey: qk.projects.all }),
+    qc.invalidateQueries({ queryKey: qk.dashboard }),
   ])
 }
 
@@ -130,6 +131,7 @@ export function useDeleteTask() {
       toast.success('Đã xoá công việc')
       // task counts drive project progress and the SUBMIT_REVIEW flow action
       qc.invalidateQueries({ queryKey: qk.projects.all })
+      qc.invalidateQueries({ queryKey: qk.dashboard })
       return qc.invalidateQueries({ queryKey: qk.tasks.lists })
     },
     onError: (err: ApiError) => toast.error(errorText(err, 'Không thể xoá công việc')),
@@ -199,6 +201,7 @@ export function useTaskNoteMutations(taskId: string) {
       qc.invalidateQueries({ queryKey: qk.tasks.notes(taskId) }),
       qc.invalidateQueries({ queryKey: qk.tasks.detail(taskId) }),
       qc.invalidateQueries({ queryKey: qk.tasks.lists }),
+      qc.invalidateQueries({ queryKey: qk.dashboard }),
     ])
   const onError = (err: ApiError) => toast.error(errorText(err, 'Không thể lưu ghi chú'))
 

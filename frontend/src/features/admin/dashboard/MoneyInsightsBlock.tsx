@@ -92,14 +92,16 @@ function ReceivableRow({ item }: { item: ReceivableItem }) {
 }
 
 /** Presentational: collected money vs the previous period, plus the real receivables list. */
-export function MoneyInsightsView({ insights, period, onPeriodChange }: {
+export function MoneyInsightsView({ insights, period, onPeriodChange, loading = false }: {
   insights: MoneyInsights
   period: MoneyPeriod
   onPeriodChange: (p: MoneyPeriod) => void
+  /** The shown numbers belong to the previous period while the new one loads. */
+  loading?: boolean
 }) {
   const { collected, accepted, receivables } = insights
   return (
-    <div className="space-y-5">
+    <div aria-busy={loading} className={cn('space-y-5 transition-opacity', loading && 'opacity-50')}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div role="group" aria-label="Kỳ báo cáo" className="inline-flex rounded-lg border p-0.5">
           {PERIODS.map(p => (
@@ -199,7 +201,7 @@ export function MoneyInsightsView({ insights, period, onPeriodChange }: {
 
 export function MoneyInsightsBlock() {
   const [period, setPeriod] = useState<MoneyPeriod>('month')
-  const { data, isLoading, error, refetch } = useMoneyInsights(period)
+  const { data, isLoading, isPlaceholderData, error, refetch } = useMoneyInsights(period)
   return (
     <Section title="Tiền đã thu và công nợ" icon={Wallet}>
       {isLoading ? (
@@ -214,7 +216,7 @@ export function MoneyInsightsBlock() {
           <Button variant="link" className="px-0" onClick={() => refetch()}>Thử lại</Button>
         </div>
       ) : (
-        <MoneyInsightsView insights={data} period={period} onPeriodChange={setPeriod} />
+        <MoneyInsightsView insights={data} period={period} onPeriodChange={setPeriod} loading={isPlaceholderData} />
       )}
     </Section>
   )

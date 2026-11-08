@@ -77,6 +77,8 @@ export default function DashboardPage() {
     <div className="space-y-6">
       <PageHeader title="Tổng quan" description="Lịch tuần này, sức khỏe dự án, tiền thu và hoạt động của khách." />
 
+      <SetupChecklistCard />
+
       {isLoading ? (
         <div className="space-y-6">
           <Skeleton className="h-64 w-full rounded-xl" />
@@ -91,66 +93,66 @@ export default function DashboardPage() {
           <Button variant="link" className="px-0" onClick={() => refetch()}>Thử lại</Button>
         </div>
       ) : (
-        <div className="space-y-6">
-          <SetupChecklistCard />
-          <FlowTodoBlock summary={data.actionRequired} />
-          <ScheduleBlock />
+        <FlowTodoBlock summary={data.actionRequired} />
+      )}
 
-          <div className="grid gap-6 lg:grid-cols-2">
-            <Section title="Dự án" icon={FolderKanban}>
+      <ScheduleBlock />
+
+      {data && !isLoading && !error && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          <Section title="Dự án" icon={FolderKanban}>
+            <div className="grid grid-cols-2 gap-3">
+              <StatTile to={dashboardLinks.inProgress} label="Đang làm" value={data.projects.inProgress} testId="dsh-inProgress" />
+              <StatTile to={dashboardLinks.onHold} label="Tạm dừng" value={data.projects.onHold} testId="dsh-onHold" />
+            </div>
+            <div className="space-y-2">
+              <h3 className="text-sm font-medium text-foreground">Deadline trong 7 ngày</h3>
+              {data.projects.dueIn7Days.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Không có dự án nào đến hạn trong 7 ngày tới.</p>
+              ) : (
+                <ul data-testid="dsh-dueIn7Days" className="divide-y">
+                  {data.projects.dueIn7Days.map(p => (
+                    <li key={p.id}>
+                      <Link
+                        to={`/admin/projects/${p.id}`}
+                        className="flex items-center justify-between gap-3 rounded-md py-2 text-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate font-medium text-foreground">{p.name}</span>
+                          <span className="block truncate text-xs text-muted-foreground">{p.clientName}</span>
+                        </span>
+                        <span className="flex shrink-0 flex-col items-end gap-1">
+                          <span className="tabular-nums text-foreground">{formatDate(p.dueDate)}</span>
+                          <StatusBadge status={p.status} />
+                        </span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </Section>
+
+          <Section title="Tiền" icon={FileText}>
+            <div className="grid gap-3">
+              <StatTile to={dashboardLinks.outstanding} label="Đang chờ thu" value={<MoneyText amount={data.money.outstanding} />} testId="dsh-outstanding" />
               <div className="grid grid-cols-2 gap-3">
-                <StatTile to={dashboardLinks.inProgress} label="Đang làm" value={data.projects.inProgress} testId="dsh-inProgress" />
-                <StatTile to={dashboardLinks.onHold} label="Tạm dừng" value={data.projects.onHold} testId="dsh-onHold" />
+                <StatTile to={dashboardLinks.acceptedThisMonth} label="Đã chốt tháng này" value={<MoneyText amount={data.money.acceptedThisMonth} />} testId="dsh-acceptedThisMonth" />
+                <StatTile to={dashboardLinks.additionalThisMonth} label="Phát sinh tháng này" value={<MoneyText amount={data.money.additionalThisMonth} />} testId="dsh-additionalThisMonth" />
               </div>
-              <div className="space-y-2">
-                <h3 className="text-sm font-medium text-foreground">Deadline trong 7 ngày</h3>
-                {data.projects.dueIn7Days.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">Không có dự án nào đến hạn trong 7 ngày tới.</p>
-                ) : (
-                  <ul data-testid="dsh-dueIn7Days" className="divide-y">
-                    {data.projects.dueIn7Days.map(p => (
-                      <li key={p.id}>
-                        <Link
-                          to={`/admin/projects/${p.id}`}
-                          className="flex items-center justify-between gap-3 rounded-md py-2 text-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        >
-                          <span className="min-w-0">
-                            <span className="block truncate font-medium text-foreground">{p.name}</span>
-                            <span className="block truncate text-xs text-muted-foreground">{p.clientName}</span>
-                          </span>
-                          <span className="flex shrink-0 flex-col items-end gap-1">
-                            <span className="tabular-nums text-foreground">{formatDate(p.dueDate)}</span>
-                            <StatusBadge status={p.status} />
-                          </span>
-                        </Link>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </Section>
-
-            <Section title="Tiền" icon={FileText}>
-              <div className="grid gap-3">
-                <StatTile to={dashboardLinks.outstanding} label="Đang chờ thu" value={<MoneyText amount={data.money.outstanding} />} testId="dsh-outstanding" />
-                <div className="grid grid-cols-2 gap-3">
-                  <StatTile to={dashboardLinks.acceptedThisMonth} label="Đã chốt tháng này" value={<MoneyText amount={data.money.acceptedThisMonth} />} testId="dsh-acceptedThisMonth" />
-                  <StatTile to={dashboardLinks.additionalThisMonth} label="Phát sinh tháng này" value={<MoneyText amount={data.money.additionalThisMonth} />} testId="dsh-additionalThisMonth" />
-                </div>
-              </div>
-              <AcceptedChart data={data.acceptedByMonth} />
-            </Section>
-          </div>
-
-          <ProjectHealthBlock />
-          <MoneyInsightsBlock />
-
-          <div className="grid gap-6 lg:grid-cols-2">
-            <ClientActivityBlock />
-            <StorageWidget />
-          </div>
+            </div>
+            <AcceptedChart data={data.acceptedByMonth} />
+          </Section>
         </div>
       )}
+
+      <ProjectHealthBlock />
+      <MoneyInsightsBlock />
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <ClientActivityBlock />
+        <StorageWidget />
+      </div>
     </div>
   )
 }

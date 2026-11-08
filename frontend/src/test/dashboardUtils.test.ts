@@ -1,6 +1,6 @@
 import {
   DASHBOARD_FLOW_LIMIT, barPercent, dashboardLinks, dayHeading, monthLabel, projectsNeedingAction, removeTaskFromSchedule,
-  scheduleIsEmpty, deadlineLabel, deltaLabel, receivableReminder,
+  restoreTaskInSchedule, scheduleIsEmpty, deadlineLabel, deltaLabel, receivableReminder,
 } from '@/features/admin/dashboard/dashboardUtils'
 import type { DashboardSchedule, ReceivableItem, ScheduleTask } from '@/lib/dashboardTypes'
 import type { FlowAction, FlowActionKind, FlowProjectActions, FlowWarning } from '@/lib/flowTypes'
@@ -132,5 +132,20 @@ describe('receivableReminder', () => {
     const base = { clientName: 'Chị Lan', projectName: 'Logo ABC', number: 'BG-2030-0003', version: 1, depositPercent: 50, depositAmount: 5_000_000, outstanding: 10_000_000 }
     expect(receivableReminder({ ...base, paymentStatus: 'UNPAID' } as ReceivableItem)).toContain('tiền cọc')
     expect(receivableReminder({ ...base, paymentStatus: 'DEPOSIT_PAID', outstanding: 5_000_000 } as ReceivableItem)).toContain('số tiền còn lại')
+  })
+})
+
+describe('restoreTaskInSchedule', () => {
+  it('puts a removed overdue task back and counts it again', () => {
+    const removed = removeTaskFromSchedule(schedule(), 'a')
+    const back = restoreTaskInSchedule(removed, task('a', '2030-05-10'))
+    expect(back.overdue.items.map(t => t.id)).toEqual(['a', 'b'])
+    expect(back.overdue.total).toBe(2)
+  })
+  it('puts a removed day task back on its day, only once', () => {
+    const removed = removeTaskFromSchedule(schedule(), 'c')
+    const back = restoreTaskInSchedule(removed, task('c', '2030-05-15'))
+    expect(back.days[0].tasks.map(t => t.id)).toEqual(['c'])
+    expect(restoreTaskInSchedule(back, task('c', '2030-05-15'))).toBe(back)
   })
 })

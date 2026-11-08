@@ -27,8 +27,8 @@ const insights = (over: Partial<MoneyInsights['receivables']> = {}): MoneyInsigh
   },
 })
 
-const renderView = (data: MoneyInsights, onPeriodChange = vi.fn()) =>
-  render(<MemoryRouter><MoneyInsightsView insights={data} period="month" onPeriodChange={onPeriodChange} /></MemoryRouter>)
+const renderView = (data: MoneyInsights, onPeriodChange = vi.fn(), loading = false) =>
+  render(<MemoryRouter><MoneyInsightsView insights={data} period="month" onPeriodChange={onPeriodChange} loading={loading} /></MemoryRouter>)
 
 describe('MoneyInsightsView', () => {
   it('shows collected money with its comparison and the period caption', () => {
@@ -37,6 +37,11 @@ describe('MoneyInsightsView', () => {
     expect(screen.getByTestId('dsh-collected-delta')).toHaveTextContent('+50,0% so với cùng kỳ trước')
     expect(screen.getByText('Cọc / Phần còn lại')).toBeInTheDocument()
     expect(screen.getByText(/01\/05\/2030/)).toHaveTextContent('15/05/2030')
+  })
+
+  it('marks the block busy while the next period loads', () => {
+    const { container } = renderView(insights(), vi.fn(), true)
+    expect(container.firstElementChild).toHaveAttribute('aria-busy', 'true')
   })
 
   it('switches the period', async () => {

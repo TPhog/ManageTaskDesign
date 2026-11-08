@@ -1,4 +1,4 @@
-import type { DashboardSchedule, HealthRisk, MoneyPeriod, ReceivableItem } from '@/lib/dashboardTypes'
+import type { DashboardSchedule, ScheduleTask, HealthRisk, MoneyPeriod, ReceivableItem } from '@/lib/dashboardTypes'
 import { paymentReminderMessage } from '@/lib/messageTemplates'
 import type { FlowProjectActions } from '@/lib/flowTypes'
 
@@ -78,6 +78,20 @@ export function removeTaskFromSchedule(s: DashboardSchedule, taskId: string): Da
       ? { total: Math.max(0, s.overdue.total - 1), items: s.overdue.items.filter(t => t.id !== taskId) }
       : s.overdue,
     days: s.days.map(day => (day.tasks.some(t => t.id === taskId) ? { ...day, tasks: day.tasks.filter(t => t.id !== taskId) } : day)),
+  }
+}
+
+/** Undo of removeTaskFromSchedule for one task (failed tick): puts it back in overdue or in its day. */
+export function restoreTaskInSchedule(s: DashboardSchedule, task: ScheduleTask): DashboardSchedule {
+  const present = s.overdue.items.some(t => t.id === task.id) || s.days.some(d => d.tasks.some(t => t.id === task.id))
+  if (present) return s
+  if (task.dueDate < s.today) {
+    const items = [...s.overdue.items, task].sort((a, b) => a.dueDate.localeCompare(b.dueDate))
+    return { ...s, overdue: { total: s.overdue.total + 1, items } }
+  }
+  return {
+    ...s,
+    days: s.days.map(d => (d.date === task.dueDate ? { ...d, tasks: [...d.tasks, task].sort((a, b) => a.sortOrder - b.sortOrder) } : d)),
   }
 }
 

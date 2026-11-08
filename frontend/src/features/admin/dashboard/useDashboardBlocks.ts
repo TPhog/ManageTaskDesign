@@ -7,7 +7,7 @@ import type {
 import { qk } from '@/lib/queryKeys'
 import type { TaskDetail } from '@/lib/types'
 import { useMoveTask } from '@/features/admin/tasks/useTasks'
-import { removeTaskFromSchedule } from './dashboardUtils'
+import { removeTaskFromSchedule, restoreTaskInSchedule } from './dashboardUtils'
 
 /** All dashboard blocks use staleTime 0 like useDashboard: they summarise other pages, refetch on each visit. */
 export function useDashboardSchedule() {
@@ -27,12 +27,11 @@ export function useCompleteScheduleTask() {
       api.post<TaskDetail>(`/admin/tasks/${task.id}/move`, { status: 'DONE', sortOrder: task.sortOrder }),
     onMutate: async ({ task }) => {
       await qc.cancelQueries({ queryKey: qk.dashboardBlocks.schedule })
-      const snapshot = qc.getQueryData<DashboardSchedule>(qk.dashboardBlocks.schedule)
-      if (snapshot) qc.setQueryData(qk.dashboardBlocks.schedule, removeTaskFromSchedule(snapshot, task.id))
-      return { snapshot }
+      qc.setQueryData<DashboardSchedule>(qk.dashboardBlocks.schedule, prev => prev && removeTaskFromSchedule(prev, task.id))
     },
-    onError: (_err: ApiError, _vars, ctx) => {
-      if (ctx?.snapshot) qc.setQueryData(qk.dashboardBlocks.schedule, ctx.snapshot)
+    // Put back only this task: another tick may be in flight and must stay removed
+    onError: (_err: ApiError, { task }) => {
+      qc.setQueryData<DashboardSchedule>(qk.dashboardBlocks.schedule, prev => prev && restoreTaskInSchedule(prev, task))
       toast.error('Không thể đánh dấu xong công việc')
     },
     onSuccess: (_data, { task }) => {
@@ -67,6 +66,7 @@ export function useDismissSetup() {
     onSuccess: () => {
       qc.setQueryData<SetupChecklist>(qk.dashboardBlocks.setup, prev => prev && { ...prev, dismissed: true })
     },
+    onError: () => toast.error('Không thể ẩn hướng dẫn, thử lại sau'),
   })
 }
 

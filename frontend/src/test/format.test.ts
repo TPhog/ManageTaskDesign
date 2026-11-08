@@ -18,4 +18,9 @@ describe('formatDate', () => {
   it('formats ISO date string as dd/MM/yyyy', () => {
     expect(formatDate('2026-11-07T00:00:00Z')).toBe('07/11/2026')
   })
+
+  it('keeps a date-only string on its calendar day in any timezone', () => {
+    expect(formatDate('2026-11-07')).toBe('07/11/2026')
+    expect(formatDate('2030-01-01')).toBe('01/01/2030')
+  })
 })
