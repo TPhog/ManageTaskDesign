@@ -26,6 +26,8 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: false,
+    // dev server reached through the designer's tunnel domain
+    allowedHosts: ['cam.akers.date'],
     proxy: {
       '/api': 'http://localhost:5261',
     },
