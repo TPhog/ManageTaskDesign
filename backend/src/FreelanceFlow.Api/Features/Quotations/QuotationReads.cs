@@ -1,6 +1,7 @@
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Quotations;
+using FreelanceFlow.Api.Domain.Requests;
 using FreelanceFlow.Api.Infrastructure.VietQr;
 using Microsoft.EntityFrameworkCore;
 
@@ -100,6 +101,20 @@ internal static class QuotationReads
 
         var snapshot = q.Snapshot is null ? null : QuotationSnapshot.FromJson(q.Snapshot);
 
+        var newDeliverables = await (
+                from r in db.RevisionItems.AsNoTracking()
+                join line in db.QuotationItems.AsNoTracking() on r.QuotationItemId equals (Guid?)line.Id
+                join s in db.Services.AsNoTracking() on r.ServiceId equals (Guid?)s.Id into ss
+                from s in ss.DefaultIfEmpty()
+                join d in db.Deliverables.AsNoTracking() on r.CreatedDeliverableId equals (Guid?)d.Id into ds
+                from d in ds.DefaultIfEmpty()
+                where line.QuotationId == id && r.Type == RevisionItemTypes.NewDeliverable
+                      && r.WorkStatus != RevisionWorkStatuses.Cancelled
+                orderby line.SortOrder, r.SortOrder
+                select new QuotationNewDeliverableDto(r.Id, line.Id, line.Description, r.ServiceId,
+                    s == null ? null : s.Name, r.CreatedDeliverableId, d == null ? null : d.Name))
+            .ToListAsync();
+
         return new QuotationDetailDto(
             q.Id, q.ProjectId, names.ProjectName, names.ClientName,
             q.Kind, q.Number, q.Version, q.PreviousVersionId,
@@ -110,6 +125,6 @@ internal static class QuotationReads
             q.IssueDate, q.ExpiryDate, q.SentAt,
             q.AcceptedAt, q.AcceptedNote, q.RejectedAt, q.RejectedReason,
             q.DepositPaidAt, q.PaidAt,
-            items, snapshot, QrOptions(q, snapshot, today), versions);
+            items, snapshot, QrOptions(q, snapshot, today), versions, newDeliverables);
     }
 }
