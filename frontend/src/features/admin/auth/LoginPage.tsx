@@ -6,6 +6,7 @@ import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { CheckCircle2, Loader2 } from 'lucide-react'
 import { api } from '@/lib/api'
+import { authGate } from '@/lib/authGate'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -25,15 +26,18 @@ const highlights = [
 export default function LoginPage() {
   const navigate = useNavigate()
 
-  const { data: user, isLoading: checkingAuth } = useQuery({
+  const me = useQuery({
     queryKey: ['me'],
     queryFn: () => api.get<{ username: string }>('/auth/me'),
     retry: false,
   })
+  const gate = authGate(me)
+  const checkingAuth = gate === 'checking'
 
+  // Redirect only on a successful check: after a failed refetch React Query still holds the old user
   useEffect(() => {
-    if (user) navigate('/admin', { replace: true })
-  }, [user, navigate])
+    if (gate === 'signed-in') navigate('/admin', { replace: true })
+  }, [gate, navigate])
 
   const { register, handleSubmit, formState: { errors }, setError } = useForm<FormValues>({
     resolver: zodResolver(schema),
