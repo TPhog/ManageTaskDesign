@@ -48,6 +48,9 @@ public static class FlowActionKinds
     public const string CopyPaymentReminder = "COPY_PAYMENT_REMINDER";
     public const string ConfirmClientAcceptance = "CONFIRM_CLIENT_ACCEPTANCE";
     public const string ConfirmClientPayment = "CONFIRM_CLIENT_PAYMENT";
+    public const string MarkQuoted = "MARK_QUOTED";
+    public const string RecordDeposit = "RECORD_DEPOSIT";
+    public const string ViewTasks = "VIEW_TASKS";
 }
 
 public static class FlowWarningKinds
@@ -61,6 +64,7 @@ public static class FlowWarningKinds
     public const string BalanceDue = "BALANCE_DUE";
     public const string DeliveredWithOpenRevisions = "DELIVERED_WITH_OPEN_REVISIONS";
     public const string ReviewWithOpenRevisions = "REVIEW_WITH_OPEN_REVISIONS";
+    public const string CompletedWithOpenItems = "COMPLETED_WITH_OPEN_ITEMS";
 }
 
 /// <summary>
@@ -77,7 +81,10 @@ public sealed record FlowQuotation(
     string PaymentStatus, int DepositPercent, long Total, long DepositAmount, DateTimeOffset CreatedAt,
     DateTimeOffset? ClientAcceptedAt = null, string? PaymentNoticePurpose = null);
 
-/// <summary>Everything Evaluate needs, loaded by Features/Projects/ProjectFlowReads. NewRequestIds: oldest first.</summary>
+/// <summary>
+/// Everything Evaluate needs, loaded by Features/Projects/ProjectFlowReads. NewRequestIds: oldest first.
+/// OpenTasks: tasks of the project that are not DONE.
+/// </summary>
 public sealed record FlowFacts(
     string ProjectStatus,
     bool BriefConfirmed,
@@ -85,7 +92,8 @@ public sealed record FlowFacts(
     IReadOnlyList<FlowQuotation> Quotations,
     int OverdueTasks,
     IReadOnlyList<Guid> NewRequestIds,
-    int UnquotedChargeableItems);
+    int UnquotedChargeableItems,
+    int OpenTasks = 0);
 
 public sealed record FlowTarget(Guid? DeliverableId = null, Guid? QuotationId = null, Guid? RequestId = null);
 
@@ -126,7 +134,7 @@ public static class ProjectFlow
         if (facts.ProjectStatus == "COMPLETED")
         {
             ClientStatementActions(b, facts);
-            DeliveredWithOpenRevisions(b, active);
+            CompletedWithOpenItems(b, facts, active);
             Balance(b, facts);
             return b.State(FlowStages.Close, Steps(-1, markCurrent: false));
         }
@@ -138,7 +146,7 @@ public static class ProjectFlow
         switch (stage)
         {
             case FlowStages.Prepare: Prepare(b, facts, active, initial); break;
-            case FlowStages.Quote: Quote(b, initial, today); break;
+            case FlowStages.Quote: Quote(b, facts, initial, today); break;
             case FlowStages.Execute: Execute(b, facts, active, initial); break;
             case FlowStages.Review: Review(b, facts, active); break;
             default: Close(b, facts); break;
@@ -162,11 +170,11 @@ public static class ProjectFlow
             b.Act(FlowActionKinds.ConfirmBrief, "Xác nhận brief");
             b.Warn(FlowWarningKinds.BriefNotConfirmed, "Brief chưa được xác nhận", FlowSeverities.Info);
         }
-        if (!initial.Any(q => q.Status is "DRAFT" or "SENT" or "ACCEPTED"))
+        if (active.Count > 0 && !initial.Any(q => q.Status is "DRAFT" or "SENT" or "ACCEPTED"))
             b.Act(FlowActionKinds.CreateQuotation, "Tạo báo giá");
     }
 
-    private static void Quote(Builder b, List<FlowQuotation> initial, DateOnly today)
+    private static void Quote(Builder b, FlowFacts f, List<FlowQuotation> initial, DateOnly today)
     {
         var draft = Newest(initial, "DRAFT");
         var sent = Newest(initial, "SENT");
@@ -177,6 +185,8 @@ public static class ProjectFlow
             if (sent.ClientAcceptedAt is null)
                 b.Act(FlowActionKinds.RecordAcceptance, "Ghi nhận khách chấp nhận báo giá", new FlowTarget(QuotationId: sent.Id));
             b.Act(FlowActionKinds.CopyQuotationMessage, "Sao chép tin nhắn báo giá", new FlowTarget(QuotationId: sent.Id));
+            // BR-01: DRAFT → QUOTED is the designer's click, suggested here, never automatic
+            if (f.ProjectStatus == "DRAFT") b.Act(FlowActionKinds.MarkQuoted, "Chuyển dự án sang Đã báo giá");
             if (sent.ExpiryDate is { } expiry)
             {
                 var days = expiry.DayNumber - today.DayNumber;
@@ -198,6 +208,7 @@ public static class ProjectFlow
         if (f.ProjectStatus is "DRAFT" or "QUOTED") b.Act(FlowActionKinds.StartProject, "Bắt đầu dự án");
         foreach (var d in active.Where(d => d.Status == "IN_PROGRESS" && d.TaskTotal > 0 && d.TaskDone == d.TaskTotal))
             b.Act(FlowActionKinds.SubmitReview, $"Gửi duyệt: {d.Name}", new FlowTarget(DeliverableId: d.Id));
+        if (f.ProjectStatus == "IN_PROGRESS" && f.OpenTasks > 0) b.Act(FlowActionKinds.ViewTasks, "Xem công việc");
         RevisionFollowUps(b, f, active);
         ReviewBlockedByRevisions(b, active);
 
@@ -210,7 +221,10 @@ public static class ProjectFlow
                     ? $"Chưa nhận cọc {RevisionQuota.Vnd(unpaid.DepositAmount)} của báo giá {Ref(unpaid)}"
                     : $"Chưa nhận thanh toán báo giá {Ref(unpaid)}",
                 FlowSeverities.Warning);
-            b.Act(FlowActionKinds.CopyPaymentReminder, "Sao chép tin nhắc thanh toán", new FlowTarget(QuotationId: unpaid.Id));
+            b.Act(FlowActionKinds.RecordDeposit,
+                unpaid.DepositPercent > 0 ? "Đánh dấu đã nhận cọc" : "Đánh dấu đã nhận thanh toán",
+                new FlowTarget(QuotationId: unpaid.Id));
+            b.Act(FlowActionKinds.CopyPaymentReminder, "Sao chép tin nhắn thanh toán", new FlowTarget(QuotationId: unpaid.Id));
         }
         if (f.OverdueTasks > 0)
             b.Warn(FlowWarningKinds.TasksOverdue, $"{f.OverdueTasks} công việc quá hạn", FlowSeverities.Warning);
@@ -288,6 +302,25 @@ public static class ProjectFlow
                 FlowSeverities.Warning);
     }
 
+    /// <summary>
+    /// DF-08: a COMPLETED project never suggests moving back — what is still open (deliverables not DELIVERED, e.g. a
+    /// P09 NEW_DELIVERABLE accepted after completion; tasks not DONE; TODO / IN_PROGRESS revision items) is an info note.
+    /// </summary>
+    private static void CompletedWithOpenItems(Builder b, FlowFacts f, List<FlowDeliverable> active)
+    {
+        var deliverables = active.Count(d => d.Status != "DELIVERED");
+        var items = active.Sum(d => d.OpenRevisionItems);
+        var parts = new List<string>();
+        if (deliverables > 0) parts.Add($"{deliverables} hạng mục");
+        if (f.OpenTasks > 0) parts.Add($"{f.OpenTasks} công việc");
+        if (items > 0) parts.Add($"{items} mục sửa");
+        if (parts.Count == 0) return;
+        var list = parts.Count == 1 ? parts[0] : $"{string.Join(", ", parts.Take(parts.Count - 1))} và {parts[^1]}";
+        b.Warn(FlowWarningKinds.CompletedWithOpenItems,
+            $"Dự án đã hoàn thành nhưng còn {list} chưa xong — mở lại dự án nếu cần làm tiếp",
+            FlowSeverities.Info);
+    }
+
     private static void QuotaWarnings(Builder b, List<FlowDeliverable> active)
     {
         foreach (var d in active.Where(d => d.UsedRounds > 0 && d.UsedRounds >= d.IncludedRounds))
@@ -299,7 +332,7 @@ public static class ProjectFlow
         var due = f.Quotations.Where(q => Outstanding(q) > 0).OrderBy(q => q.CreatedAt).ToList();
         if (due.Count == 0) return;
         b.Warn(FlowWarningKinds.BalanceDue, $"Khách còn nợ {RevisionQuota.Vnd(due.Sum(Outstanding))}", FlowSeverities.Warning);
-        b.Act(FlowActionKinds.CopyPaymentReminder, "Sao chép tin nhắc thanh toán", new FlowTarget(QuotationId: due[0].Id));
+        b.Act(FlowActionKinds.CopyPaymentReminder, "Sao chép tin nhắn thanh toán", new FlowTarget(QuotationId: due[0].Id));
     }
 
     private static string Ref(FlowQuotation q) => q.Number is null ? "nháp" : $"{q.Number} (v{q.Version})";

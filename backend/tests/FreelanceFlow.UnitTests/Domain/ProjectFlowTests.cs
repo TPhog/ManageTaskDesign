@@ -19,8 +19,8 @@ public class ProjectFlowTests
 
     private static FlowFacts Facts(string projectStatus = "DRAFT", bool brief = false,
         FlowDeliverable[]? deliverables = null, FlowQuotation[]? quotations = null,
-        int overdue = 0, Guid[]? requests = null, int chargeable = 0) =>
-        new(projectStatus, brief, deliverables ?? [], quotations ?? [], overdue, requests ?? [], chargeable);
+        int overdue = 0, Guid[]? requests = null, int chargeable = 0, int openTasks = 0) =>
+        new(projectStatus, brief, deliverables ?? [], quotations ?? [], overdue, requests ?? [], chargeable, openTasks);
 
     private static FlowState Eval(FlowFacts f) => ProjectFlow.Evaluate(f, Today);
 
@@ -32,7 +32,7 @@ public class ProjectFlowTests
         s.Actions.Select(a => a.Primary).Should().Equal(s.Actions.Select((_, i) => i == 0));
 
     [Fact]
-    public void Delivered_with_open_revisions_warns_in_execute_review_close_and_completed_but_not_without_open_items()
+    public void Delivered_with_open_revisions_warns_in_execute_review_close_but_not_completed_nor_without_open_items()
     {
         var paid = new[] { Q("ACCEPTED", payment: "PAID") };
         var execute = Eval(Facts("IN_PROGRESS", true, [D("DELIVERED", openRevisions: 2), D("IN_PROGRESS")], paid));
@@ -44,8 +44,9 @@ public class ProjectFlowTests
         (execute.Stage, review.Stage, close.Stage).Should().Be(("EXECUTE", "REVIEW", "CLOSE"));
         execute.Warnings.Should().Contain(new FlowWarning("DELIVERED_WITH_OPEN_REVISIONS",
             "Logo đã bàn giao nhưng còn 2 mục sửa chưa xong — chuyển về Đang làm", "warning"));
-        foreach (var s in new[] { review, close, completed })
+        foreach (var s in new[] { review, close })
             s.Warnings.Select(w => w.Kind).Should().Contain("DELIVERED_WITH_OPEN_REVISIONS");
+        completed.Warnings.Select(w => w.Kind).Should().NotContain("DELIVERED_WITH_OPEN_REVISIONS");
         clean.Warnings.Select(w => w.Kind).Should().NotContain("DELIVERED_WITH_OPEN_REVISIONS");
     }
 
@@ -57,7 +58,7 @@ public class ProjectFlowTests
         s.Stage.Should().Be("PREPARE");
         StepStatuses(s).Should().Equal("current", "upcoming", "upcoming", "upcoming", "upcoming");
         s.Steps.Select(x => x.Stage).Should().Equal("PREPARE", "QUOTE", "EXECUTE", "REVIEW", "CLOSE");
-        Kinds(s).Should().Equal("ADD_DELIVERABLE", "CONFIRM_BRIEF", "CREATE_QUOTATION");
+        Kinds(s).Should().Equal("ADD_DELIVERABLE", "CONFIRM_BRIEF");
         s.Actions[0].Label.Should().Be("Thêm hạng mục");
         OnlyFirstIsPrimary(s);
         s.Warnings.Should().Equal(new FlowWarning("BRIEF_NOT_CONFIRMED", "Brief chưa được xác nhận", "info"));
@@ -101,8 +102,8 @@ public class ProjectFlowTests
 
         var s = Eval(Facts(brief: true, deliverables: [D("NOT_STARTED")], quotations: [sent]));
 
-        Kinds(s).Should().Equal("RECORD_ACCEPTANCE", "COPY_QUOTATION_MESSAGE");
-        s.Actions.Should().OnlyContain(a => a.Target.QuotationId == sent.Id);
+        Kinds(s).Should().Equal("RECORD_ACCEPTANCE", "COPY_QUOTATION_MESSAGE", "MARK_QUOTED");
+        s.Actions.Where(a => a.Kind != "MARK_QUOTED").Should().OnlyContain(a => a.Target.QuotationId == sent.Id);
         s.Actions[0].Label.Should().Be("Ghi nhận khách chấp nhận báo giá");
         OnlyFirstIsPrimary(s);
         s.Warnings.Should().BeEmpty();
@@ -139,8 +140,9 @@ public class ProjectFlowTests
 
         s.Stage.Should().Be("EXECUTE");
         StepStatuses(s).Should().Equal("done", "done", "current", "upcoming", "upcoming");
-        Kinds(s).Should().Equal("START_PROJECT", "COPY_PAYMENT_REMINDER");
+        Kinds(s).Should().Equal("START_PROJECT", "RECORD_DEPOSIT", "COPY_PAYMENT_REMINDER");
         s.Actions[1].Target.QuotationId.Should().Be(accepted.Id);
+        s.Actions[2].Target.QuotationId.Should().Be(accepted.Id);
         OnlyFirstIsPrimary(s);
         s.Warnings.Should().Equal(new FlowWarning("DEPOSIT_UNPAID",
             "Chưa nhận cọc 1.000.000 ₫ của báo giá BG-2026-0001 (v1)", "warning"));
@@ -264,7 +266,7 @@ public class ProjectFlowTests
 
         s.Stage.Should().Be("CLOSE");
         StepStatuses(s).Should().Equal("done", "done", "done", "done", "done");
-        s.Actions.Should().Equal(new FlowAction("COPY_PAYMENT_REMINDER", "Sao chép tin nhắc thanh toán", true,
+        s.Actions.Should().Equal(new FlowAction("COPY_PAYMENT_REMINDER", "Sao chép tin nhắn thanh toán", true,
             new FlowTarget(QuotationId: accepted.Id)));
         s.Warnings.Should().Equal(new FlowWarning("BALANCE_DUE", "Khách còn nợ 2.000.000 ₫", "warning"));
     }
@@ -341,5 +343,103 @@ public class ProjectFlowTests
         s.Stage.Should().Be("REVIEW");
         s.Warnings.Should().Contain(new FlowWarning("REVIEW_WITH_OPEN_REVISIONS",
             "Logo đang chờ khách duyệt nhưng còn 2 mục sửa chưa xong — khách chưa duyệt được trên portal", "warning"));
+    }
+
+    [Fact]
+    public void Prepare_without_deliverables_does_not_offer_to_create_a_quotation()
+    {
+        var s = Eval(Facts());
+        Kinds(s).Should().Equal("ADD_DELIVERABLE", "CONFIRM_BRIEF");
+        s.Actions[0].Primary.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Prepare_with_a_deliverable_still_offers_the_quotation()
+    {
+        var s = Eval(Facts(deliverables: [D("NOT_STARTED")]));
+        Kinds(s).Should().Equal("CONFIRM_BRIEF", "CREATE_QUOTATION");
+    }
+
+    [Theory]
+    [InlineData("DRAFT", true)]
+    [InlineData("QUOTED", false)]
+    public void Sent_quotation_offers_mark_quoted_only_while_project_is_draft(string projectStatus, bool offered)
+    {
+        var s = Eval(Facts(projectStatus, brief: true, deliverables: [D("NOT_STARTED")], quotations: [Q("SENT")]));
+        s.Stage.Should().Be("QUOTE");
+        Kinds(s).Contains("MARK_QUOTED").Should().Be(offered);
+        if (offered) s.Actions.Single(a => a.Kind == "MARK_QUOTED").Primary.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Started_project_offers_view_tasks_after_submit_review_actions()
+    {
+        var s = Eval(Facts("IN_PROGRESS", true,
+            [D("IN_PROGRESS", total: 2, done: 2), D("IN_PROGRESS", "Banner", total: 3, done: 1)],
+            [Q("ACCEPTED", payment: "PAID")], openTasks: 4));
+        Kinds(s).Should().Equal("SUBMIT_REVIEW", "VIEW_TASKS");
+        OnlyFirstIsPrimary(s);
+    }
+
+    [Fact]
+    public void Started_project_without_open_tasks_has_no_view_tasks()
+    {
+        var s = Eval(Facts("IN_PROGRESS", true, [D("IN_PROGRESS")], [Q("ACCEPTED", payment: "PAID")], openTasks: 0));
+        Kinds(s).Should().NotContain("VIEW_TASKS");
+    }
+
+    [Fact]
+    public void Unpaid_deposit_offers_record_deposit_before_the_reminder_with_the_fixed_typo()
+    {
+        var accepted = Q("ACCEPTED", depositPercent: 30);
+        var s = Eval(Facts("IN_PROGRESS", true, [D("IN_PROGRESS")], [accepted], openTasks: 1));
+        Kinds(s).Should().Equal("VIEW_TASKS", "RECORD_DEPOSIT", "COPY_PAYMENT_REMINDER");
+        s.Actions.Single(a => a.Kind == "RECORD_DEPOSIT").Label.Should().Be("Đánh dấu đã nhận cọc");
+        s.Actions.Single(a => a.Kind == "RECORD_DEPOSIT").Target.QuotationId.Should().Be(accepted.Id);
+        s.Actions.Single(a => a.Kind == "COPY_PAYMENT_REMINDER").Label.Should().Be("Sao chép tin nhắn thanh toán");
+    }
+
+    [Fact]
+    public void Unpaid_without_deposit_percent_says_payment_not_deposit()
+    {
+        var s = Eval(Facts("IN_PROGRESS", true, [D("IN_PROGRESS")], [Q("ACCEPTED", depositPercent: 0, deposit: 0)]));
+        s.Actions.Single(a => a.Kind == "RECORD_DEPOSIT").Label.Should().Be("Đánh dấu đã nhận thanh toán");
+    }
+
+    [Fact]
+    public void Completed_project_never_suggests_going_back_and_lists_open_items_as_info()
+    {
+        var paid = new[] { Q("ACCEPTED", payment: "PAID") };
+        var s = Eval(Facts("COMPLETED", true, [D("DELIVERED", openRevisions: 2)], paid, openTasks: 4));
+        s.Warnings.Select(w => w.Kind).Should().NotContain("DELIVERED_WITH_OPEN_REVISIONS");
+        s.Warnings.Should().ContainSingle(w => w.Kind == "COMPLETED_WITH_OPEN_ITEMS" && w.Severity == "info"
+            && w.Message == "Dự án đã hoàn thành nhưng còn 4 công việc và 2 mục sửa chưa xong — mở lại dự án nếu cần làm tiếp");
+        s.Warnings.Select(w => w.Message).Should().NotContain(m => m.Contains("chuyển về Đang làm"));
+    }
+
+    [Fact]
+    public void Completed_project_with_nothing_open_has_no_open_items_warning()
+    {
+        var s = Eval(Facts("COMPLETED", true, [D("DELIVERED")], [Q("ACCEPTED", payment: "PAID")]));
+        s.Warnings.Select(w => w.Kind).Should().NotContain("COMPLETED_WITH_OPEN_ITEMS");
+    }
+
+    [Theory]   // P09: an accepted NEW_DELIVERABLE in a COMPLETED project adds a NOT_STARTED deliverable (no tasks)
+    [InlineData("NOT_STARTED", 0, "Dự án đã hoàn thành nhưng còn 1 hạng mục chưa xong — mở lại dự án nếu cần làm tiếp")]
+    [InlineData("IN_PROGRESS", 3, "Dự án đã hoàn thành nhưng còn 1 hạng mục và 3 công việc chưa xong — mở lại dự án nếu cần làm tiếp")]
+    public void Completed_project_counts_a_deliverable_that_is_not_delivered(string status, int openTasks, string message)
+    {
+        var s = Eval(Facts("COMPLETED", true, [D("DELIVERED"), D(status, "Sticker"), D("CANCELLED", "Bỏ")],
+            [Q("ACCEPTED", payment: "PAID")], openTasks: openTasks));
+        s.Warnings.Should().ContainSingle(w => w.Kind == "COMPLETED_WITH_OPEN_ITEMS")
+            .Which.Should().Be(new FlowWarning("COMPLETED_WITH_OPEN_ITEMS", message, "info"));
+    }
+
+    [Fact]
+    public void Completed_project_joins_three_kinds_of_open_items()
+    {
+        var s = Eval(Facts("COMPLETED", true, [D("IN_PROGRESS", openRevisions: 1)], [Q("ACCEPTED", payment: "PAID")], openTasks: 2));
+        s.Warnings.Single(w => w.Kind == "COMPLETED_WITH_OPEN_ITEMS").Message.Should()
+            .Be("Dự án đã hoàn thành nhưng còn 1 hạng mục, 2 công việc và 1 mục sửa chưa xong — mở lại dự án nếu cần làm tiếp");
     }
 }

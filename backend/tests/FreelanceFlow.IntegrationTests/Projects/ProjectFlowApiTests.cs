@@ -121,11 +121,34 @@ public class ProjectFlowApiTests(AppFactory factory) : PortalTestBase(factory)
         var flow = await FlowAsync(projectId);
 
         flow.GetProperty("stage").GetString().Should().Be("PREPARE");
-        Kinds(flow.GetProperty("actions")).Should().Equal("ADD_DELIVERABLE", "CONFIRM_BRIEF", "CREATE_QUOTATION");
+        Kinds(flow.GetProperty("actions")).Should().Equal("ADD_DELIVERABLE", "CONFIRM_BRIEF");
         flow.GetProperty("actions")[0].GetProperty("primary").GetBoolean().Should().BeTrue();
         flow.GetProperty("actions")[0].GetProperty("target").GetProperty("deliverableId").ValueKind.Should().Be(JsonValueKind.Null);
         Kinds(flow.GetProperty("warnings")).Should().Equal("BRIEF_NOT_CONFIRMED");
         (await Client.GetAsync($"/api/admin/projects/{Guid.NewGuid()}/flow")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task New_project_without_deliverables_does_not_offer_a_quotation()
+    {
+        await LoginAsync();
+        var projectId = await NewProjectAsync();
+        var flow = await FlowAsync(projectId);
+        Kinds(flow.GetProperty("actions")).Should().Equal("ADD_DELIVERABLE", "CONFIRM_BRIEF");
+    }
+
+    [Fact]
+    public async Task Started_project_with_open_tasks_offers_view_tasks()
+    {
+        await LoginAsync();
+        var projectId = await NewProjectAsync();
+        var logo = await CreateDeliverableAsync(projectId, "Logo");
+        await QuotedAsync(projectId);
+        (await StartAsync(projectId, new[] { new { deliverableId = logo, titles = new[] { "Phác thảo" } } })).EnsureSuccessStatusCode();
+
+        var flow = await FlowAsync(projectId);
+
+        Kinds(flow.GetProperty("actions")).Should().Equal("VIEW_TASKS", "RECORD_DEPOSIT", "COPY_PAYMENT_REMINDER");
     }
 
     [Fact]
@@ -141,7 +164,7 @@ public class ProjectFlowApiTests(AppFactory factory) : PortalTestBase(factory)
         flow.GetProperty("stage").GetString().Should().Be("EXECUTE");
         flow.GetProperty("steps").EnumerateArray().Select(s => s.GetProperty("status").GetString())
             .Should().Equal("done", "done", "current", "upcoming", "upcoming");
-        Kinds(flow.GetProperty("actions")).Should().Equal("START_PROJECT", "COPY_PAYMENT_REMINDER");
+        Kinds(flow.GetProperty("actions")).Should().Equal("START_PROJECT", "RECORD_DEPOSIT", "COPY_PAYMENT_REMINDER");
         Kinds(flow.GetProperty("warnings")).Should().Equal("DEPOSIT_UNPAID");
         flow.GetProperty("warnings")[0].GetProperty("message").GetString().Should().StartWith("Chưa nhận cọc 1.000.000 ₫ của báo giá ");
     }

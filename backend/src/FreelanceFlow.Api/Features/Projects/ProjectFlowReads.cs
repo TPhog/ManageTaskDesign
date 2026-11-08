@@ -61,6 +61,12 @@ internal static class ProjectFlowReads
             .Select(g => new { ProjectId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.ProjectId, x => x.Count);
 
+        var openTasks = await db.Tasks.AsNoTracking()
+            .Where(t => ids.Contains(t.ProjectId) && t.Status != "DONE")
+            .GroupBy(t => t.ProjectId)
+            .Select(g => new { ProjectId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.ProjectId, x => x.Count);
+
         var newRequests = await db.ClientRequests.AsNoTracking()
             .Where(r => ids.Contains(r.ProjectId) && r.Status == RequestStatuses.New)
             .OrderBy(r => r.CreatedAt).ThenBy(r => r.Id)
@@ -110,6 +116,7 @@ internal static class ProjectFlowReads
                 q.ClientAcceptedAt, q.ClientPaymentNoticePurpose)).ToList(),
             overdue.GetValueOrDefault(p.Key),
             requestsByProject[p.Key].Select(r => r.Id).ToList(),
-            unquoted.GetValueOrDefault(p.Key)));
+            unquoted.GetValueOrDefault(p.Key),
+            openTasks.GetValueOrDefault(p.Key)));
     }
 }
