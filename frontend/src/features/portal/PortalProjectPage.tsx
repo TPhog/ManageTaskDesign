@@ -13,6 +13,8 @@ import type { PortalProjectDetail, PortalTimelineItem } from '@/lib/portalTypes'
 import { designTypeLabel, portalDeliverableStatus, portalProjectStatus } from './labels'
 import { ProgressBar } from './ProgressBar'
 import { deliveredText, progressOf, remainingRoundsText } from './progress'
+import { PortalQuotationList } from './PortalQuotationList'
+import { usePortalQuotations } from './usePortal'
 
 const panelClass = 'rounded-xl border bg-card p-4 shadow-card sm:p-5'
 
@@ -31,6 +33,8 @@ export default function PortalProjectPage() {
     queryFn: () => api.get<PagedResult<PortalTimelineItem>>(`/portal/projects/${id}/timeline?pageSize=50`),
     enabled: !!project,
   })
+
+  const { data: quotations } = usePortalQuotations(id, !!project)
 
   if (isLoading) {
     return (
@@ -135,6 +139,19 @@ export default function PortalProjectPage() {
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section aria-labelledby="portal-quotations" className={panelClass}>
+        <h2 id="portal-quotations" className="text-sm font-semibold text-foreground">Báo giá</h2>
+        {!quotations ? (
+          <Skeleton className="mt-3 h-16 w-full" />
+        ) : quotations.length === 0 ? (
+          <p className="mt-2 text-sm text-muted-foreground">Chưa có báo giá nào cho dự án này.</p>
+        ) : (
+          <div className="mt-3">
+            <PortalQuotationList items={quotations} />
+          </div>
         )}
       </section>
 

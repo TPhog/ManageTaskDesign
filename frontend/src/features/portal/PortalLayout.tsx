@@ -1,17 +1,25 @@
 import { useState } from 'react'
-import { Link, Outlet } from 'react-router-dom'
+import { Link, Outlet, useLocation } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Link2Off, Loader2, LogOut, Mail, Phone, WifiOff } from 'lucide-react'
+import { FileText, FolderOpen, Link2Off, Loader2, LogOut, Mail, Phone, WifiOff, type LucideIcon } from 'lucide-react'
 import { Button, buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { qk } from '@/lib/queryKeys'
 import type { PortalMe } from '@/lib/portalTypes'
 import { PortalMessage } from './PortalMessage'
 import { isSessionExpired, logoutCompleted } from './errors'
 
+// docs/08 §3.1: bottom navigation of the portal (mobile-first)
+const navItems: { to: string; label: string; icon: LucideIcon; match: (path: string) => boolean }[] = [
+  { to: '/portal', label: 'Dự án', icon: FolderOpen, match: p => p === '/portal' || p.startsWith('/portal/projects') },
+  { to: '/portal/quotations', label: 'Báo giá', icon: FileText, match: p => p.startsWith('/portal/quotations') },
+]
+
 export default function PortalLayout() {
   const qc = useQueryClient()
+  const { pathname } = useLocation()
   const [loggedOut, setLoggedOut] = useState(false)
 
   const { data: me, isLoading, error, refetch } = useQuery({
@@ -94,9 +102,34 @@ export default function PortalLayout() {
           </Button>
         </div>
       </header>
-      <main className="mx-auto max-w-2xl px-4 py-5">
+      <main className="mx-auto max-w-2xl px-4 pb-24 pt-5">
         <Outlet />
       </main>
+      <nav
+        aria-label="Điều hướng portal"
+        className="fixed inset-x-0 bottom-0 z-10 border-t bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+      >
+        <ul className="mx-auto flex max-w-2xl">
+          {navItems.map(item => {
+            const active = item.match(pathname)
+            return (
+              <li key={item.to} className="flex-1">
+                <Link
+                  to={item.to}
+                  aria-current={active ? 'page' : undefined}
+                  className={cn(
+                    'flex h-14 flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
+                    active ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+                  )}
+                >
+                  <item.icon className="h-5 w-5" aria-hidden="true" />
+                  {item.label}
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      </nav>
     </div>
   )
 }

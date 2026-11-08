@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 import { qk } from '@/lib/queryKeys'
+import { cn } from '@/lib/utils'
 import type { PortalProjectListItem } from '@/lib/portalTypes'
 import { designTypeLabel, portalProjectStatus } from './labels'
 import { ProgressBar } from './ProgressBar'
@@ -42,10 +43,13 @@ export default function PortalHomePage() {
       ) : (
         <ul className="space-y-3">
           {projects.map(p => (
-            <li key={p.id}>
+            <li key={p.id} className="relative">
               <Link
                 to={`/portal/projects/${p.id}`}
-                className="block rounded-xl border bg-card p-4 shadow-card transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className={cn(
+                  'block rounded-xl border bg-card p-4 shadow-card transition-colors hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  p.hasOpenQuotation && 'pb-14',
+                )}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -66,13 +70,18 @@ export default function PortalHomePage() {
                     )}
                   </div>
                 </div>
-                {p.hasOpenQuotation && (
-                  <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-200">
-                    <Sparkles className="h-3 w-3" aria-hidden="true" />
-                    Có báo giá mới
-                  </span>
-                )}
               </Link>
+              {/* A sibling of the card link (links cannot nest), placed inside the card's bottom padding */}
+              {p.hasOpenQuotation && (
+                <Link
+                  to={p.openQuotationId ? `/portal/quotations/${p.openQuotationId}` : '/portal/quotations'}
+                  aria-label={`Xem báo giá mới của ${p.name}`}
+                  className="absolute bottom-4 left-4 inline-flex min-h-8 items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-200 transition-colors hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Sparkles className="h-3 w-3" aria-hidden="true" />
+                  Có báo giá mới
+                </Link>
+              )}
             </li>
           ))}
         </ul>
