@@ -53,8 +53,8 @@ public static class ClientsEndpoints
 
         // QA D-07: pickers show the newest clients first; the list page keeps the name order
         var ordered = sort == "createdAt:desc"
-            ? query.OrderByDescending(c => c.CreatedAt)
-            : query.OrderBy(c => c.Name);
+            ? query.OrderByDescending(c => c.CreatedAt).ThenBy(c => c.Id)
+            : query.OrderBy(c => c.Name).ThenBy(c => c.Id);
         var clients = await ordered
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
