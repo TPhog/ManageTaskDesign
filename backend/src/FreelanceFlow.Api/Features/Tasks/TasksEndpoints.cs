@@ -33,6 +33,8 @@ public static class TasksEndpoints
         Guid? projectId = null,
         string? status = null,
         string? due = null,
+        string? q = null,
+        Guid? clientId = null,
         int page = 1,
         int pageSize = 20)
     {
@@ -55,6 +57,16 @@ public static class TasksEndpoints
 
         if (status != null)
             query = query.Where(x => x.Task.Status == status);
+
+        if (clientId is { } cid)
+            query = query.Where(x => x.Project.ClientId == cid);
+
+        // QA D-06/D-18: free-text search over the task title and its project name
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var lower = q.Trim().ToLowerInvariant();
+            query = query.Where(x => x.Task.Title.ToLower().Contains(lower) || x.Project.Name.ToLower().Contains(lower));
+        }
 
         // Due buckets use today(VN) and skip DONE (matches partial index ix_tasks_due)
         query = due switch

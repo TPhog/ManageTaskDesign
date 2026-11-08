@@ -24,7 +24,8 @@ public static class RequestsEndpoints
     }
 
     private static async Task<IResult> ListRequests(
-        AppDbContext db, string? status = null, Guid? projectId = null, int page = 1, int pageSize = 20)
+        AppDbContext db, string? status = null, Guid? projectId = null, Guid? clientId = null, string? q = null,
+        int page = 1, int pageSize = 20)
     {
         if (status is not null && !RequestStatuses.All.Contains(status))
             return Results.ValidationProblem(new Dictionary<string, string[]>
@@ -37,6 +38,15 @@ public static class RequestsEndpoints
         var query = db.ClientRequests.AsNoTracking();
         if (status is not null) query = query.Where(r => r.Status == status);
         if (projectId is { } pid) query = query.Where(r => r.ProjectId == pid);
+        if (clientId is { } cid) query = query.Where(r => db.Projects.Any(p => p.Id == r.ProjectId && p.ClientId == cid));
+        // QA D-06: search the request text, its project and its client
+        if (!string.IsNullOrWhiteSpace(q))
+        {
+            var lower = q.Trim().ToLowerInvariant();
+            query = query.Where(r => r.Content.ToLower().Contains(lower) ||
+                db.Projects.Any(p => p.Id == r.ProjectId &&
+                    (p.Name.ToLower().Contains(lower) || db.Clients.Any(c => c.Id == p.ClientId && c.Name.ToLower().Contains(lower)))));
+        }
 
         var total = await query.CountAsync();
         var ids = await query

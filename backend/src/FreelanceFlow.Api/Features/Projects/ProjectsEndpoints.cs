@@ -1,6 +1,7 @@
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Projects;
+using FreelanceFlow.Api.Domain.Quotations;
 using FreelanceFlow.Api.Domain.Revisions;
 using FreelanceFlow.Api.Domain.Tasks;
 using FreelanceFlow.Api.Infrastructure;
@@ -44,8 +45,11 @@ public static class ProjectsEndpoints
 
         if (!string.IsNullOrWhiteSpace(q))
         {
-            var lower = q.ToLowerInvariant();
-            query = query.Where(p => p.Name.ToLower().Contains(lower));
+            // QA D-07: pickers find a project by its own name or by its client's name/company
+            var lower = q.Trim().ToLowerInvariant();
+            query = query.Where(p => p.Name.ToLower().Contains(lower) ||
+                db.Clients.Any(c => c.Id == p.ClientId &&
+                    (c.Name.ToLower().Contains(lower) || (c.Company != null && c.Company.ToLower().Contains(lower)))));
         }
 
         if (!string.IsNullOrWhiteSpace(dueBefore) && DateOnly.TryParse(dueBefore, out var dueDateFilter))
@@ -154,6 +158,24 @@ public static class ProjectsEndpoints
         var taskCounts = await TaskProgress.PerDeliverable(db.Tasks.Where(t => t.ProjectId == id))
             .ToDictionaryAsync(x => x.DeliverableId);
 
+        // QA D-02/D-24: live quotations (DRAFT/SENT/ACCEPTED) that already contain each deliverable, oldest first
+        var quoteRows = await (
+                from i in db.QuotationItems.AsNoTracking()
+                join qt in db.Quotations.AsNoTracking() on i.QuotationId equals qt.Id
+                where qt.ProjectId == id
+                      && i.SourceType == QuotationItemSources.Deliverable && i.SourceId != null
+                      && (qt.Status == QuotationStatuses.Draft || qt.Status == QuotationStatuses.Sent ||
+                          qt.Status == QuotationStatuses.Accepted)
+                orderby qt.CreatedAt
+                select new { DeliverableId = i.SourceId!.Value, qt.Id, qt.Number, qt.Version, qt.Status, qt.Kind })
+            .ToListAsync();
+        var quotedIn = quoteRows
+            .GroupBy(x => x.DeliverableId)
+            .ToDictionary(g => g.Key, g => g
+                .DistinctBy(x => x.Id)
+                .Select(x => new DeliverableQuoteRefDto(x.Id, x.Number, x.Version, x.Status, x.Kind))
+                .ToList());
+
         var deliverableDtos = deliverables.Select(d =>
         {
             var used = usedRoundsMap.GetValueOrDefault(d.Id);
@@ -178,6 +200,7 @@ public static class ProjectsEndpoints
                 ProgressPercent = TaskProgress.Percent(taskTotal, taskDone),
                 d.ClientDecision,
                 d.ClientDecisionAt,
+                QuotedIn = quotedIn.GetValueOrDefault(d.Id) ?? new List<DeliverableQuoteRefDto>(),
             };
         });
 
@@ -429,3 +452,6 @@ record ChangeStatusRequest(
     bool? ReasonPublic,
     bool? ConfirmWarnings,
     uint? RowVersion);
+
+/// <summary>A live quotation (DRAFT/SENT/ACCEPTED) that has a line sourced from the deliverable (QA D-02).</summary>
+record DeliverableQuoteRefDto(Guid QuotationId, string? Number, int Version, string Status, string Kind);

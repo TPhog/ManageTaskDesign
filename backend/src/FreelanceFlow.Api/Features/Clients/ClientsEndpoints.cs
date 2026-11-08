@@ -31,7 +31,8 @@ public static class ClientsEndpoints
         string? q = null,
         string? status = null,
         int page = 1,
-        int pageSize = 20)
+        int pageSize = 20,
+        string? sort = null)
     {
         pageSize = Math.Min(pageSize, 100);
         var query = db.Clients.AsNoTracking();
@@ -50,8 +51,11 @@ public static class ClientsEndpoints
 
         var total = await query.CountAsync();
 
-        var clients = await query
-            .OrderBy(c => c.Name)
+        // QA D-07: pickers show the newest clients first; the list page keeps the name order
+        var ordered = sort == "createdAt:desc"
+            ? query.OrderByDescending(c => c.CreatedAt)
+            : query.OrderBy(c => c.Name);
+        var clients = await ordered
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(c => new
@@ -67,10 +71,11 @@ public static class ClientsEndpoints
                     .Where(q => db.Projects.Any(p => p.Id == q.ProjectId && p.ClientId == c.Id) &&
                                 q.Status == "ACCEPTED")
                     .Sum(q => (long?)q.Total) ?? 0L,
+                // BR-73: UNPAID -> total, DEPOSIT_PAID -> total - deposit, PAID -> 0 (same as GET /clients/{id})
                 Outstanding = db.Quotations
                     .Where(q => db.Projects.Any(p => p.Id == q.ProjectId && p.ClientId == c.Id) &&
                                 q.Status == "ACCEPTED" && q.PaymentStatus != "PAID")
-                    .Sum(q => (long?)q.Total) ?? 0L,
+                    .Sum(q => (long?)(q.PaymentStatus == "DEPOSIT_PAID" ? q.Total - q.DepositAmount : q.Total)) ?? 0L,
             })
             .ToListAsync();
 
