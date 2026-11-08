@@ -25,6 +25,12 @@ public class PortalReviewStateTests(AppFactory factory) : PortalTestBase(factory
         return (d, p.GetProperty("deliverableSummary"));
     }
 
+    /// <summary>GET /api/portal/projects — the list computes awaitingClient in SQL (separate code path from the detail).</summary>
+    private static async Task<int> ListAwaitingAsync(Arranged s) =>
+        (await s.Portal.GetFromJsonAsync<JsonElement>("/api/portal/projects")).EnumerateArray()
+            .Single(p => p.GetProperty("id").GetGuid() == s.ProjectId)
+            .GetProperty("deliverableSummary").GetProperty("awaitingClient").GetInt32();
+
     private static Task<HttpResponseMessage> ApproveAsync(Arranged s) =>
         s.Portal.PostAsync($"/api/portal/deliverables/{s.DeliverableId}/approve", null);
 
@@ -69,6 +75,7 @@ public class PortalReviewStateTests(AppFactory factory) : PortalTestBase(factory
         d.GetProperty("reviewState").GetString().Should().Be("CHANGES_IN_PROGRESS");
         d.GetProperty("hasOpenChangeRequest").GetBoolean().Should().BeTrue();
         summary.GetProperty("awaitingClient").GetInt32().Should().Be(0);
+        (await ListAwaitingAsync(s)).Should().Be(0, "a NEW request tied to the deliverable means it is not awaiting the client");
 
         var resp = await ApproveAsync(s);
         resp.StatusCode.Should().Be(HttpStatusCode.Conflict);
@@ -83,7 +90,11 @@ public class PortalReviewStateTests(AppFactory factory) : PortalTestBase(factory
         var round = await CreateRoundAsync(s.ProjectId, s.DeliverableId, "noi bo", ("Đổi màu", "MINOR", "IN_QUOTA"));
         var itemId = round.GetProperty("items")[0].GetProperty("id").GetGuid();
 
-        (await ReadAsync(s)).Deliverable.GetProperty("reviewState").GetString().Should().Be("CHANGES_IN_PROGRESS");
+        var (open, openSummary) = await ReadAsync(s);
+        open.GetProperty("reviewState").GetString().Should().Be("CHANGES_IN_PROGRESS");
+        open.GetProperty("hasOpenChangeRequest").GetBoolean().Should().BeTrue();
+        openSummary.GetProperty("awaitingClient").GetInt32().Should().Be(0);
+        (await ListAwaitingAsync(s)).Should().Be(0, "an open revision item of the deliverable means it is not awaiting the client");
         var blocked = await ApproveAsync(s);
         blocked.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await blocked.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("CHANGE_REQUEST_OPEN");
@@ -99,7 +110,11 @@ public class PortalReviewStateTests(AppFactory factory) : PortalTestBase(factory
                 .EnsureSuccessStatusCode();
         }
 
-        (await ReadAsync(s)).Deliverable.GetProperty("reviewState").GetString().Should().Be("AWAITING_CLIENT");
+        var (done, doneSummary) = await ReadAsync(s);
+        done.GetProperty("reviewState").GetString().Should().Be("AWAITING_CLIENT");
+        done.GetProperty("hasOpenChangeRequest").GetBoolean().Should().BeFalse();
+        doneSummary.GetProperty("awaitingClient").GetInt32().Should().Be(1);
+        (await ListAwaitingAsync(s)).Should().Be(1);
         (await ApproveAsync(s)).StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
@@ -115,6 +130,7 @@ public class PortalReviewStateTests(AppFactory factory) : PortalTestBase(factory
             .EnsureSuccessStatusCode();
 
         (await ReadAsync(s)).Deliverable.GetProperty("reviewState").GetString().Should().Be("AWAITING_CLIENT");
+        (await ListAwaitingAsync(s)).Should().Be(1, "a DECLINED request no longer blocks");
     }
 
     [Fact]
