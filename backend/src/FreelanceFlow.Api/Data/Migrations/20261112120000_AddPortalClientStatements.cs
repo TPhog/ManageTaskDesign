@@ -14,14 +14,11 @@ namespace FreelanceFlow.Api.Data.Migrations
     {
         // fn_quotation_locked is fail-closed (20261108100000): the client statement columns must be whitelisted or every
         // portal accept / payment notice on a SENT quotation is rejected by the trigger.
-        private const string BaseColumns =
-            "'status','accepted_at','accepted_note','evidence_file_id','rejected_at','rejected_reason'," +
-            "'payment_status','deposit_paid_at','paid_at','internal_notes','updated_at'";
+        // LockFunction("") is the 20261108100000 body byte for byte (Down); Up appends the Plan 12 columns.
+        private const string Plan12Columns =
+            ",\n                                  'client_accepted_at','client_payment_notice_purpose','client_payment_notice_at','client_payment_notice_note'";
 
-        private const string Plan12Columns = BaseColumns +
-            ",'client_accepted_at','client_payment_notice_purpose','client_payment_notice_at','client_payment_notice_note'";
-
-        private static string LockFunction(string columns) => $@"
+        private static string LockFunction(string extraColumns) => $@"
 CREATE OR REPLACE FUNCTION fn_quotation_locked() RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
@@ -31,9 +28,15 @@ BEGIN
         END IF;
         RETURN OLD;
     END IF;
+    -- Fail-closed: after DRAFT only the listed lifecycle columns may change; every other column
+    -- (id, created_at, content, snapshot, and any future column) must equal its OLD value.
     IF OLD.status <> 'DRAFT' AND (
            NEW.status = 'DRAFT'
-        OR (to_jsonb(NEW) - ARRAY[{columns}]) IS DISTINCT FROM (to_jsonb(OLD) - ARRAY[{columns}])) THEN
+        OR (to_jsonb(NEW) - ARRAY['status','accepted_at','accepted_note','evidence_file_id','rejected_at','rejected_reason',
+                                  'payment_status','deposit_paid_at','paid_at','internal_notes','updated_at'{extraColumns}])
+           IS DISTINCT FROM
+           (to_jsonb(OLD) - ARRAY['status','accepted_at','accepted_note','evidence_file_id','rejected_at','rejected_reason',
+                                  'payment_status','deposit_paid_at','paid_at','internal_notes','updated_at'{extraColumns}])) THEN
         RAISE EXCEPTION 'quotation_locked: content of quotation % (status %) cannot be modified', OLD.id, OLD.status
             USING ERRCODE = 'check_violation';
     END IF;
@@ -93,7 +96,7 @@ END; $$;";
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql(LockFunction(BaseColumns));
+            migrationBuilder.Sql(LockFunction(""));
 
             migrationBuilder.DropCheckConstraint(
                 name: "ck_quotations_payment_notice_at",
