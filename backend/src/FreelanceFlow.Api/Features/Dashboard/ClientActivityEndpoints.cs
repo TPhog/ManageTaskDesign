@@ -31,9 +31,6 @@ internal static class ClientActivityEndpoints
             .Where(id => id != null).Select(id => id!.Value).Distinct().ToList();
         var clients = await db.Clients.AsNoTracking().Where(c => clientIds.Contains(c.Id))
             .Select(c => new { c.Id, c.Name }).ToDictionaryAsync(c => c.Id, c => c.Name, ct);
-        var quotationIds = feed.Where(f => f.Action == QuotationAccepted).Select(f => f.EntityId).Distinct().ToList();
-        var numbers = await db.Quotations.AsNoTracking().Where(q => quotationIds.Contains(q.Id))
-            .Select(q => new { q.Id, q.Number }).ToDictionaryAsync(q => q.Id, q => q.Number, ct);
 
         var items = feed.Select(f =>
         {
@@ -50,9 +47,8 @@ internal static class ClientActivityEndpoints
                 RequestCreated => ("REQUEST_CREATED", f.ClientMessage ?? "Khách gửi yêu cầu mới", $"/admin/requests/{f.EntityId}"),
                 DeliverableApproved => ("DELIVERABLE_APPROVED", f.ClientMessage ?? "Khách đã duyệt sản phẩm",
                     f.ProjectId is { } hp ? $"/admin/projects/{hp}" : "/admin/projects"),
-                _ => ("QUOTATION_ACCEPTED",
-                    f.ClientMessage ?? (numbers.GetValueOrDefault(f.EntityId) is { } no ? $"Khách đã chấp nhận báo giá {no}" : "Khách đã chấp nhận báo giá"),
-                    $"/admin/quotations/{f.EntityId}"),
+                // production always writes "Báo giá {Number} (v{Version}) đã được chấp nhận" as client_message
+                _ => ("QUOTATION_ACCEPTED", f.ClientMessage ?? "Khách đã chấp nhận báo giá", $"/admin/quotations/{f.EntityId}"),
             };
             return new ClientActivityItemDto(f.Id, f.OccurredAt, kind, text, clientName, projectName, href);
         }).ToList();

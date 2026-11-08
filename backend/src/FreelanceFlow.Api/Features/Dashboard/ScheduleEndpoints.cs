@@ -38,7 +38,7 @@ internal static class ScheduleEndpoints
             .ToListAsync(ct);
         var undated = await open.CountAsync(x => x.t.DueDate == null, ct);
 
-        var openStatuses = new[] { "DRAFT", "QUOTED", "IN_PROGRESS", "ON_HOLD" };
+        var openStatuses = DashboardRules.OpenProjectStatuses;
         var projectDeadlines = await (
                 from p in db.Projects.AsNoTracking()
                 join c in db.Clients.AsNoTracking() on p.ClientId equals c.Id

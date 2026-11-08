@@ -62,14 +62,7 @@ public static class DashboardEndpoints
 
         // ---- DSH-03: tiền ----
         // docs/04 §4.2: BR-73 outstanding of ACCEPTED quotations whose project is not CANCELLED
-        var outstanding = await (
-                from q in db.Quotations.AsNoTracking()
-                join p in db.Projects.AsNoTracking() on q.ProjectId equals p.Id
-                where q.Status == QuotationStatuses.Accepted && p.Status != "CANCELLED"
-                select q.PaymentStatus == PaymentStatuses.Paid ? 0L
-                    : q.PaymentStatus == PaymentStatuses.DepositPaid ? q.Total - q.DepositAmount
-                    : q.Total)
-            .SumAsync();
+        var outstanding = await DashboardQueries.OutstandingTotalAsync(db);
 
         // accepted_at is the date the designer entered (BR-36); one read feeds the month totals and the chart (DSH-04)
         var chartStart = DashboardRules.ChartStart(today);

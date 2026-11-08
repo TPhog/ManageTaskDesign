@@ -24,11 +24,13 @@ public static class DailyDigestMessage
         {
             sb.AppendLine($"**Deadline dự án trong {DashboardRules.DigestDeadlineDays} ngày**");
             foreach (var d in f.ProjectDeadlines.Take(MaxPerGroup)) sb.AppendLine($"- {d.Name} · {Date(d.Date)}");
+            More(sb, f.ProjectDeadlines.Count, "dự án");
         }
         if (f.ExpiringQuotations.Count > 0)
         {
             sb.AppendLine($"**Báo giá hết hạn trong {DashboardRules.DigestDeadlineDays} ngày**");
             foreach (var q in f.ExpiringQuotations.Take(MaxPerGroup)) sb.AppendLine($"- {q.Number ?? "Báo giá nháp"} · hạn {Date(q.Expiry)}");
+            More(sb, f.ExpiringQuotations.Count, "báo giá");
         }
         var description = sb.Length > MaxLength ? sb.ToString(0, MaxLength) + "…" : sb.ToString().TrimEnd();
         var urgent = f.OverdueCount > 0 || f.ExpiringQuotations.Count > 0;
@@ -51,6 +53,11 @@ public static class DailyDigestMessage
         sb.AppendLine($"**{title} ({count})**");
         foreach (var t in tasks.Take(MaxPerGroup)) sb.AppendLine($"- {t.Title} · {t.ProjectName} · {Date(t.DueDate)}");
         if (count > MaxPerGroup) sb.AppendLine($"- và {count - MaxPerGroup} việc khác");
+    }
+
+    private static void More(StringBuilder sb, int total, string noun)
+    {
+        if (total > MaxPerGroup) sb.AppendLine($"- và {total - MaxPerGroup} {noun} khác");
     }
 
     private static string Date(DateOnly d) => d.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);

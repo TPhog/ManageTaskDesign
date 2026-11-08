@@ -27,6 +27,10 @@ public sealed class DailyDigestService(
         if (DashboardRules.VnHour(clock.UtcNow) < settings.DigestHourVn) return DigestOutcome.TooEarly;
 
         var today = clock.TodayVn;
+
+        // One transaction: claim the day, read, enqueue, commit. Concurrent callers wait on the row lock and then match 0 rows;
+        // any failure before the commit rolls the claim back, so the day is retried on the next tick instead of being lost.
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
         var claimed = await db.DashboardStates
             .Where(s => s.Id == 1 && (s.DigestLastRunDate == null || s.DigestLastRunDate < today))
             .ExecuteUpdateAsync(u => u.SetProperty(s => s.DigestLastRunDate, today), ct);
@@ -39,16 +43,14 @@ public sealed class DailyDigestService(
 
         var facts = await LoadFactsAsync(today, ct);
         var message = DailyDigestMessage.Build(facts, today, app.Value.PublicBaseUrl);
-        if (message is null) return DigestOutcome.NothingToReport;
+        if (message is null)
+        {
+            await tx.CommitAsync(ct);
+            return DigestOutcome.NothingToReport;
+        }
 
-        try
-        {
-            await notifier.EnqueueAsync(message, ct);
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            logger.LogWarning("Daily digest enqueue failed ({ExceptionType})", ex.GetType().Name);
-        }
+        await notifier.EnqueueAsync(message, ct);   // in-memory queue; a throw propagates and rolls the claim back
+        await tx.CommitAsync(ct);
         return DigestOutcome.Sent;
     }
 
@@ -92,14 +94,7 @@ public sealed class DailyDigestService(
             .ToListAsync(ct);
 
         // same receivables filter as GET /api/admin/dashboard (BR-73, project not CANCELLED)
-        var receivables = await (
-                from q in db.Quotations.AsNoTracking()
-                join p in db.Projects.AsNoTracking() on q.ProjectId equals p.Id
-                where q.Status == QuotationStatuses.Accepted && p.Status != "CANCELLED"
-                select q.PaymentStatus == PaymentStatuses.Paid ? 0L
-                    : q.PaymentStatus == PaymentStatuses.DepositPaid ? q.Total - q.DepositAmount
-                    : q.Total)
-            .SumAsync(ct);
+        var receivables = await DashboardQueries.OutstandingTotalAsync(db, ct);
 
         return new DigestFacts(overdueCount, overdue, todayCount, todayItems, tomorrowCount, tomorrowItems, deadlines, expiring, receivables);
     }

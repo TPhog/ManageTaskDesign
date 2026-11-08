@@ -31,7 +31,7 @@ public class DashboardClientActivityTests(AppFactory factory) : IntegrationTestB
         items.Select(i => i.GetProperty("kind").GetString())
             .Should().Equal("QUOTATION_ACCEPTED", "DELIVERABLE_APPROVED", "REQUEST_CREATED");
 
-        items[0].GetProperty("text").GetString().Should().Be("Khách đã chấp nhận báo giá BG-2030-0001");
+        items[0].GetProperty("text").GetString().Should().Be("Báo giá BG-2030-0001 (v1) đã được chấp nhận");
         items[0].GetProperty("href").GetString().Should().Be($"/admin/quotations/{QuotationId}");
         items[1].GetProperty("text").GetString().Should().Be("Khách đã duyệt Logo");
         items[1].GetProperty("href").GetString().Should().Be($"/admin/projects/{ProjectId}");
@@ -86,7 +86,8 @@ public class DashboardClientActivityTests(AppFactory factory) : IntegrationTestB
             Log("CLIENT", "deliverable", DeliverableId, "deliverable.client_approved", 1, "Khách đã duyệt Logo"),
             Log("DESIGNER", "request", Guid.NewGuid(), "request.created", 2),                // designer-made: excluded
             Log("CLIENT", "file", Guid.NewGuid(), "image.uploaded", 3),                      // not a feed action
-            Log("DESIGNER", "quotation", QuotationId, "quotation.accepted", 4));
+            Log("DESIGNER", "quotation", QuotationId, "quotation.accepted", 4,
+                "Báo giá BG-2030-0001 (v1) đã được chấp nhận"));   // the exact shape QuotationWorkflowEndpoints writes
         await db.SaveChangesAsync();
     }
 }

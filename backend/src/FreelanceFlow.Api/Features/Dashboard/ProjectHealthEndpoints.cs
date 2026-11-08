@@ -11,7 +11,6 @@ namespace FreelanceFlow.Api.Features.Dashboard;
 /// <summary>P11 BR-92: one health row per running project, scored from the same FlowFacts the project page uses.</summary>
 internal static class ProjectHealthEndpoints
 {
-    private const int MaxLoaded = 50;
     private const int MaxReturned = 12;
 
     public static void MapProjectHealthEndpoints(this IEndpointRouteBuilder admin) => admin.MapGet("dashboard/project-health", Get);
@@ -30,10 +29,8 @@ internal static class ProjectHealthEndpoints
             select new { p.Id, p.Name, p.Status, p.DueDate, ClientId = c.Id, ClientName = c.Name };
 
         var total = await candidates.CountAsync(ct);
-        var loaded = await candidates
-            .OrderBy(x => x.DueDate == null).ThenBy(x => x.DueDate).ThenBy(x => x.Name)
-            .Take(MaxLoaded)
-            .ToListAsync(ct);
+        // single-user dataset: score every candidate so a risky undated project is never dropped before ranking
+        var loaded = await candidates.ToListAsync(ct);
 
         var facts = await ProjectFlowReads.LoadFactsAsync(db, loaded.Select(x => x.Id).ToList(), today);
 

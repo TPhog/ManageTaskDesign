@@ -45,6 +45,18 @@ public class DailyDigestMessageTests
     }
 
     [Fact]
+    public void Deadline_and_quotation_lists_also_say_how_many_more()
+    {
+        var f = Empty() with
+        {
+            ProjectDeadlines = Enumerable.Range(0, 7).Select(i => new DigestDeadline($"Dự án {i}", Today.AddDays(1))).ToList(),
+            ExpiringQuotations = Enumerable.Range(0, 6).Select(i => new DigestQuotation($"BG-{i}", Today.AddDays(1))).ToList(),
+        };
+        var n = DailyDigestMessage.Build(f, Today, null)!;
+        n.Description.Should().Contain("và 2 dự án khác").And.Contain("và 1 báo giá khác");
+    }
+
+    [Fact]
     public void Caps_each_list_at_five_and_says_how_many_more()
     {
         var many = Enumerable.Range(0, 9).Select(i => T($"Task {i}", -1)).ToList();

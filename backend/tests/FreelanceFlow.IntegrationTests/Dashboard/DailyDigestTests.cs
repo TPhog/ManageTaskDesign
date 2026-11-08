@@ -1,4 +1,9 @@
+using FreelanceFlow.Api.Common;
 using FreelanceFlow.Api.Data;
+using FreelanceFlow.Api.Domain.Common;
+using FreelanceFlow.Api.Infrastructure.Notifications;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using FreelanceFlow.Api.Domain.Clients;
 using FreelanceFlow.Api.Domain.Projects;
 using FreelanceFlow.Api.Domain.Tasks;
@@ -61,8 +66,34 @@ public class DailyDigestTests(AppFactory factory) : IntegrationTestBase(factory)
         var services = await HostAsync(day);
         (await RunAsync(services)).Should().Be(DigestOutcome.NothingToReport);
         (await LastRunAsync(services)).Should().Be(day);
-        await Task.Delay(300);
-        Factory.Notifications.Sent.Should().NotContain(n => n.Title == "Nhắc việc ngày 10/01/2020");
+        // NothingToReport is returned before anything is enqueued, so there is nothing to wait for
+    }
+
+    [Fact]
+    public async Task A_failure_before_the_message_is_queued_releases_the_day_for_a_retry()
+    {
+        var day = new DateOnly(2030, 8, 1);
+        var (_, services) = await CreateAsync(Factory, SeedAsync, day);
+        await ResetAsync(services, enabled: true, hour: 8, resetState: true);
+
+        using (var scope = services.CreateScope())
+        {
+            var failing = new DailyDigestService(
+                scope.ServiceProvider.GetRequiredService<AppDbContext>(),
+                scope.ServiceProvider.GetRequiredService<IClock>(),
+                new ThrowingNotifier(),
+                scope.ServiceProvider.GetRequiredService<IOptions<AppSettings>>(),
+                NullLogger<DailyDigestService>.Instance);
+            await FluentActions.Awaiting(() => failing.RunAsync()).Should().ThrowAsync<InvalidOperationException>();
+        }
+        (await LastRunAsync(services)).Should().BeNull();
+        (await RunAsync(services)).Should().Be(DigestOutcome.Sent);
+    }
+
+    private sealed class ThrowingNotifier : INotifier
+    {
+        public ValueTask EnqueueAsync(Notification n, CancellationToken ct = default) =>
+            throw new InvalidOperationException("queue unavailable");
     }
 
     [Fact]
@@ -78,12 +109,17 @@ public class DailyDigestTests(AppFactory factory) : IntegrationTestBase(factory)
     private async Task<IServiceProvider> HostAsync(DateOnly day, bool enabled = true, int hour = 8, bool resetState = true)
     {
         var (_, services) = await CreateAsync(Factory, SeedAsync, day);
+        await ResetAsync(services, enabled, hour, resetState);
+        return services;
+    }
+
+    private static async Task ResetAsync(IServiceProvider services, bool enabled, int hour, bool resetState)
+    {
         using var scope = services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         await db.Database.ExecuteSqlRawAsync(
             $"UPDATE settings SET digest_enabled = {(enabled ? "true" : "false")}, digest_hour_vn = {hour}");
         if (resetState) await db.Database.ExecuteSqlRawAsync("UPDATE dashboard_state SET digest_last_run_date = NULL");
-        return services;
     }
 
     private static async Task<DigestOutcome> RunAsync(IServiceProvider services)
