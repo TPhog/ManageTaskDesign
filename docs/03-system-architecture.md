@@ -143,7 +143,7 @@ Client(Portal)        API                         DB                     Designe
 | `Storage__QuotaBytes` | `10737418240` | Hạn mức dung lượng (byte); chặn upload ở 90 % |
 | `Notifications__Discord__WebhookUrl` | (secret) | Webhook cảnh báo cho designer; để trống = tắt |
 | `App__MaxUploadMb` | `20` | |
-| `Seed__DesignerEmail` | `me@example.com` | Chỉ dùng lần đầu khi chưa có tài khoản |
+| `Seed__DesignerUsername` | `me@example.com` | Chỉ dùng lần đầu khi chưa có tài khoản |
 | `Seed__DesignerPassword` | (secret) | Chỉ dùng lần đầu; xóa khỏi env sau khi seed |
 | `ASPNETCORE_ENVIRONMENT` | `Production` | |
 
