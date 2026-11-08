@@ -45,7 +45,10 @@ public static class QuotationsEndpoints
         if (projectId is { } pid) query = query.Where(x => x.Quotation.ProjectId == pid);
         if (clientId is { } cid) query = query.Where(x => x.ClientId == cid);
         if (!string.IsNullOrWhiteSpace(status)) query = query.Where(x => x.Quotation.Status == status);
-        if (!string.IsNullOrWhiteSpace(paymentStatus)) query = query.Where(x => x.Quotation.PaymentStatus == paymentStatus);
+        // payment_status defaults to UNPAID on every row; it is only meaningful once the client has accepted
+        if (!string.IsNullOrWhiteSpace(paymentStatus))
+            query = query.Where(x =>
+                x.Quotation.Status == QuotationStatuses.Accepted && x.Quotation.PaymentStatus == paymentStatus);
         // EXPIRED is not stored (ADR-009): filter it as SENT + expiry_date before today (VN)
         query = effectiveStatus switch
         {
@@ -60,6 +63,7 @@ public static class QuotationsEndpoints
         var total = await query.CountAsync();
         var rows = await query
             .OrderByDescending(x => x.Quotation.CreatedAt)
+            .ThenByDescending(x => x.Quotation.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .ToListAsync();
@@ -214,6 +218,10 @@ public static class QuotationsEndpoints
         catch (DbUpdateConcurrencyException)
         {
             return QuotationReads.Concurrency();
+        }
+        catch (DbUpdateException e) when (QuotationReads.IsLockViolation(e))
+        {
+            return QuotationReads.Locked(); // a concurrent Send locked the quotation between load and save
         }
 
         return Results.Ok(await QuotationReads.LoadDetailAsync(db, id, clock.TodayVn));

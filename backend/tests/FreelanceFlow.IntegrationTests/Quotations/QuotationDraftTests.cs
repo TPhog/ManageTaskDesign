@@ -253,6 +253,18 @@ public class QuotationDraftTests(AppFactory factory) : QuotationTestBase(factory
     }
 
     [Fact]
+    public async Task Payment_filter_ignores_quotations_that_are_not_accepted()
+    {
+        await LoginAsync();
+        var (projectA, _) = await CreateSendableDraftAsync();
+
+        var list = await Client.GetFromJsonAsync<JsonElement>(
+            $"/api/admin/quotations?projectId={projectA}&paymentStatus=UNPAID");
+
+        list.GetProperty("total").GetInt32().Should().Be(0);
+    }
+
+    [Fact]
     public async Task Get_unknown_quotation_returns_404()
     {
         await LoginAsync();
