@@ -6,6 +6,7 @@ using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Features.Auth;
 using FreelanceFlow.Api.Features.Clients;
 using FreelanceFlow.Api.Features.Dashboard;
+using FreelanceFlow.Api.Features.Images;
 using FreelanceFlow.Api.Features.Portal;
 using FreelanceFlow.Api.Features.Projects;
 using FreelanceFlow.Api.Features.Quotations;
@@ -13,11 +14,13 @@ using FreelanceFlow.Api.Features.Requests;
 using FreelanceFlow.Api.Features.Revisions;
 using FreelanceFlow.Api.Features.Services;
 using FreelanceFlow.Api.Features.Settings;
+using FreelanceFlow.Api.Features.Storage;
 using FreelanceFlow.Api.Features.Tasks;
 using FreelanceFlow.Api.Infrastructure;
 using FreelanceFlow.Api.Infrastructure.Notifications;
 using FreelanceFlow.Api.Infrastructure.Security;
 using FreelanceFlow.Api.Infrastructure.Storage;
+using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
@@ -58,6 +61,12 @@ builder.Services.AddHostedService<NotificationDispatcher>();
 
 // Image storage (plan 08): local folder Storage:Local:RootPath with quota Storage:QuotaBytes
 builder.Services.AddFileStorage(builder.Configuration);
+builder.Services.AddScoped<StorageAlertService>();
+builder.Services.AddScoped<ImageUploader>();
+// Upload endpoints raise their own request size (RequestSizeLimit); multipart parsing must allow the same
+builder.Services.Configure<FormOptions>(o => o.MultipartBodyLengthLimit = ImageLimits.MaxAdminBodyBytes);
+if (builder.Configuration.GetValue("Storage:ReconcileIntervalHours", 24) > 0)
+    builder.Services.AddHostedService<StorageReconciliationService>();
 
 // DbContext
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection")
@@ -234,6 +243,9 @@ app.MapRequestsEndpoints();
 app.MapRevisionsEndpoints();
 app.MapProgressUpdatesEndpoints();
 app.MapDashboardEndpoints();
+app.MapImagesEndpoints();
+app.MapStorageEndpoints();
+app.MapWatermarkEndpoints();
 app.MapProjectFlowEndpoints();
 app.MapPortalSessionEndpoints();
 app.MapPortalProjectsEndpoints();
