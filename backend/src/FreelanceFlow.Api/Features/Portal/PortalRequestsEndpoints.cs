@@ -164,7 +164,7 @@ public static class PortalRequestsEndpoints
             var oneLine = string.Join(' ', request.Content.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
             var excerpt = oneLine.Length > 200 ? oneLine[..200] + "…" : oneLine;
             var url = Uri.TryCreate(app.PublicBaseUrl, UriKind.Absolute, out var baseUri)
-                ? $"{baseUri.AbsoluteUri.TrimEnd('/')}/admin/requests?id={request.Id}"
+                ? $"{baseUri.AbsoluteUri.TrimEnd('/')}/admin/requests/{request.Id}"
                 : null;
             await notifier.EnqueueAsync(new Notification("Yêu cầu mới từ khách", excerpt, url, NotificationSeverity.Info, fields));
         }

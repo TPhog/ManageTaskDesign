@@ -26,7 +26,7 @@ public class PortalRequestNotificationTests(AppFactory factory) : PortalTestBase
         var n = hits.Should().ContainSingle().Subject;
         n.Title.Should().Be("Yêu cầu mới từ khách");
         n.Description.Should().Be("Đổi màu chữ sang xanh navy");
-        n.Url.Should().Be($"http://localhost/admin/requests?id={requestId}");
+        n.Url.Should().Be($"http://localhost/admin/requests/{requestId}");
         n.Fields.Should().Contain([new NotificationField("Khách", clientName), new NotificationField("Hạng mục", "Logo chính")]);
     }
 
