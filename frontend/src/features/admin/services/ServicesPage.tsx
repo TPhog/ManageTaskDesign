@@ -242,7 +242,7 @@ export default function ServicesPage() {
               setTemplateErr(error)
               if (!error) saveMutation.mutate(data)
             })}
-            className="mt-6 flex flex-1 flex-col"
+            className="mt-6 flex min-h-0 flex-1 flex-col"
             noValidate
           >
             <div className="flex-1 space-y-5 overflow-y-auto pr-1">

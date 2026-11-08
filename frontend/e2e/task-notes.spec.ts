@@ -31,7 +31,9 @@ test.describe('Task notes', () => {
     await drawer.getByLabel('Mô tả của Chọn font').fill('Ưu tiên font không chân')
     await drawer.getByRole('button', { name: 'Lưu mô tả' }).click()
     await expectToast(page, 'Đã lưu mô tả')
-    await drawer.getByRole('checkbox', { name: 'Chọn font' }).check()
+    const fontItem = drawer.getByRole('checkbox', { name: 'Chọn font' })
+    await fontItem.click()
+    await expect(fontItem).toBeChecked()
     await drawer.getByRole('button', { name: 'Mở mô tả Chọn font' }).click()
     await expect(drawer.getByText('Ưu tiên font không chân')).toBeVisible()
 
