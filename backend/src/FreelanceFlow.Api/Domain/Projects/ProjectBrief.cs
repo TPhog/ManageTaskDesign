@@ -18,6 +18,9 @@ public class ProjectBrief : IAuditable
     {
         if (Status == "CONFIRMED")
             throw new DomainException("BRIEF_LOCKED", "Brief đã được xác nhận");
+        // QA D-08: an empty version would show up on the client's timeline as "confirmed"
+        if (string.IsNullOrWhiteSpace(Content))
+            throw new DomainException("BUSINESS_RULE", "Brief đang trống — nhập nội dung trước khi xác nhận");
         Status = "CONFIRMED";
         ConfirmedAt = clock.UtcNow;
     }

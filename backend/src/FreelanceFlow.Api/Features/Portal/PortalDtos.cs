@@ -11,7 +11,8 @@ public sealed record PortalDesignerDto(string DisplayName, string? LogoUrl, stri
 
 public sealed record PortalMeDto(string ClientName, PortalDesignerDto Designer);
 
-public sealed record PortalDeliverableSummaryDto(int Total, int Delivered, int Approved);
+/// <summary>InReview: deliverables waiting for the client's approval (QA C-06).</summary>
+public sealed record PortalDeliverableSummaryDto(int Total, int Delivered, int Approved, int InReview);
 
 public sealed record PortalProjectListItemDto(
     Guid Id,
@@ -52,7 +53,11 @@ public sealed record PortalProjectDetailDto(
     IReadOnlyList<PortalDeliverableDto> Deliverables,
     PortalBriefDto? Brief);
 
-public sealed record PortalTimelineItemDto(DateTimeOffset OccurredAt, string Message);
+/// <summary>Kind: "MESSAGE" = the designer's progress update, "EVENT" = an automatic status line (QA C-12).</summary>
+public sealed record PortalTimelineItemDto(DateTimeOffset OccurredAt, string Message, string Kind);
+
+/// <summary>GET /api/portal/studio — public: lets signed-out / expired / bad-link pages show how to reach the studio.</summary>
+public sealed record PortalStudioDto(string DisplayName, string? ContactPhone, string? ContactEmail);
 
 public sealed record PortalPagedDto<T>(IReadOnlyList<T> Items, int Page, int PageSize, int Total);
 

@@ -112,7 +112,7 @@ public class FlowEntityTests
     {
         var p = new Project { Status = "DRAFT" };
 
-        p.Start(hasAcceptedInitialQuotation: false).Should().Equal("Chưa có báo giá gốc được chấp nhận. Xác nhận để tiếp tục.");
+        p.Start(hasAcceptedInitialQuotation: false).Should().Equal("Chưa có báo giá gốc được khách chấp nhận.");
 
         p.Status.Should().Be("IN_PROGRESS");
         new Project { Status = "QUOTED" }.Start(hasAcceptedInitialQuotation: true).Should().BeEmpty();

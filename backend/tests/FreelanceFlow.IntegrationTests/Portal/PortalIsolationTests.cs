@@ -14,6 +14,7 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
     {
         ["POST /api/portal/session"] = null,
         ["POST /api/portal/logout"] = null,
+        ["GET /api/portal/studio"] = null, // public studio contact, no resource (PortalSessionTests.Studio_contact_is_public…)
         ["GET /api/portal/me"] = "/api/portal/me",
         ["GET /api/portal/projects"] = "/api/portal/projects",
         ["GET /api/portal/projects/{id:guid}"] = "/api/portal/projects/{projectA}",

@@ -63,15 +63,15 @@ public class Project : IAuditable
 
         // Warnings for DRAFT/QUOTED → IN_PROGRESS
         if (to is "IN_PROGRESS" && !hasAcceptedInitialQuotation)
-            warnings.Add("Chưa có báo giá gốc được chấp nhận. Xác nhận để tiếp tục.");
+            warnings.Add("Chưa có báo giá gốc được khách chấp nhận.");
 
         // Warnings for IN_PROGRESS → COMPLETED
         if (to is "COMPLETED")
         {
             if (hasIncompleteDeliverables)
-                warnings.Add("Còn deliverable chưa hoàn thành hoặc bị hủy.");
+                warnings.Add("Còn hạng mục chưa bàn giao (chưa ở trạng thái Đã bàn giao hoặc Đã huỷ).");
             if (hasUnpaidAcceptedQuotations)
-                warnings.Add("Còn báo giá ACCEPTED chưa được thanh toán đầy đủ.");
+                warnings.Add("Còn báo giá đã chấp nhận chưa thu đủ tiền.");
         }
 
         return [.. warnings];

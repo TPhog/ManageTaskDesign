@@ -113,6 +113,10 @@ public static class BriefsEndpoints
         {
             brief.Confirm(clock);
         }
+        catch (DomainException ex) when (ex.Code == "BUSINESS_RULE")
+        {
+            return Results.UnprocessableEntity(new { code = ex.Code, detail = ex.Detail });
+        }
         catch (DomainException ex)
         {
             return Results.Conflict(new { code = ex.Code, detail = ex.Detail });

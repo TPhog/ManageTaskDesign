@@ -24,6 +24,10 @@ public static class PortalSessionEndpoints
 
         app.MapGet("/api/portal/me", Me)
            .RequireAuthorization(PortalPrincipal.Policy);
+
+        // Public on purpose: the studio's own contact (also printed on every quotation), never client data.
+        app.MapGet("/api/portal/studio", Studio)
+           .AllowAnonymous();
     }
 
     // 07-security §4.2. Request body (the token) must never be logged.
@@ -82,6 +86,12 @@ public static class PortalSessionEndpoints
             null, // logo file serving arrives with M3
             settings?.ContactPhone,
             settings?.ContactEmail)));
+    }
+
+    private static async Task<IResult> Studio(AppDbContext db)
+    {
+        var settings = await db.Settings.AsNoTracking().FirstOrDefaultAsync();
+        return Results.Ok(new PortalStudioDto(settings?.DisplayName ?? "", settings?.ContactPhone, settings?.ContactEmail));
     }
 
     private static IResult InvalidLink() => Results.Problem(

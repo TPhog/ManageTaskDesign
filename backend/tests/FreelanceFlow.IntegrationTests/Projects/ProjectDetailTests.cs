@@ -1,3 +1,4 @@
+using System.Net;
 using System.Text.Json;
 
 namespace FreelanceFlow.IntegrationTests.Projects;
@@ -26,11 +27,28 @@ public class ProjectDetailTests(AppFactory factory) : IntegrationTestBase(factor
         var v1 = (await Client.GetFromJsonAsync<JsonElement>($"/api/admin/projects/{projectId}"))
             .GetProperty("brief").GetProperty("id").GetGuid();
 
+        (await Client.PutAsJsonAsync($"/api/admin/briefs/{v1}", new { content = "Brief v1" })).EnsureSuccessStatusCode();
         (await Client.PostAsync($"/api/admin/briefs/{v1}/confirm", null)).EnsureSuccessStatusCode();
         (await Client.PostAsync($"/api/admin/projects/{projectId}/briefs", null)).EnsureSuccessStatusCode();
 
         var detail = await Client.GetFromJsonAsync<JsonElement>($"/api/admin/projects/{projectId}");
         detail.GetProperty("brief").GetProperty("version").GetInt32().Should().Be(2);
+    }
+
+    [Fact]
+    public async Task Confirming_an_empty_brief_returns_422_and_keeps_it_draft()   // QA D-08
+    {
+        await LoginAsync();
+        var projectId = await CreateProjectAsync();
+        var v1 = (await Client.GetFromJsonAsync<JsonElement>($"/api/admin/projects/{projectId}"))
+            .GetProperty("brief").GetProperty("id").GetGuid();
+
+        var resp = await Client.PostAsync($"/api/admin/briefs/{v1}/confirm", null);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("BUSINESS_RULE");
+        (await Client.GetFromJsonAsync<JsonElement>($"/api/admin/projects/{projectId}"))
+            .GetProperty("brief").GetProperty("status").GetString().Should().Be("DRAFT");
     }
 
     private async Task<Guid> CreateProjectAsync()

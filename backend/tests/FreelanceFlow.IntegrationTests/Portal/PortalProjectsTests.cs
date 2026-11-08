@@ -124,7 +124,7 @@ public class PortalProjectsTests(AppFactory factory) : PortalTestBase(factory)
         items.Select(i => i.GetProperty("message").GetString())
             .Should().Equal("Logo: Chờ duyệt", "Dự án chuyển sang: Đang thực hiện");
         items.Should().AllSatisfy(i =>
-            i.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo("occurredAt", "message"));
+            i.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo("occurredAt", "message", "kind"));
     }
 
     [Fact]
@@ -182,5 +182,40 @@ public class PortalProjectsTests(AppFactory factory) : PortalTestBase(factory)
 
         (await portal.GetAsync($"/api/portal/projects/{Guid.NewGuid()}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
         (await portal.GetAsync($"/api/portal/projects/{Guid.NewGuid()}/timeline")).StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task Summary_counts_deliverables_waiting_for_the_client()   // QA C-06
+    {
+        await LoginAsync();
+        var (clientId, token) = await CreateClientWithPortalLinkAsync();
+        var projectId = await CreateProjectAsync(clientId, "Cho duyet");
+        await MoveDeliverableAsync(await CreateDeliverableAsync(projectId, "Logo"), "IN_PROGRESS", "IN_REVIEW");
+        await CreateDeliverableAsync(projectId, "Menu");
+        var portal = await OpenPortalSessionAsync(token);
+
+        var list = await portal.GetFromJsonAsync<JsonElement>("/api/portal/projects");
+        var detail = await portal.GetFromJsonAsync<JsonElement>($"/api/portal/projects/{projectId}");
+
+        list[0].GetProperty("deliverableSummary").GetProperty("inReview").GetInt32().Should().Be(1);
+        detail.GetProperty("deliverableSummary").GetProperty("inReview").GetInt32().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Timeline_marks_designer_messages_apart_from_system_events()   // QA C-12
+    {
+        await LoginAsync();
+        var (clientId, token) = await CreateClientWithPortalLinkAsync();
+        var projectId = await CreateProjectAsync(clientId, "Tin nhan");
+        await ChangeProjectStatusAsync(projectId, new { to = "IN_PROGRESS", confirmWarnings = true });
+        (await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/progress-updates",
+            new { message = "Đã xong phác thảo" })).EnsureSuccessStatusCode();
+        var portal = await OpenPortalSessionAsync(token);
+
+        var items = (await portal.GetFromJsonAsync<JsonElement>($"/api/portal/projects/{projectId}/timeline"))
+            .GetProperty("items").EnumerateArray().ToList();
+
+        items.Select(i => (i.GetProperty("message").GetString(), i.GetProperty("kind").GetString()))
+            .Should().Equal(("Đã xong phác thảo", "MESSAGE"), ("Dự án chuyển sang: Đang thực hiện", "EVENT"));
     }
 }

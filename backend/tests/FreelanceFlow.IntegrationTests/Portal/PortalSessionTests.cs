@@ -20,6 +20,18 @@ public class PortalSessionTests(AppFactory factory) : PortalTestBase(factory)
     }
 
     [Fact]
+    public async Task Studio_contact_is_public_and_carries_only_the_contact_fields()   // QA C-04/C-14/C-15
+    {
+        var bare = CreateBareClient();
+
+        var resp = await bare.GetAsync("/api/portal/studio");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var body = await resp.Content.ReadFromJsonAsync<JsonElement>();
+        body.EnumerateObject().Select(p => p.Name).Should().BeEquivalentTo("displayName", "contactPhone", "contactEmail");
+    }
+
+    [Fact]
     public async Task Unknown_or_malformed_token_returns_generic_401_without_cookie()
     {
         foreach (var token in new[] { new string('A', 43), "not-a-token", "" })

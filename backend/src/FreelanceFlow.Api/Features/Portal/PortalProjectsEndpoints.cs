@@ -37,7 +37,8 @@ public static class PortalProjectsEndpoints
                 new PortalDeliverableSummaryDto(
                     db.Deliverables.Count(d => d.ProjectId == p.Id && d.Status != "CANCELLED"),
                     db.Deliverables.Count(d => d.ProjectId == p.Id && d.Status == "DELIVERED"),
-                    db.Deliverables.Count(d => d.ProjectId == p.Id && d.Status == "APPROVED")),
+                    db.Deliverables.Count(d => d.ProjectId == p.Id && d.Status == "APPROVED"),
+                    db.Deliverables.Count(d => d.ProjectId == p.Id && d.Status == "IN_REVIEW")),
                 db.Quotations.Any(q => q.ProjectId == p.Id && q.Status == "SENT" &&
                                        (q.ExpiryDate == null || q.ExpiryDate >= today)),
                 // M7b: target of the "Có báo giá mới" chip — the newest open quotation
@@ -94,7 +95,8 @@ public static class PortalProjectsEndpoints
         var summary = new PortalDeliverableSummaryDto(
             deliverables.Count(d => d.Status != "CANCELLED"),
             deliverables.Count(d => d.Status == "DELIVERED"),
-            deliverables.Count(d => d.Status == "APPROVED"));
+            deliverables.Count(d => d.Status == "APPROVED"),
+            deliverables.Count(d => d.Status == "IN_REVIEW"));
 
         // BRF-04: only the newest CONFIRMED brief is visible to the client
         var brief = await db.ProjectBriefs.AsNoTracking()
@@ -191,7 +193,8 @@ public static class PortalProjectsEndpoints
             .OrderByDescending(a => a.OccurredAt).ThenByDescending(a => a.Id)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(a => new PortalTimelineItemDto(a.OccurredAt, a.ClientMessage!))
+            .Select(a => new PortalTimelineItemDto(a.OccurredAt, a.ClientMessage!,
+                a.Action == "project.progress_update" ? "MESSAGE" : "EVENT"))
             .ToListAsync();
 
         return Results.Ok(new PortalPagedDto<PortalTimelineItemDto>(items, page, pageSize, total));

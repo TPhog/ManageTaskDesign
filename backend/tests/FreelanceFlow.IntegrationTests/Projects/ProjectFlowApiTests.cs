@@ -26,8 +26,12 @@ public class ProjectFlowApiTests(AppFactory factory) : PortalTestBase(factory)
     private static List<string> Kinds(JsonElement items) =>
         items.EnumerateArray().Select(a => a.GetProperty("kind").GetString()!).ToList();
 
-    private async Task ConfirmBriefAsync(Guid projectId) =>
-        (await Client.PostAsync($"/api/admin/briefs/{await GetLatestBriefIdAsync(projectId)}/confirm", null)).EnsureSuccessStatusCode();
+    private async Task ConfirmBriefAsync(Guid projectId)
+    {
+        var briefId = await GetLatestBriefIdAsync(projectId);
+        (await Client.PutAsJsonAsync($"/api/admin/briefs/{briefId}", new { content = "Brief" })).EnsureSuccessStatusCode();
+        (await Client.PostAsync($"/api/admin/briefs/{briefId}/confirm", null)).EnsureSuccessStatusCode();
+    }
 
     private async Task AcceptAsync(Guid quotationId)
     {
@@ -202,7 +206,7 @@ public class ProjectFlowApiTests(AppFactory factory) : PortalTestBase(factory)
         body.GetProperty("startedDeliverables").GetInt32().Should().Be(2);
         body.GetProperty("createdTasks").GetInt32().Should().Be(2);
         body.GetProperty("warnings").EnumerateArray().Select(w => w.GetString())
-            .Should().Equal("Chưa có báo giá gốc được chấp nhận. Xác nhận để tiếp tục.");
+            .Should().Equal("Chưa có báo giá gốc được khách chấp nhận.");
 
         var project = await ProjectAsync(projectId);
         project.GetProperty("status").GetString().Should().Be("IN_PROGRESS");

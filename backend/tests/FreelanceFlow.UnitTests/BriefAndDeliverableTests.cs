@@ -11,7 +11,7 @@ public class BriefTests
     [Fact]
     public void Confirm_DraftBrief_SetsConfirmedStatus()
     {
-        var brief = new ProjectBrief { Status = "DRAFT", Version = 1 };
+        var brief = new ProjectBrief { Status = "DRAFT", Version = 1, Content = "Logo tông xanh" };
         brief.Confirm(FakeClock());
 
         Assert.Equal("CONFIRMED", brief.Status);
@@ -24,6 +24,19 @@ public class BriefTests
         var brief = new ProjectBrief { Status = "CONFIRMED", ConfirmedAt = DateTimeOffset.UtcNow };
         var ex = Assert.Throws<DomainException>(() => brief.Confirm(FakeClock()));
         Assert.Equal("BRIEF_LOCKED", ex.Code);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("    ")]
+    public void Confirm_EmptyBrief_ThrowsBusinessRule(string content)   // QA D-08
+    {
+        var brief = new ProjectBrief { Status = "DRAFT", Version = 1, Content = content };
+
+        var ex = Assert.Throws<DomainException>(() => brief.Confirm(FakeClock()));
+
+        Assert.Equal("BUSINESS_RULE", ex.Code);
+        Assert.Equal("DRAFT", brief.Status);
     }
 
     [Fact]
