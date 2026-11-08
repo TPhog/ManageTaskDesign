@@ -14,6 +14,10 @@ public static class DashboardEndpoints
         var admin = app.MapGroup("/api/admin").RequireAuthorization();
         admin.MapGet("dashboard", GetDashboard);
         admin.MapSetupChecklistEndpoints();
+        admin.MapScheduleEndpoints();
+        admin.MapProjectHealthEndpoints();
+        admin.MapMoneyInsightsEndpoints();
+        admin.MapClientActivityEndpoints();
     }
 
     /// <summary>
