@@ -83,7 +83,7 @@ export async function moveDeliverable(page: Page, deliverableId: string, ...stat
 export async function createTask(
   page: Page,
   projectId: string,
-  body: { title: string; status?: string; dueDate?: string },
+  body: { title: string; status?: string; dueDate?: string; priority?: string },
 ): Promise<string> {
   return (await apiPost(page.request, page, `/api/admin/projects/${projectId}/tasks`, body)).id
 }
