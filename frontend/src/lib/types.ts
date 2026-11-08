@@ -33,6 +33,14 @@ export interface Deliverable {
   status: DeliverableStatus
   dueDate: string | null
   sortOrder: number
+  /** plan 06b: tasks linked to the deliverable (DONE / all) */
+  taskTotal: number
+  taskDone: number
+  /** % of tasks DONE, half-up; null when the deliverable has no task */
+  progressPercent: number | null
+  /** 'APPROVED' once the client pressed "Duyệt" on the portal; cleared when it leaves IN_REVIEW */
+  clientDecision: 'APPROVED' | null
+  clientDecisionAt: string | null
 }
 
 export interface Brief {
@@ -126,6 +134,8 @@ export interface TaskListItem {
   checklistDone: number
   createdAt: string
   updatedAt: string
+  hasDescription: boolean
+  notesCount: number
 }
 
 export interface ChecklistItem {
@@ -133,6 +143,7 @@ export interface ChecklistItem {
   text: string
   done: boolean
   sortOrder: number
+  description: string
 }
 
 /** GET /admin/tasks/{id}; every task write returns this shape */
@@ -156,6 +167,15 @@ export interface TaskDetail {
   updatedAt: string
   /** Set when the task was created from a revision item */
   revisionItemId?: string | null
+  notesCount: number
+}
+
+/** GET /admin/tasks/{id}/notes item — designer-only */
+export interface TaskNote {
+  id: string
+  body: string
+  createdAt: string
+  updatedAt: string
 }
 
 export interface TaskListParams {

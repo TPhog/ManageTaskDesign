@@ -22,6 +22,14 @@ export const qk = {
     lists:  ['tasks', 'list']                                     as const,
     list:   (params: TaskListParams) => ['tasks', 'list', params] as const,
     detail: (id: string)             => ['tasks', 'detail', id]   as const,
+    notes:  (id: string)             => ['tasks', 'notes', id]    as const,
+  },
+
+  // Under 'projects' on purpose: every existing invalidateQueries(qk.projects.all) also refreshes the flow
+  flow: {
+    project:      (projectId: string) => ['projects', projectId, 'flow']          as const,
+    startPreview: (projectId: string) => ['projects', projectId, 'start-preview'] as const,
+    actions:      ['projects', 'flow-actions']                                    as const,
   },
 
   quotations: {
