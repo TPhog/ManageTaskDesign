@@ -64,6 +64,7 @@ builder.Services.AddHostedService<NotificationDispatcher>();
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddScoped<StorageAlertService>();
 builder.Services.AddScoped<ImageUploader>();
+builder.Services.AddScoped<StorageSweeper>();
 builder.Services.AddSingleton(new FreelanceFlow.Api.Infrastructure.Images.ImageProcessingGate(
     builder.Configuration.GetValue("Storage:MaxConcurrentImageProcessing",
         FreelanceFlow.Api.Infrastructure.Images.ImageProcessingGate.DefaultPermits)));

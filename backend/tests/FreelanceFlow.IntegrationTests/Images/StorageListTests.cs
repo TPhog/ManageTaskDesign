@@ -43,9 +43,8 @@ public class StorageListTests(AppFactory factory) : ImageTestBase(factory)
         (await Client.GetAsync("/api/admin/storage/images?olderThanMonths=121")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
         (await Client.DeleteAsync($"/api/admin/tasks/{activeTask}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
-        var orphaned = await Client.GetFromJsonAsync<JsonElement>($"/api/admin/storage/images?projectId={active}");
-        orphaned.GetProperty("items").EnumerateArray().Should().HaveCount(2)
-            .And.OnlyContain(i => i.GetProperty("taskTitle").ValueKind == JsonValueKind.Null, "deleted task — images stay until the designer deletes them");
+        (await Client.GetFromJsonAsync<JsonElement>($"/api/admin/storage/images?projectId={active}"))
+            .GetProperty("total").GetInt32().Should().Be(0, "P10: a deleted task takes its images with it");
 
         var bulk = await Client.PostAsJsonAsync("/api/admin/images/bulk-delete",
             new { ids = new[] { doneImage.GetProperty("id").GetGuid(), Guid.NewGuid() } });

@@ -1,7 +1,11 @@
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
+using FreelanceFlow.Api.Domain.Files;
 using FreelanceFlow.Api.Domain.Tasks;
+using FreelanceFlow.Api.Features.Images;
+using FreelanceFlow.Api.Features.Storage;
 using FreelanceFlow.Api.Infrastructure;
+using FreelanceFlow.Api.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 
 namespace FreelanceFlow.Api.Features.Tasks;
@@ -215,19 +219,32 @@ public static class TasksEndpoints
         return Results.Ok(await LoadDetailAsync(db, id, clock.TodayVn));
     }
 
-    // Hard delete — tasks are not financial data (docs/05 §3.9); checklist rows and notes go with the FK cascade
-    private static async Task<IResult> DeleteTask(Guid id, AppDbContext db, ActivityWriter activity)
+    // Hard delete — tasks are not financial data (docs/05 §3.9); checklist rows and notes go with the FK cascade.
+    // P10 (BR-88): the task's images go too, in the same transaction, except quotation evidence (BR-87), which stays.
+    private static async Task<IResult> DeleteTask(
+        Guid id, AppDbContext db, ActivityWriter activity, IFileStorage storage, IClock clock,
+        StorageAlertService storageAlerts, ILoggerFactory loggers)
     {
         var task = await db.Tasks.Include(t => t.ChecklistItems).FirstOrDefaultAsync(t => t.Id == id);
         if (task == null) return Results.NotFound();
 
+        var taskImages = db.Files.Where(f => f.OwnerType == ImageOwnerTypes.Task && f.OwnerId == id && f.DeletedAt == null);
+        var images = await taskImages.Where(f => !db.Quotations.Any(q => q.EvidenceFileId == f.Id)).ToListAsync();
+        var kept = await taskImages.CountAsync() - images.Count;
+        var clientId = await ClientIdOfAsync(db, task.ProjectId);
+
         db.Tasks.Remove(task);
-        activity.Write("task", task.Id, "task.deleted",
-            clientId: await ClientIdOfAsync(db, task.ProjectId), projectId: task.ProjectId,
-            data: new { title = task.Title });
+        await ImageDeletion.MarkDeletedAsync(db, activity, clock, images, bulk: false, CancellationToken.None);
+        activity.Write("task", task.Id, "task.deleted", clientId: clientId, projectId: task.ProjectId,
+            data: new { title = task.Title, imagesDeleted = images.Count, imagesKept = kept });
 
         await db.SaveChangesAsync();
 
+        if (images.Count > 0)
+        {
+            await ImageDeletion.DeleteObjectsAsync(storage, loggers.CreateLogger("FreelanceFlow.Images"), images);
+            await storageAlerts.EvaluateSafelyAsync(CancellationToken.None);
+        }
         return Results.NoContent();
     }
 
