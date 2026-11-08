@@ -264,9 +264,9 @@ public class Quotation : IAuditable
     {
         if (Status != QuotationStatuses.Sent)
             throw new DomainException("INVALID_TRANSITION", "Báo giá không còn chờ bạn đồng ý");
+        if (ClientAcceptedAt is not null) return false;   // before the expiry check: a repeat stays idempotent
         if (EffectiveStatus(today) == QuotationStatuses.Expired)
             throw new DomainException("QUOTATION_EXPIRED", "Báo giá đã hết hạn — vui lòng liên hệ nhà thiết kế để gửi lại");
-        if (ClientAcceptedAt is not null) return false;
         ClientAcceptedAt = now;
         return true;
     }

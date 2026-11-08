@@ -54,6 +54,16 @@ public class QuotationClientStatementTests
     }
 
     [Fact]
+    public void Repeating_an_acceptance_after_expiry_stays_idempotent()
+    {
+        var q = Sent();
+        q.RecordClientAcceptance(Today, Now).Should().BeTrue();
+
+        q.RecordClientAcceptance(Today.AddDays(8), Now.AddDays(8)).Should().BeFalse();
+        q.ClientAcceptedAt.Should().Be(Now);
+    }
+
+    [Fact]
     public void Payment_notice_must_match_an_amount_that_is_due_now()
     {
         var q = Sent();
