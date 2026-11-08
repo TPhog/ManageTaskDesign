@@ -18,6 +18,9 @@ public static class TasksEndpoints
         admin.MapPut("tasks/{id:guid}", UpdateTask);
         admin.MapPost("tasks/{id:guid}/move", MoveTask);
         admin.MapDelete("tasks/{id:guid}", DeleteTask);
+        admin.MapPost("tasks/{id:guid}/checklist", AddChecklistItem);
+        admin.MapPut("tasks/{id:guid}/checklist/{itemId:guid}", UpdateChecklistItem);
+        admin.MapDelete("tasks/{id:guid}/checklist/{itemId:guid}", RemoveChecklistItem);
     }
 
     private static async Task<IResult> ListTasks(
@@ -208,6 +211,58 @@ public static class TasksEndpoints
         await db.SaveChangesAsync();
 
         return Results.NoContent();
+    }
+
+    // Checklist edits are not logged: no status, money, quota or portal change (CLAUDE.md activity rule)
+    private static async Task<IResult> AddChecklistItem(
+        Guid id,
+        ChecklistItemRequest body,
+        AppDbContext db,
+        IClock clock)
+    {
+        var task = await db.Tasks.Include(t => t.ChecklistItems).FirstOrDefaultAsync(t => t.Id == id);
+        if (task == null) return Results.NotFound();
+
+        var errors = TaskValidation.ChecklistText(body.Text);
+        if (errors.Count > 0) return Results.ValidationProblem(errors);
+
+        var item = task.AddChecklistItem(body.Text!);
+        // Explicit Add: a new child with a preset Guid key found only through the navigation is treated as an UPDATE
+        db.TaskChecklistItems.Add(item);
+        await db.SaveChangesAsync();
+
+        return Results.Created($"/api/admin/tasks/{id}", await LoadDetailAsync(db, id, clock.TodayVn));
+    }
+
+    private static async Task<IResult> UpdateChecklistItem(
+        Guid id,
+        Guid itemId,
+        ChecklistItemRequest body,
+        AppDbContext db,
+        IClock clock)
+    {
+        var task = await db.Tasks.Include(t => t.ChecklistItems).FirstOrDefaultAsync(t => t.Id == id);
+        if (task == null || task.ChecklistItems.All(i => i.Id != itemId)) return Results.NotFound();
+
+        var errors = TaskValidation.ChecklistText(body.Text);
+        if (body.Done == null) errors["done"] = ["Bắt buộc"];
+        if (errors.Count > 0) return Results.ValidationProblem(errors);
+
+        task.UpdateChecklistItem(itemId, body.Text!, body.Done!.Value);
+        await db.SaveChangesAsync();
+
+        return Results.Ok(await LoadDetailAsync(db, id, clock.TodayVn));
+    }
+
+    private static async Task<IResult> RemoveChecklistItem(Guid id, Guid itemId, AppDbContext db, IClock clock)
+    {
+        var task = await db.Tasks.Include(t => t.ChecklistItems).FirstOrDefaultAsync(t => t.Id == id);
+        if (task == null || task.ChecklistItems.All(i => i.Id != itemId)) return Results.NotFound();
+
+        db.TaskChecklistItems.Remove(task.RemoveChecklistItem(itemId));
+        await db.SaveChangesAsync();
+
+        return Results.Ok(await LoadDetailAsync(db, id, clock.TodayVn));
     }
 
     internal static async Task<TaskDetailDto?> LoadDetailAsync(AppDbContext db, Guid id, DateOnly today)
