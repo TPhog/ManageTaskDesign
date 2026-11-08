@@ -294,6 +294,73 @@ public class RequestsTests(AppFactory factory) : RevisionTestBase(factory)
     }
 
     [Fact]
+    public async Task Suggest_billing_honours_explicit_billing_of_sibling_items()   // B4, BR-42
+    {
+        await LoginAsync();
+        var projectId = await CreateProjectAsync();
+        var logo = await CreateQuotaDeliverableAsync(projectId, "Logo", 1);
+        await TriageNewRequestAsync(projectId, Round(logo, ("R1", "MINOR", null)));   // 1/1 used
+
+        var resp = await Client.PostAsJsonAsync("/api/admin/revisions/suggest-billing", new
+        {
+            deliverableId = logo,
+            items = new object[] { new { type = "MINOR", billing = (string?)null }, new { type = "MINOR", billing = "IN_QUOTA" } },
+        });
+        var triaged = await TriageNewRequestAsync(projectId, Round(logo, ("A", "MINOR", null), ("B", "MINOR", "IN_QUOTA")));
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK);
+        var suggested = (await resp.Content.ReadFromJsonAsync<JsonElement>())[0].GetProperty("billing").GetString();
+        suggested.Should().Be("IN_QUOTA").And.Be(ItemsOfRounds(triaged)[0].GetProperty("billing").GetString());
+        (await Client.PostAsJsonAsync("/api/admin/revisions/suggest-billing", new
+        {
+            deliverableId = logo,
+            items = new[] { new { type = "MINOR", billing = "BOGUS" } },
+        })).StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Activity_visible_only_filters_server_side_and_keeps_paging()   // B6
+    {
+        await LoginAsync();
+        var projectId = await CreateProjectAsync();
+        var declined = IdOf(await CreateRequestAsync(projectId, "Sẽ từ chối"));
+        (await DeclineAsync(declined, "Ngoài phạm vi")).StatusCode.Should().Be(HttpStatusCode.OK);
+        for (var i = 0; i < 3; i++) await CreateRequestAsync(projectId, $"Yêu cầu {i}");   // newer, not client-visible
+
+        var page = await Client.GetFromJsonAsync<JsonElement>($"/api/admin/projects/{projectId}/activity?visibleOnly=true&pageSize=1");
+        var all = await Client.GetFromJsonAsync<JsonElement>($"/api/admin/projects/{projectId}/activity?pageSize=1");
+
+        page.GetProperty("total").GetInt32().Should().Be(1);
+        page.GetProperty("items").EnumerateArray().Should().ContainSingle()
+            .Which.GetProperty("action").GetString().Should().Be("request.declined");
+        all.GetProperty("total").GetInt32().Should().BeGreaterThan(1);
+    }
+
+    [Fact]
+    public async Task Triage_and_manual_round_are_blocked_on_cancelled_project_or_deliverable()   // B8
+    {
+        await LoginAsync();
+        var projectId = await CreateProjectAsync();
+        var logo = await CreateQuotaDeliverableAsync(projectId, "Logo", 3);
+        var requestId = IdOf(await CreateRequestAsync(projectId));
+        await MoveDeliverableAsync(logo, "CANCELLED");
+
+        var triage = await PostTriageAsync(requestId, Round(logo, ("A", "MINOR", null)));
+        var manual = await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/rounds", Round(logo, ("A", "MINOR", null)));
+
+        triage.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        manual.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await manual.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("BUSINESS_RULE");
+        (await GetRequestAsync(requestId)).GetProperty("request").GetProperty("status").GetString().Should().Be("NEW");
+
+        (await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/status", new { to = "CANCELLED", reason = "Khách huỷ" }))
+            .EnsureSuccessStatusCode();
+        (await PostTriageAsync(requestId, Round(null, ("A", "MINOR", null)))).StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/rounds", Round(null, ("A", "MINOR", null))))
+            .StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+    }
+
+    [Fact]
     public async Task Suggest_billing_previews_without_saving()   // docs/05 §3.7.1, docs/08 §2.3
     {
         await LoginAsync();

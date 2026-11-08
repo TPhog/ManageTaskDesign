@@ -50,7 +50,8 @@ public static class AdditionalQuotationEndpoints
                                           || x.Item.WorkStatus == RevisionWorkStatuses.Cancelled).ToList();
         if (notQuotable.Count > 0)
             return QuotationReads.BusinessRule("Chỉ tạo báo giá phát sinh từ mục tính phí chưa báo giá (BR-46): "
-                + string.Join(", ", notQuotable.Select(x => x.Item.Description)));
+                + string.Join(", ", notQuotable.Take(5).Select(x => Truncate(x.Item.Description, 80)))
+                + (notQuotable.Count > 5 ? $" … và {notQuotable.Count - 5} mục khác" : ""));
 
         var serviceByItem = (body.NewDeliverableServices ?? [])
             .GroupBy(s => s.RevisionItemId)
@@ -121,4 +122,6 @@ public static class AdditionalQuotationEndpoints
 
         return Results.Created($"/api/admin/quotations/{quotation.Id}", new CreateQuotationResponse(quotation.Id, []));
     }
+
+    private static string Truncate(string text, int max) => text.Length <= max ? text : text[..max] + "…";
 }

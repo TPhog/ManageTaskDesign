@@ -22,12 +22,18 @@ internal static class RoundCreation
         AppDbContext db, ActivityWriter activity, Project project, IReadOnlyList<RoundBody> bodies,
         Guid? sourceRequestId, DateOnly today)
     {
+        if (project.Status == "CANCELLED")
+            throw new DomainException("BUSINESS_RULE", "Dự án đã huỷ — không thêm vòng sửa mới");
         var deliverableIds = bodies.Where(b => b.DeliverableId != null).Select(b => b.DeliverableId!.Value).Distinct().ToList();
         var deliverables = await db.Deliverables.AsNoTracking()
             .Where(d => d.ProjectId == project.Id && deliverableIds.Contains(d.Id))
             .ToDictionaryAsync(d => d.Id);
         if (deliverables.Count != deliverableIds.Count)
             throw new DomainException("VALIDATION_FAILED", "Hạng mục không thuộc dự án này");
+
+        var cancelled = deliverables.Values.FirstOrDefault(d => d.Status == "CANCELLED");
+        if (cancelled is not null)
+            throw new DomainException("BUSINESS_RULE", $"Hạng mục \"{cancelled.Name}\" đã huỷ — không thêm vòng sửa mới");
 
         var used = await RevisionQuota.UsedRounds(db.RevisionRounds.Where(r => r.ProjectId == project.Id), db.RevisionItems)
             .ToDictionaryAsync(x => x.DeliverableId, x => x.UsedRounds);

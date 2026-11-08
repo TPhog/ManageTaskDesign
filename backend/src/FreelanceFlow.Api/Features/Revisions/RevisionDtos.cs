@@ -14,7 +14,7 @@ public sealed record TriageBody(RoundBody[]? Rounds, uint RowVersion);
 
 public sealed record DeclineBody(string? Reason, uint RowVersion);
 
-public sealed record SuggestBillingItem(string? Type);
+public sealed record SuggestBillingItem(string? Type, string? Billing);
 
 public sealed record SuggestBillingBody(Guid? DeliverableId, SuggestBillingItem[]? Items);
 

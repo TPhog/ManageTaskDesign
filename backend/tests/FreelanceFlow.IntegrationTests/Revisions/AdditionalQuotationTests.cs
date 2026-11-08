@@ -15,6 +15,25 @@ public class AdditionalQuotationTests(AppFactory factory) : RevisionTestBase(fac
     }
 
     [Fact]
+    public async Task Rejected_items_detail_is_capped_at_five_truncated_descriptions()   // B9
+    {
+        await LoginAsync();
+        var projectId = await CreateProjectAsync();
+        var logo = await CreateQuotaDeliverableAsync(projectId, "Logo", 10);
+        var longText = new string('x', 200);
+        var ids = await TriageItemsAsync(projectId, logo,
+            Enumerable.Range(1, 7).Select(i => ($"{i}-{longText}", "MINOR", (string?)"IN_QUOTA")).ToArray());
+
+        var resp = await PostFromRevisionsAsync(projectId, new { revisionItemIds = ids });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        var detail = (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("detail").GetString()!;
+        detail.Should().EndWith("… và 2 mục khác");
+        System.Text.RegularExpressions.Regex.Matches(detail, "-x{10}").Count.Should().Be(5);
+        detail.Should().NotContain(new string('x', 81));
+    }
+
+    [Fact]
     public async Task From_revisions_builds_round_and_new_deliverable_lines_and_links_every_item()   // AC-Q8, BR-46
     {
         await LoginAsync();

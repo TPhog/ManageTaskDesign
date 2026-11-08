@@ -362,15 +362,17 @@ public static class ProjectsEndpoints
         Guid id,
         AppDbContext db,
         int page = 1,
-        int pageSize = 20)
+        int pageSize = 20,
+        bool visibleOnly = false)
     {
         pageSize = Math.Min(pageSize, 100);
         var exists = await db.Projects.AnyAsync(p => p.Id == id);
         if (!exists) return Results.NotFound();
 
-        var total = await db.ActivityLogs.CountAsync(a => a.ProjectId == id);
-        var items = await db.ActivityLogs
-            .Where(a => a.ProjectId == id)
+        var query = db.ActivityLogs.Where(a => a.ProjectId == id);
+        if (visibleOnly) query = query.Where(a => a.VisibleToClient && a.ClientMessage != null);
+        var total = await query.CountAsync();
+        var items = await query
             .OrderByDescending(a => a.OccurredAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)

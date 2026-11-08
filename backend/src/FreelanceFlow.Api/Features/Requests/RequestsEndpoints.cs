@@ -167,7 +167,8 @@ public static class RequestsEndpoints
     private static async Task<IResult> SuggestBilling(SuggestBillingBody body, AppDbContext db)
     {
         if (body.Items is null || body.Items.Length is 0 or > RevisionValidation.MaxItemsPerRound
-            || body.Items.Any(i => i.Type is null || !RevisionItemTypes.All.Contains(i.Type)))
+            || body.Items.Any(i => i.Type is null || !RevisionItemTypes.All.Contains(i.Type)
+                                   || (i.Billing is not null && !RevisionBillings.All.Contains(i.Billing))))
             return Results.ValidationProblem(new Dictionary<string, string[]>
             {
                 ["items"] = ["Danh sách loại mục không hợp lệ"],
@@ -184,7 +185,7 @@ public static class RequestsEndpoints
             quota = new DeliverableQuota(d.Name, d.IncludedRounds, used, d.ExtraRoundPrice);
         }
 
-        var plan = RevisionQuota.PlanRound(quota, body.Items.Select(i => new PlannedItemInput(i.Type!, null)).ToList());
+        var plan = RevisionQuota.PlanRound(quota, body.Items.Select(i => new PlannedItemInput(i.Type!, i.Billing)).ToList());
         return Results.Ok(plan.Items.Select(i => new SuggestionDto(i.SuggestedBilling, i.SuggestionReason)).ToList());
     }
 }
