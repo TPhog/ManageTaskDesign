@@ -5,16 +5,25 @@ using SkiaSharp;
 namespace FreelanceFlow.Api.Infrastructure.Images;
 
 /// <summary>
-/// Spec §3–4: decode (sRGB) → apply EXIF orientation → fit → WebP original/preview/thumb, watermark on preview/thumb.
-/// Re-encoding drops every metadata block (EXIF, GPS). Pure: no I/O, no DB.
+/// Spec §3–4 + P10: decode (sRGB) → apply EXIF orientation → fit → WebP original (≤ 3000 px, q80; lossless instead when
+/// smaller for flat graphics), preview (≤ 2560 px, q78, watermark), thumb (≤ 480 px, q75, lighter watermark).
+/// Client uploads get no preview: the original is served in its place. Each step takes over its input bitmap and the
+/// previous one is disposed at once, so at most two full-size bitmaps are alive. Re-encoding drops EXIF/GPS. Pure: no I/O, no DB.
 /// </summary>
 public static class ImageProcessor
 {
     public const int OriginalMaxEdge = 3000;
+    public const int PreviewMaxEdge = 2560;
     public const int ThumbMaxEdge = 480;
-    public const int OriginalQuality = 85;
-    public const int PreviewQuality = 82;
+    public const int OriginalQuality = 80;
+    public const int PreviewQuality = 78;
     public const int ThumbQuality = 75;
+    /// <summary>
+    /// Lossless is tried only when a 64 × 64 sample shows at most this many colours (UI, screenshots, flat art):
+    /// on photos it is many times larger and costs seconds of CPU (P10 measurement), so it is never attempted there.
+    /// </summary>
+    public const int FlatMaxDistinctColours = 256;
+    private const int FlatSampleGrid = 64;
     public const int MinThumbOpacityPercent = 10;
     public const long MaxDecodedPixels = 50_000_000;
     public const float WatermarkAngleDegrees = -30f;
@@ -25,31 +34,23 @@ public static class ImageProcessor
 
     private static readonly SKSamplingOptions Sampling = new(SKCubicResampler.Mitchell);
 
-    public static ProcessedImage Process(byte[] input, WatermarkSpec? watermark)
+    /// <param name="separatePreview">false for client uploads (P10): no preview is encoded, so none can be watermarked.</param>
+    public static ProcessedImage Process(byte[] input, WatermarkSpec? watermark, bool separatePreview = true)
     {
+        if (watermark is not null && !separatePreview)
+            throw new ArgumentException("A watermark is drawn on a separate preview only", nameof(watermark));
         if (ImageFormatSniffer.Detect(input) is null)
             throw new DomainException("UNSUPPORTED_FILE_TYPE", "Chỉ nhận ảnh JPEG, PNG hoặc WebP");
 
-        using var data = SKData.CreateCopy(input);
-        using var codec = SKCodec.Create(data)
-            ?? throw new DomainException("UNSUPPORTED_FILE_TYPE", "Không đọc được ảnh — file có thể bị hỏng");
-        GuardDimensions(codec.Info.Width, codec.Info.Height);
-
-        using var decoded = Decode(codec);
-        using var oriented = Orient(decoded, codec.EncodedOrigin);
-        using var original = Fit(oriented, OriginalMaxEdge);
-        using var preview = watermark is null ? Copy(original) : FlattenOnWhite(original);
-        using var thumb = watermark is null ? Fit(original, ThumbMaxEdge) : FlattenOnWhite(Fit(original, ThumbMaxEdge), disposeSource: true);
-
-        if (watermark is not null)
-        {
-            var text = watermark.Text.Normalize(NormalizationForm.FormC);
-            DrawWatermark(preview, text, watermark.OpacityPercent, PreviewFontRatio);
-            DrawWatermark(thumb, text, ThumbOpacity(watermark.OpacityPercent), ThumbFontRatio);
-        }
-
-        return new ProcessedImage(original.Width, original.Height,
-            EncodeWebp(original, OriginalQuality), EncodeWebp(preview, PreviewQuality), EncodeWebp(thumb, ThumbQuality));
+        using var original = DecodeOriginal(input);
+        var text = watermark?.Text.Normalize(NormalizationForm.FormC);
+        var originalBytes = EncodeOriginal(original);
+        var previewBytes = separatePreview
+            ? EncodeVariant(original, PreviewMaxEdge, PreviewQuality, text, watermark?.OpacityPercent ?? 0, PreviewFontRatio)
+            : null;
+        var thumbBytes = EncodeVariant(original, ThumbMaxEdge, ThumbQuality, text,
+            watermark is null ? 0 : ThumbOpacity(watermark.OpacityPercent), ThumbFontRatio);
+        return new ProcessedImage(original.Width, original.Height, originalBytes, previewBytes, thumbBytes);
     }
 
     public static int ThumbOpacity(int opacityPercent) =>
@@ -59,6 +60,37 @@ public static class ImageProcessor
     {
         if ((long)width * height > MaxDecodedPixels)
             throw new DomainException("FILE_TOO_LARGE", "Ảnh có độ phân giải quá lớn (tối đa 50 megapixel)");
+    }
+
+    /// <summary>Lossy q80 always; flat-looking bitmaps are also encoded lossless and the smaller of the two is kept.</summary>
+    internal static byte[] EncodeOriginal(SKBitmap bitmap)
+    {
+        var lossy = EncodeWebp(bitmap, OriginalQuality);
+        if (!LooksFlat(bitmap)) return lossy;
+        var lossless = EncodeLossless(bitmap);
+        return lossless.Length < lossy.Length ? lossless : lossy;
+    }
+
+    /// <summary>At most <see cref="FlatMaxDistinctColours"/> colours on a 64 × 64 sample grid (stops counting as soon as it exceeds).</summary>
+    internal static bool LooksFlat(SKBitmap bitmap)
+    {
+        var colours = new HashSet<uint>();
+        for (var i = 0; i < FlatSampleGrid; i++)
+        for (var j = 0; j < FlatSampleGrid; j++)
+        {
+            var c = bitmap.GetPixel((int)((i + 0.5) * bitmap.Width / FlatSampleGrid), (int)((j + 0.5) * bitmap.Height / FlatSampleGrid));
+            if (colours.Add((uint)c) && colours.Count > FlatMaxDistinctColours) return false;
+        }
+        return true;
+    }
+
+    /// <summary>The codec reads the caller's buffer through a stream (no copy) and is released before encoding starts.</summary>
+    private static SKBitmap DecodeOriginal(byte[] input)
+    {
+        using var codec = SKCodec.Create(new MemoryStream(input, writable: false))
+            ?? throw new DomainException("UNSUPPORTED_FILE_TYPE", "Không đọc được ảnh — file có thể bị hỏng");
+        GuardDimensions(codec.Info.Width, codec.Info.Height);
+        return Fit(Orient(Decode(codec), codec.EncodedOrigin), OriginalMaxEdge);
     }
 
     private static SKBitmap Decode(SKCodec codec)
@@ -72,39 +104,54 @@ public static class ImageProcessor
         throw new DomainException("UNSUPPORTED_FILE_TYPE", "Không đọc được ảnh — file có thể bị hỏng");
     }
 
-    /// <summary>Always returns a new bitmap. x' = ScaleX·x + SkewX·y + TransX; y' = SkewY·x + ScaleY·y + TransY.</summary>
+    /// <summary>
+    /// Takes ownership of <paramref name="src"/>: returned as is for TopLeft, otherwise disposed once the oriented copy exists.
+    /// x' = ScaleX·x + SkewX·y + TransX; y' = SkewY·x + ScaleY·y + TransY.
+    /// </summary>
     private static SKBitmap Orient(SKBitmap src, SKEncodedOrigin origin)
     {
-        if (origin == SKEncodedOrigin.TopLeft) return Copy(src);
-        float w = src.Width, h = src.Height;
-        var swap = origin is SKEncodedOrigin.LeftTop or SKEncodedOrigin.RightTop
-            or SKEncodedOrigin.RightBottom or SKEncodedOrigin.LeftBottom;
-        var matrix = origin switch
+        if (origin == SKEncodedOrigin.TopLeft) return src;
+        using (src)
         {
-            SKEncodedOrigin.TopRight => new SKMatrix(-1, 0, w, 0, 1, 0, 0, 0, 1),     // 2: mirror horizontal
-            SKEncodedOrigin.BottomRight => new SKMatrix(-1, 0, w, 0, -1, h, 0, 0, 1), // 3: rotate 180
-            SKEncodedOrigin.BottomLeft => new SKMatrix(1, 0, 0, 0, -1, h, 0, 0, 1),   // 4: mirror vertical
-            SKEncodedOrigin.LeftTop => new SKMatrix(0, 1, 0, 1, 0, 0, 0, 0, 1),       // 5: transpose
-            SKEncodedOrigin.RightTop => new SKMatrix(0, -1, h, 1, 0, 0, 0, 0, 1),     // 6: rotate 90 CW
-            SKEncodedOrigin.RightBottom => new SKMatrix(0, -1, h, -1, 0, w, 0, 0, 1), // 7: transverse
-            SKEncodedOrigin.LeftBottom => new SKMatrix(0, 1, 0, -1, 0, w, 0, 0, 1),   // 8: rotate 90 CCW
-            _ => SKMatrix.Identity,
-        };
-        var dst = new SKBitmap(src.Info.WithSize(swap ? src.Height : src.Width, swap ? src.Width : src.Height));
-        using (var canvas = new SKCanvas(dst))
-        {
-            canvas.SetMatrix(matrix);
-            canvas.DrawBitmap(src, 0, 0);
-            canvas.Flush();
+            float w = src.Width, h = src.Height;
+            var swap = origin is SKEncodedOrigin.LeftTop or SKEncodedOrigin.RightTop
+                or SKEncodedOrigin.RightBottom or SKEncodedOrigin.LeftBottom;
+            var matrix = origin switch
+            {
+                SKEncodedOrigin.TopRight => new SKMatrix(-1, 0, w, 0, 1, 0, 0, 0, 1),     // 2: mirror horizontal
+                SKEncodedOrigin.BottomRight => new SKMatrix(-1, 0, w, 0, -1, h, 0, 0, 1), // 3: rotate 180
+                SKEncodedOrigin.BottomLeft => new SKMatrix(1, 0, 0, 0, -1, h, 0, 0, 1),   // 4: mirror vertical
+                SKEncodedOrigin.LeftTop => new SKMatrix(0, 1, 0, 1, 0, 0, 0, 0, 1),       // 5: transpose
+                SKEncodedOrigin.RightTop => new SKMatrix(0, -1, h, 1, 0, 0, 0, 0, 1),     // 6: rotate 90 CW
+                SKEncodedOrigin.RightBottom => new SKMatrix(0, -1, h, -1, 0, w, 0, 0, 1), // 7: transverse
+                SKEncodedOrigin.LeftBottom => new SKMatrix(0, 1, 0, -1, 0, w, 0, 0, 1),   // 8: rotate 90 CCW
+                _ => SKMatrix.Identity,
+            };
+            var dst = new SKBitmap(src.Info.WithSize(swap ? src.Height : src.Width, swap ? src.Width : src.Height));
+            using (var canvas = new SKCanvas(dst))
+            {
+                canvas.SetMatrix(matrix);
+                canvas.DrawBitmap(src, 0, 0);
+                canvas.Flush();
+            }
+            return dst;
         }
-        return dst;
     }
 
-    /// <summary>Always returns a new bitmap; never upscales.</summary>
+    /// <summary>Takes ownership of <paramref name="src"/>; never upscales.</summary>
     private static SKBitmap Fit(SKBitmap src, int maxEdge)
     {
+        var resized = Downscaled(src, maxEdge);
+        if (resized is null) return src;
+        src.Dispose();
+        return resized;
+    }
+
+    /// <summary>Borrows <paramref name="src"/>: a downscaled copy, or null when it already fits (never upscales).</summary>
+    private static SKBitmap? Downscaled(SKBitmap src, int maxEdge)
+    {
         var longEdge = Math.Max(src.Width, src.Height);
-        if (longEdge <= maxEdge) return Copy(src);
+        if (longEdge <= maxEdge) return null;
         var scale = (double)maxEdge / longEdge;
         var width = Math.Max(1, (int)Math.Round(src.Width * scale, MidpointRounding.AwayFromZero));
         var height = Math.Max(1, (int)Math.Round(src.Height * scale, MidpointRounding.AwayFromZero));
@@ -112,8 +159,22 @@ public static class ImageProcessor
             ?? throw new InvalidOperationException("Image resize failed");
     }
 
+    /// <summary>
+    /// Preview/thumb from the original: a downscaled copy (or the original itself when it already fits — no copy),
+    /// flattened onto white and watermarked when <paramref name="text"/> is set. Every intermediate is disposed here.
+    /// </summary>
+    private static byte[] EncodeVariant(SKBitmap original, int maxEdge, int quality, string? text, int opacityPercent, float fontRatio)
+    {
+        using var resized = Downscaled(original, maxEdge);
+        var source = resized ?? original;
+        if (text is null) return EncodeWebp(source, quality);
+        using var marked = FlattenOnWhite(source);
+        DrawWatermark(marked, text, opacityPercent, fontRatio);
+        return EncodeWebp(marked, quality);
+    }
+
     /// <summary>Opaque copy over a white backdrop so transparency can neither hide nor strip the watermark.</summary>
-    private static SKBitmap FlattenOnWhite(SKBitmap src, bool disposeSource = false)
+    private static SKBitmap FlattenOnWhite(SKBitmap src)
     {
         var dst = new SKBitmap(src.Info.WithAlphaType(SKAlphaType.Premul));
         using (var canvas = new SKCanvas(dst))
@@ -122,16 +183,21 @@ public static class ImageProcessor
             canvas.DrawBitmap(src, 0, 0);
             canvas.Flush();
         }
-        if (disposeSource) src.Dispose();
         return dst;
     }
-
-    private static SKBitmap Copy(SKBitmap src) => src.Copy() ?? throw new InvalidOperationException("Image copy failed");
 
     private static byte[] EncodeWebp(SKBitmap bitmap, int quality)
     {
         using var data = bitmap.Encode(SKEncodedImageFormat.Webp, quality)
             ?? throw new InvalidOperationException("WebP encoding failed");
+        return data.ToArray();
+    }
+
+    private static byte[] EncodeLossless(SKBitmap bitmap)
+    {
+        using var pixmap = bitmap.PeekPixels();
+        using var data = pixmap.Encode(new SKWebpEncoderOptions(SKWebpEncoderCompression.Lossless, 100))
+            ?? throw new InvalidOperationException("WebP lossless encoding failed");
         return data.ToArray();
     }
 

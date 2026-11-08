@@ -14,7 +14,7 @@ namespace FreelanceFlow.Api.Features.Images;
 public sealed record ImageTarget(Guid ProjectId, string OwnerType, Guid OwnerId, Guid? RequestId, string UploadedBy, bool VisibleToClient);
 
 /// <summary>
-/// Stages uploaded images: quota check (STORAGE_FULL at ≥ 90 %), size and magic-byte checks, three WebP variants,
+/// Stages uploaded images: quota check (STORAGE_FULL at ≥ 90 %), size and magic-byte checks, WebP variants (client photos: original + thumb only),
 /// objects written, ProjectFile rows added to the DbContext (not saved). The caller writes the activity and commits
 /// with one SaveChangesAsync; on any failure it calls DiscardAsync so no orphan object stays behind.
 /// </summary>
@@ -46,13 +46,14 @@ public sealed class ImageUploader(
         foreach (var file in files)
         {
             var bytes = await ReadAllAsync(file, ct);
-            var processed = await gate.RunAsync(() => ImageProcessor.Process(bytes, watermark), ct);
+            var separatePreview = target.UploadedBy == "DESIGNER";   // P10: a client photo is stored once
+            var processed = await gate.RunAsync(() => ImageProcessor.Process(bytes, watermark, separatePreview), ct);
             var image = ProjectFile.CreateImage(target.ProjectId, target.OwnerType, target.OwnerId, target.RequestId,
                 target.UploadedBy, target.VisibleToClient, file.FileName, processed.Width, processed.Height,
-                processed.Original.LongLength, processed.Preview.LongLength, processed.Thumb.LongLength,
-                SHA256.HashData(bytes), clock.UtcNow);
+                processed.Original.LongLength, processed.Preview?.LongLength ?? 0, processed.Thumb.LongLength,
+                SHA256.HashData(bytes), clock.UtcNow, previewIsOriginal: processed.Preview is null);
             await PutAsync(image.VariantKey(ImageVariants.Original), processed.Original, ct);
-            await PutAsync(image.VariantKey(ImageVariants.Preview), processed.Preview, ct);
+            if (processed.Preview is not null) await PutAsync(image.VariantKey(ImageVariants.Preview), processed.Preview, ct);
             await PutAsync(image.VariantKey(ImageVariants.Thumb), processed.Thumb, ct);
             db.Files.Add(image);
             staged.Add(image);
@@ -83,11 +84,12 @@ public sealed class ImageUploader(
         await storage.PutAsync(key, content, WebpContentType, ct);
     }
 
+    /// <summary>One buffer of exactly the upload size (≤ App:MaxUploadMb, checked above) — no intermediate copy.</summary>
     private static async Task<byte[]> ReadAllAsync(IFormFile file, CancellationToken ct)
     {
+        var bytes = new byte[file.Length];
         await using var input = file.OpenReadStream();
-        using var buffer = new MemoryStream((int)Math.Min(file.Length, int.MaxValue));
-        await input.CopyToAsync(buffer, ct);
-        return buffer.ToArray();
+        await input.ReadExactlyAsync(bytes, ct);
+        return bytes;
     }
 }

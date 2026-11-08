@@ -23,6 +23,27 @@ internal static class TestImageFactory
         return bitmap;
     }
 
+    /// <summary>1-px vertical stripes: two colours (flat for LooksFlat) but hard for lossy WebP.</summary>
+    public static SKBitmap Stripes(int width, int height, SKColor a, SKColor b)
+    {
+        var bitmap = Solid(width, height, b);
+        for (var x = 0; x < width; x += 2)
+        for (var y = 0; y < height; y++)
+            bitmap.SetPixel(x, y, a);
+        return bitmap;
+    }
+
+    /// <summary>Seeded random RGB noise — stands in for a photo (thousands of distinct colours).</summary>
+    public static SKBitmap Noise(int width, int height, int seed)
+    {
+        var random = new Random(seed);
+        var bitmap = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
+        for (var y = 0; y < height; y++)
+        for (var x = 0; x < width; x++)
+            bitmap.SetPixel(x, y, new SKColor((byte)random.Next(256), (byte)random.Next(256), (byte)random.Next(256)));
+        return bitmap;
+    }
+
     public static byte[] Encode(SKBitmap bitmap, SKEncodedImageFormat format, int quality = 100)
     {
         using var data = bitmap.Encode(format, quality);
