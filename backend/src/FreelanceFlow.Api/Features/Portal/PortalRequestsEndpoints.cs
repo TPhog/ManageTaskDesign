@@ -81,6 +81,21 @@ public static class PortalRequestsEndpoints
                 ["content"] = ["Gửi yêu cầu dạng multipart/form-data"],
             });
         if (http.ContentLength > MaxBodyBytes) return TooLarge();
+
+        // cheap refusals before the (up to 101 MB) body is read
+        // BR-54: portal requests of this client since 00:00 VN (designer-recorded requests do not count)
+        var dayStart = ClientRequest.DayStartUtc(clock.TodayVn);
+        var sentToday = await (from r in db.ClientRequests
+                               join p in db.Projects on r.ProjectId equals p.Id
+                               where p.ClientId == principal.ClientId && r.CreatedBy == "CLIENT" && r.CreatedAt >= dayStart
+                               select r.Id).CountAsync();
+        if (sentToday >= ClientRequest.DailyClientLimit)
+            return Results.Json(
+                new { code = "RATE_LIMITED", detail = $"Mỗi ngày bạn gửi được tối đa {ClientRequest.DailyClientLimit} yêu cầu" },
+                statusCode: StatusCodes.Status429TooManyRequests);
+        var blocked = await ImageForms.EnsureUploadsAllowedAsync(storageAlerts, http, imagesOptional: true, http.HttpContext.RequestAborted);
+        if (blocked is not null) return blocked;
+
         IFormCollection form;
         try
         {
@@ -114,13 +129,6 @@ public static class PortalRequestsEndpoints
         foreach (var (field, messages) in ImageLimits.ValidateCount(form.Files.Count, ImageLimits.MaxFilesPerPortalRequest, required: false))
             errors[field] = messages;
         if (errors.Count > 0) return Results.ValidationProblem(errors);
-
-        // BR-54: portal requests of this client since 00:00 VN (designer-recorded requests do not count)
-        var dayStart = ClientRequest.DayStartUtc(clock.TodayVn);
-        var sentToday = await (from r in db.ClientRequests
-                               join p in db.Projects on r.ProjectId equals p.Id
-                               where p.ClientId == principal.ClientId && r.CreatedBy == "CLIENT" && r.CreatedAt >= dayStart
-                               select r.Id).CountAsync();
 
         ClientRequest request;
         try
@@ -165,7 +173,7 @@ public static class PortalRequestsEndpoints
             await uploader.DiscardAsync();
             throw;
         }
-        if (images.Count > 0) await storageAlerts.EvaluateSafelyAsync();
+        if (images.Count > 0) await storageAlerts.EvaluateSafelyAsync(CancellationToken.None);
 
         await NotifyDesignerAsync(db, notifier, appSettings.Value, logger, request, project.Name, principal.ClientId, images.Count);
 

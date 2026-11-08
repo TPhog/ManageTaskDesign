@@ -71,4 +71,16 @@ public class ProgressUpdateImagesTests(AppFactory factory) : ImageTestBase(facto
         activity.GetProperty("items").GetArrayLength().Should().Be(0);
         (await Client.GetFromJsonAsync<JsonElement>($"/api/admin/projects/{projectId}/images")).GetArrayLength().Should().Be(0);
     }
+
+    [Fact]
+    public async Task Unsupported_content_type_is_415_with_the_standard_error_shape()
+    {
+        await LoginAsync();
+        var (clientId, _) = await CreateClientWithPortalLinkAsync();
+        var projectId = await CreateProjectAsync(clientId, "Dự án 415");
+        var resp = await Client.PostAsync($"/api/admin/projects/{projectId}/progress-updates",
+            new StringContent("message=x", System.Text.Encoding.UTF8, "text/plain"));
+        resp.StatusCode.Should().Be(HttpStatusCode.UnsupportedMediaType);
+        (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("UNSUPPORTED_MEDIA_TYPE");
+    }
 }

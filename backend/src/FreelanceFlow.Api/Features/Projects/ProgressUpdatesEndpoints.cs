@@ -37,6 +37,8 @@ public static class ProgressUpdatesEndpoints
         IFormFileCollection? files = null;
         if (http.HasFormContentType)
         {
+            var blocked = await ImageForms.EnsureUploadsAllowedAsync(storageAlerts, http, imagesOptional: true, ct);
+            if (blocked is not null) return blocked;
             var (form, error) = await ImageForms.ReadAsync(http, ImageLimits.MaxAdminBodyBytes, ct);
             if (error is not null) return error;
             message = form!["message"].ToString();
@@ -55,7 +57,9 @@ public static class ProgressUpdatesEndpoints
         }
         else
         {
-            return Results.StatusCode(StatusCodes.Status415UnsupportedMediaType);
+            return Results.Json(
+                new { code = "UNSUPPORTED_MEDIA_TYPE", detail = "Gửi JSON hoặc multipart/form-data" },
+                statusCode: StatusCodes.Status415UnsupportedMediaType);
         }
 
         var errors = RevisionValidation.ProgressUpdate(new ProgressUpdateBody(message));
@@ -90,7 +94,7 @@ public static class ProgressUpdatesEndpoints
             throw;
         }
 
-        if (images.Count > 0) await storageAlerts.EvaluateSafelyAsync(ct);
+        if (images.Count > 0) await storageAlerts.EvaluateSafelyAsync(CancellationToken.None);
         return Results.Created($"/api/admin/projects/{projectId}/activity",
             new ProgressUpdateDto(updateId, clock.UtcNow, text, images.Select(ImageDtos.ToAdmin).ToList()));
     }

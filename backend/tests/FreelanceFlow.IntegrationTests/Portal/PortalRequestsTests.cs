@@ -3,6 +3,8 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Features.Images;
+using FreelanceFlow.IntegrationTests.Images;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -118,7 +120,8 @@ public class PortalRequestsTests(AppFactory factory) : PortalTestBase(factory)
     {
         var (portal, _, projectId) = await ArrangeAsync();
         var form = RequestForm("Sửa logo");
-        form.Add(new ByteArrayContent(new byte[ImageLimits.MaxPortalRequestBodyBytes]), "files", "qua-lon.png");
+        form.Add(new ByteArrayContent(TestImages.Png(8, 8)), "files", "qua-lon.png");
+        form.Headers.ContentLength = ImageLimits.MaxPortalRequestBodyBytes + 1;   // declared, not allocated
 
         var resp = await portal.PostAsync($"/api/portal/projects/{projectId}/requests", form);
 
@@ -163,6 +166,41 @@ public class PortalRequestsTests(AppFactory factory) : PortalTestBase(factory)
         var otherPortal = await OpenPortalSessionAsync(otherToken);
         (await SendAsync(otherPortal, await CreateProjectAsync(otherClient, "Khách khác"), "Không bị ảnh hưởng"))
             .StatusCode.Should().Be(HttpStatusCode.Created);
+
+        // at the limit the body is never parsed: a malformed multipart is 429, not 400
+        var garbage = new StringContent("--xyz\r\nContent-Disposition: form-data; name=\"content\"\r\n\r\ntruncated");
+        garbage.Headers.ContentType = MediaTypeHeaderValue.Parse("multipart/form-data; boundary=xyz");
+        (await portal.PostAsync($"/api/portal/projects/{projectId}/requests", garbage))
+            .StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+    }
+
+    [Fact]
+    public async Task Full_storage_is_507_before_a_large_body_is_read_but_text_only_requests_still_pass()
+    {
+        await LoginAsync();
+        var (clientId, token) = await CreateClientWithPortalLinkAsync();
+        var ownProject = await CreateProjectAsync(clientId, "Dự án đầy");
+        var projectId = ownProject;
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Files.Add(FreelanceFlow.Api.Domain.Files.ProjectFile.CreateImage(projectId, FreelanceFlow.Api.Domain.Files.ImageOwnerTypes.Task,
+                Guid.NewGuid(), null, "DESIGNER", false, "filler.webp", 1, 1, 10_000, 1, 1, new byte[32], DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync();
+        }
+        await using var host = Factory.WithWebHostBuilder(b => b.ConfigureTestServices(s =>
+            s.PostConfigure<FreelanceFlow.Api.Infrastructure.Storage.StorageOptions>(o => o.QuotaBytes = 1)));
+        var portal = await OpenPortalSessionAsync(token, host.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            { AllowAutoRedirect = false, HandleCookies = false }));
+
+        var big = RequestForm("Có ảnh");
+        big.Add(new ByteArrayContent(TestImages.Png(8, 8)), "files", "a.png");
+        big.Headers.ContentLength = 1_000_000;   // declared: more than a text-only body
+        var blocked = await portal.PostAsync($"/api/portal/projects/{ownProject}/requests", big);
+        blocked.StatusCode.Should().Be(HttpStatusCode.InsufficientStorage);
+        (await blocked.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("STORAGE_FULL");
+
+        (await SendAsync(portal, ownProject, "Chỉ chữ")).StatusCode.Should().Be(HttpStatusCode.Created);
     }
 
     [Fact]

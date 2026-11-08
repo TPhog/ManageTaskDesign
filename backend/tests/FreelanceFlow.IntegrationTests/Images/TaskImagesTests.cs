@@ -3,6 +3,7 @@ using System.Text;
 using System.Text.Json;
 using FreelanceFlow.Api.Data;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -165,5 +166,48 @@ public class TaskImagesTests(AppFactory factory) : ImageTestBase(factory)
         var anonymous = Factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
         (await anonymous.GetAsync($"/api/admin/images/{id}/thumb")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
         (await anonymous.GetAsync("/api/admin/storage/usage")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task Missing_stored_object_is_a_404_that_browsers_may_not_cache()
+    {
+        var (projectId, taskId) = await ArrangeAsync();
+        var id = (await UploadTaskImagesAsync(Client, taskId, TestImages.Png(40, 40)))[0].GetProperty("id").GetGuid();
+        var ok = await Client.GetAsync($"/api/admin/images/{id}/thumb");
+        ok.StatusCode.Should().Be(HttpStatusCode.OK);
+        ok.Headers.CacheControl!.MaxAge.Should().Be(TimeSpan.FromMinutes(10));
+
+        File.Delete(VariantPath(projectId, id, "thumb"));
+        var missing = await Client.GetAsync($"/api/admin/images/{id}/thumb");
+        missing.StatusCode.Should().Be(HttpStatusCode.NotFound);
+        missing.Headers.CacheControl?.MaxAge.Should().BeNull();
+        missing.Headers.Contains("ETag").Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Blocked_storage_answers_507_before_the_body_is_read()
+    {
+        var (_, taskId) = await ArrangeAsync();
+        await UploadTaskImagesAsync(Client, taskId, TestImages.Png(16, 16)); // usage > 1 byte
+        await using var host = Factory.WithWebHostBuilder(b => b.ConfigureTestServices(s =>
+            s.PostConfigure<FreelanceFlow.Api.Infrastructure.Storage.StorageOptions>(o => o.QuotaBytes = 1)));
+        var admin = host.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
+        await LoginOnAsync(admin);
+
+        var garbage = new StringContent("not multipart at all");
+        garbage.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("multipart/form-data; boundary=xyz");
+        var resp = await admin.PostAsync($"/api/admin/tasks/{taskId}/images", garbage);
+        resp.StatusCode.Should().Be(HttpStatusCode.InsufficientStorage, "a body that would be a 400 is never parsed while storage is full");
+    }
+
+    [Fact]
+    public async Task Declared_content_length_over_the_limit_is_413_payload_too_large()
+    {
+        var (_, taskId) = await ArrangeAsync();
+        var body = TestImages.Form(TestImages.Png(16, 16));
+        body.Headers.ContentLength = FreelanceFlow.Api.Features.Images.ImageLimits.MaxAdminBodyBytes + 1;
+        var resp = await Client.PostAsync($"/api/admin/tasks/{taskId}/images", body);
+        resp.StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge);
+        (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("PAYLOAD_TOO_LARGE");
     }
 }

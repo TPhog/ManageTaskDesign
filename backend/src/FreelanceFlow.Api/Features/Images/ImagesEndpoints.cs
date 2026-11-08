@@ -38,6 +38,8 @@ public static class ImagesEndpoints
                           select new { t.Id, t.ProjectId, p.ClientId }).FirstOrDefaultAsync(ct);
         if (task is null) return Results.NotFound();
 
+        var blocked = await ImageForms.EnsureUploadsAllowedAsync(storageAlerts, http, imagesOptional: false, ct);
+        if (blocked is not null) return blocked;
         var (form, error) = await ImageForms.ReadAsync(http, ImageLimits.MaxAdminBodyBytes, ct);
         if (error is not null) return error;
         var countErrors = ImageLimits.ValidateCount(form!.Files.Count, ImageLimits.MaxFilesPerAdminRequest, required: true);
@@ -64,7 +66,7 @@ public static class ImagesEndpoints
             throw;
         }
 
-        await storageAlerts.EvaluateSafelyAsync(ct);
+        await storageAlerts.EvaluateSafelyAsync(CancellationToken.None);
         return Results.Json(images.Select(ImageDtos.ToAdmin).ToList(), statusCode: StatusCodes.Status201Created);
     }
 
@@ -120,7 +122,7 @@ public static class ImagesEndpoints
             return ImageResults.FromDomain(new DomainException("FILE_IN_USE", "Ảnh là chứng từ của báo giá — không xoá được"));
 
         await ImageDeletion.DeleteAsync(db, storage, activity, clock, loggers.CreateLogger(LogCategory), [image], bulk: false, ct);
-        await storageAlerts.EvaluateSafelyAsync(ct);
+        await storageAlerts.EvaluateSafelyAsync(CancellationToken.None);
         return Results.NoContent();
     }
 
@@ -142,7 +144,7 @@ public static class ImagesEndpoints
         if (images.Count > 0)
         {
             freed = await ImageDeletion.DeleteAsync(db, storage, activity, clock, loggers.CreateLogger(LogCategory), images, bulk: true, ct);
-            await storageAlerts.EvaluateSafelyAsync(ct);
+            await storageAlerts.EvaluateSafelyAsync(CancellationToken.None);
         }
         return Results.Ok(new BulkDeleteResultDto(images.Count, ids.Count - images.Count, freed));
     }
