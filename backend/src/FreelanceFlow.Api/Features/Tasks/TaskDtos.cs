@@ -19,9 +19,11 @@ public record TaskListItemDto(
     int ChecklistTotal,
     int ChecklistDone,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    bool HasDescription,   // plan 06b: Kanban card icon
+    int NotesCount);
 
-public record ChecklistItemDto(Guid Id, string Text, bool Done, int SortOrder);
+public record ChecklistItemDto(Guid Id, string Text, bool Done, int SortOrder, string Description);
 
 public record TaskDetailDto(
     Guid Id,
@@ -41,7 +43,8 @@ public record TaskDetailDto(
     IReadOnlyList<ChecklistItemDto> Checklist,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    Guid? RevisionItemId);   // REV-06: task created from a revision item
+    Guid? RevisionItemId,   // REV-06: task created from a revision item
+    int NotesCount);
 
 public record CreateTaskRequest(
     string? Title,
@@ -64,4 +67,9 @@ public record UpdateTaskRequest(
 
 public record MoveTaskRequest(string? Status, double? SortOrder);
 
-public record ChecklistItemRequest(string? Text, bool? Done);
+// Description null = keep the current one (the checkbox toggle sends only text + done)
+public record ChecklistItemRequest(string? Text, bool? Done, string? Description);
+
+public record TaskNoteRequest(string? Body);
+
+public record TaskNoteDto(Guid Id, string Body, DateTimeOffset CreatedAt, DateTimeOffset UpdatedAt);

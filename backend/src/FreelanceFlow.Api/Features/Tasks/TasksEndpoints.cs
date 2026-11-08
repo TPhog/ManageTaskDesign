@@ -21,6 +21,10 @@ public static class TasksEndpoints
         admin.MapPost("tasks/{id:guid}/checklist", AddChecklistItem);
         admin.MapPut("tasks/{id:guid}/checklist/{itemId:guid}", UpdateChecklistItem);
         admin.MapDelete("tasks/{id:guid}/checklist/{itemId:guid}", RemoveChecklistItem);
+        admin.MapGet("tasks/{id:guid}/notes", ListNotes);
+        admin.MapPost("tasks/{id:guid}/notes", AddNote);
+        admin.MapPut("tasks/{id:guid}/notes/{noteId:guid}", UpdateNote);
+        admin.MapDelete("tasks/{id:guid}/notes/{noteId:guid}", DeleteNote);
     }
 
     private static async Task<IResult> ListTasks(
@@ -88,7 +92,9 @@ public static class TasksEndpoints
                 db.TaskChecklistItems.Count(i => i.TaskId == x.Task.Id),
                 db.TaskChecklistItems.Count(i => i.TaskId == x.Task.Id && i.Done),
                 x.Task.CreatedAt,
-                x.Task.UpdatedAt))
+                x.Task.UpdatedAt,
+                x.Task.Description != "",
+                db.TaskNotes.Count(n => n.TaskId == x.Task.Id)))
             .ToListAsync();
 
         return Results.Ok(new { items, page, pageSize, total });
@@ -110,7 +116,7 @@ public static class TasksEndpoints
         var project = await db.Projects.AsNoTracking().FirstOrDefaultAsync(p => p.Id == projectId);
         if (project == null) return Results.NotFound();
 
-        var errors = TaskValidation.TaskFields(body.Title, body.Status, body.Priority);
+        var errors = TaskValidation.TaskFields(body.Title, body.Status, body.Priority, body.Description);
         await CheckDeliverableAsync(db, projectId, body.DeliverableId, errors);
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
@@ -147,7 +153,7 @@ public static class TasksEndpoints
         var task = await db.Tasks.FindAsync(id);
         if (task == null) return Results.NotFound();
 
-        var errors = TaskValidation.TaskFields(body.Title, body.Status, body.Priority);
+        var errors = TaskValidation.TaskFields(body.Title, body.Status, body.Priority, body.Description);
         await CheckDeliverableAsync(db, task.ProjectId, body.DeliverableId, errors);
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
@@ -197,7 +203,7 @@ public static class TasksEndpoints
         return Results.Ok(await LoadDetailAsync(db, id, clock.TodayVn));
     }
 
-    // Hard delete — tasks are not financial data (docs/05 §3.9); checklist rows go with the FK cascade
+    // Hard delete — tasks are not financial data (docs/05 §3.9); checklist rows and notes go with the FK cascade
     private static async Task<IResult> DeleteTask(Guid id, AppDbContext db, ActivityWriter activity)
     {
         var task = await db.Tasks.Include(t => t.ChecklistItems).FirstOrDefaultAsync(t => t.Id == id);
@@ -223,10 +229,10 @@ public static class TasksEndpoints
         var task = await db.Tasks.Include(t => t.ChecklistItems).FirstOrDefaultAsync(t => t.Id == id);
         if (task == null) return Results.NotFound();
 
-        var errors = TaskValidation.ChecklistText(body.Text);
+        var errors = TaskValidation.ChecklistText(body.Text, body.Description);
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
-        var item = task.AddChecklistItem(body.Text!);
+        var item = task.AddChecklistItem(body.Text!, body.Description ?? "");
         // Explicit Add: a new child with a preset Guid key found only through the navigation is treated as an UPDATE
         db.TaskChecklistItems.Add(item);
         await db.SaveChangesAsync();
@@ -244,11 +250,11 @@ public static class TasksEndpoints
         var task = await db.Tasks.Include(t => t.ChecklistItems).FirstOrDefaultAsync(t => t.Id == id);
         if (task == null || task.ChecklistItems.All(i => i.Id != itemId)) return Results.NotFound();
 
-        var errors = TaskValidation.ChecklistText(body.Text);
+        var errors = TaskValidation.ChecklistText(body.Text, body.Description);
         if (body.Done == null) errors["done"] = ["Bắt buộc"];
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
-        task.UpdateChecklistItem(itemId, body.Text!, body.Done!.Value);
+        task.UpdateChecklistItem(itemId, body.Text!, body.Done!.Value, body.Description);
         await db.SaveChangesAsync();
 
         return Results.Ok(await LoadDetailAsync(db, id, clock.TodayVn));
@@ -264,6 +270,62 @@ public static class TasksEndpoints
 
         return Results.Ok(await LoadDetailAsync(db, id, clock.TodayVn));
     }
+
+    // ---------- notes (plan 06b F5): designer-only, not logged (same rule as the checklist) ----------
+
+    private static async Task<IResult> ListNotes(Guid id, AppDbContext db)
+    {
+        if (!await db.Tasks.AnyAsync(t => t.Id == id)) return Results.NotFound();
+
+        var notes = await db.TaskNotes.AsNoTracking()
+            .Where(n => n.TaskId == id)
+            .OrderByDescending(n => n.CreatedAt).ThenByDescending(n => n.Id)
+            .Select(n => new TaskNoteDto(n.Id, n.Body, n.CreatedAt, n.UpdatedAt))
+            .ToListAsync();
+
+        return Results.Ok(notes);
+    }
+
+    private static async Task<IResult> AddNote(Guid id, TaskNoteRequest body, AppDbContext db)
+    {
+        if (!await db.Tasks.AnyAsync(t => t.Id == id)) return Results.NotFound();
+
+        var errors = TaskValidation.NoteBody(body.Body);
+        if (errors.Count > 0) return Results.ValidationProblem(errors);
+
+        var note = TaskNote.Create(id, body.Body!);
+        db.TaskNotes.Add(note);
+        await db.SaveChangesAsync();
+
+        return Results.Created($"/api/admin/tasks/{id}/notes/{note.Id}", ToNoteDto(note));
+    }
+
+    private static async Task<IResult> UpdateNote(Guid id, Guid noteId, TaskNoteRequest body, AppDbContext db)
+    {
+        var note = await db.TaskNotes.FirstOrDefaultAsync(n => n.Id == noteId && n.TaskId == id);
+        if (note == null) return Results.NotFound();
+
+        var errors = TaskValidation.NoteBody(body.Body);
+        if (errors.Count > 0) return Results.ValidationProblem(errors);
+
+        note.Edit(body.Body!);
+        await db.SaveChangesAsync();
+
+        return Results.Ok(ToNoteDto(note));
+    }
+
+    private static async Task<IResult> DeleteNote(Guid id, Guid noteId, AppDbContext db)
+    {
+        var note = await db.TaskNotes.FirstOrDefaultAsync(n => n.Id == noteId && n.TaskId == id);
+        if (note == null) return Results.NotFound();
+
+        db.TaskNotes.Remove(note);
+        await db.SaveChangesAsync();
+
+        return Results.NoContent();
+    }
+
+    private static TaskNoteDto ToNoteDto(TaskNote n) => new(n.Id, n.Body, n.CreatedAt, n.UpdatedAt);
 
     internal static async Task<TaskDetailDto?> LoadDetailAsync(AppDbContext db, Guid id, DateOnly today)
     {
@@ -282,6 +344,7 @@ public static class TasksEndpoints
                 .Where(d => d.Id == task.DeliverableId)
                 .Select(d => d.Name)
                 .FirstOrDefaultAsync();
+        var notesCount = await db.TaskNotes.CountAsync(n => n.TaskId == id);
 
         return new TaskDetailDto(
             task.Id,
@@ -300,11 +363,12 @@ public static class TasksEndpoints
             task.IsOverdue(today),
             task.ChecklistItems
                 .OrderBy(i => i.SortOrder)
-                .Select(i => new ChecklistItemDto(i.Id, i.Text, i.Done, i.SortOrder))
+                .Select(i => new ChecklistItemDto(i.Id, i.Text, i.Done, i.SortOrder, i.Description))
                 .ToList(),
             task.CreatedAt,
             task.UpdatedAt,
-            task.RevisionItemId);
+            task.RevisionItemId,
+            notesCount);
     }
 
     // Appends to the bottom of the column
