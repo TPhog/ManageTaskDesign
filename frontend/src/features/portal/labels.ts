@@ -29,3 +29,29 @@ export const designTypeLabel: Record<string, string> = {
   PRINT: 'In ấn',
   OTHER: 'Khác',
 }
+
+// docs/08 §3.2–3.3: client-facing names; EXPIRED stays a badge ("Đã hết hạn"), never a stored status.
+export const portalQuotationStatus: Record<string, string> = {
+  SENT: 'Chờ bạn xem xét',
+  ACCEPTED: 'Đã xác nhận',
+  REJECTED: 'Đã từ chối',
+  EXPIRED: 'Đã hết hạn',
+  SUPERSEDED: 'Phiên bản cũ',
+}
+
+export const portalPaymentStatus: Record<string, string> = {
+  UNPAID: 'Chưa thanh toán',
+  DEPOSIT_PAID: 'Đã nhận cọc',
+  PAID: 'Đã thanh toán',
+}
+
+export const portalRequestStatus: Record<string, string> = {
+  NEW: 'Mới',
+  TRIAGED: 'Đã tiếp nhận',
+  DECLINED: 'Từ chối',
+}
+
+export const portalQuotationKind: Record<string, string> = {
+  INITIAL: 'Báo giá',
+  ADDITIONAL: 'Báo giá phát sinh',
+}

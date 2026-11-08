@@ -1,7 +1,9 @@
 const BASE = '/api'
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  // multipart: the browser sets Content-Type with the boundary itself
+  const isForm = body instanceof FormData
+  const headers: Record<string, string> = isForm ? {} : { 'Content-Type': 'application/json' }
 
   if (method !== 'GET' && method !== 'HEAD') {
     const csrfToken = document.cookie
@@ -15,7 +17,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     method,
     headers,
     credentials: 'same-origin',
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
   })
 
   if (!res.ok) {
@@ -53,6 +55,7 @@ export function emptyToNull<T extends Record<string, unknown>>(values: T): T {
 export const api = {
   get:    <T>(path: string)                   => request<T>('GET',    path),
   post:   <T>(path: string, body: unknown)    => request<T>('POST',   path, body),
+  postForm: <T>(path: string, form: FormData) => request<T>('POST',   path, form),
   put:    <T>(path: string, body: unknown)    => request<T>('PUT',    path, body),
   patch:  <T>(path: string, body: unknown)    => request<T>('PATCH',  path, body),
   delete: <T>(path: string)                   => request<T>('DELETE', path),
