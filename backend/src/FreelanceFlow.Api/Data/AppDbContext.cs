@@ -2,6 +2,7 @@ using FreelanceFlow.Api.Domain.Activity;
 using FreelanceFlow.Api.Domain.Auth;
 using FreelanceFlow.Api.Domain.Catalog;
 using FreelanceFlow.Api.Domain.Clients;
+using FreelanceFlow.Api.Domain.Dashboard;
 using FreelanceFlow.Api.Domain.Files;
 using FreelanceFlow.Api.Domain.Projects;
 using FreelanceFlow.Api.Domain.Quotations;
@@ -36,6 +37,7 @@ public class AppDbContext : DbContext
     public DbSet<QuotationItem> QuotationItems => Set<QuotationItem>();
     public DbSet<ProjectFile> Files => Set<ProjectFile>();
     public DbSet<StorageAlert> StorageAlerts => Set<StorageAlert>();
+    public DbSet<DashboardState> DashboardStates => Set<DashboardState>();
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

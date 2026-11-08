@@ -9,8 +9,12 @@ namespace FreelanceFlow.Api.Features.Dashboard;
 
 public static class DashboardEndpoints
 {
-    public static void MapDashboardEndpoints(this IEndpointRouteBuilder app) =>
-        app.MapGroup("/api/admin").RequireAuthorization().MapGet("dashboard", GetDashboard);
+    public static void MapDashboardEndpoints(this IEndpointRouteBuilder app)
+    {
+        var admin = app.MapGroup("/api/admin").RequireAuthorization();
+        admin.MapGet("dashboard", GetDashboard);
+        admin.MapSetupChecklistEndpoints();
+    }
 
     /// <summary>
     /// docs/05 §3.12 — DSH-01..04 / BR-90. Read-only AsNoTracking queries; money is summed in SQL as long VND.

@@ -46,5 +46,21 @@ public class Settings
         UpdatedAt = now;
     }
 
+    // Plan 11 - daily Discord digest (config only; runtime state lives in dashboard_state)
+    public const int MinDigestHour = 0;
+    public const int MaxDigestHour = 23;
+
+    public bool DigestEnabled { get; set; } = true;
+    public int DigestHourVn { get; set; } = 8;
+
+    public void SetDigest(bool enabled, int hourVn, DateTimeOffset now)
+    {
+        if (hourVn is < MinDigestHour or > MaxDigestHour)
+            throw new DomainException("VALIDATION_FAILED", $"Giờ nhắc việc từ {MinDigestHour} đến {MaxDigestHour}");
+        DigestEnabled = enabled;
+        DigestHourVn = hourVn;
+        UpdatedAt = now;
+    }
+
     public Bank? Bank { get; set; }
 }

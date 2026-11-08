@@ -83,6 +83,10 @@ namespace FreelanceFlow.Api.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("OccurredAt")
+                        .IsDescending()
+                        .HasDatabaseName("ix_activity_occurred");
+
                     b.HasIndex("ClientId", "OccurredAt")
                         .IsDescending(false, true)
                         .HasDatabaseName("ix_activity_client");
@@ -299,6 +303,28 @@ namespace FreelanceFlow.Api.Data.Migrations
                     b.ToTable("clients", null, t =>
                         {
                             t.HasCheckConstraint("ck_clients_status", "status IN ('ACTIVE','INACTIVE')");
+                        });
+                });
+
+            modelBuilder.Entity("FreelanceFlow.Api.Domain.Dashboard.DashboardState", b =>
+                {
+                    b.Property<short>("Id")
+                        .HasColumnType("smallint")
+                        .HasColumnName("id");
+
+                    b.Property<DateOnly?>("DigestLastRunDate")
+                        .HasColumnType("date")
+                        .HasColumnName("digest_last_run_date");
+
+                    b.Property<DateTimeOffset?>("SetupDismissedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("setup_dismissed_at");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("dashboard_state", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_dashboard_state_singleton", "id = 1");
                         });
                 });
 
@@ -1321,6 +1347,18 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasDefaultValue(7)
                         .HasColumnName("default_validity_days");
 
+                    b.Property<bool>("DigestEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("digest_enabled");
+
+                    b.Property<int>("DigestHourVn")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(8)
+                        .HasColumnName("digest_hour_vn");
+
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasColumnType("text")
@@ -1374,6 +1412,8 @@ namespace FreelanceFlow.Api.Data.Migrations
                             t.HasCheckConstraint("ck_settings_account_no", "bank_account_no ~ '^[0-9A-Za-z]{4,19}$' OR bank_account_no IS NULL");
 
                             t.HasCheckConstraint("ck_settings_deposit", "default_deposit_percent BETWEEN 0 AND 100");
+
+                            t.HasCheckConstraint("ck_settings_digest_hour", "digest_hour_vn BETWEEN 0 AND 23");
 
                             t.HasCheckConstraint("ck_settings_prefix", "quotation_prefix ~ '^[A-Z]{1,5}$'");
 

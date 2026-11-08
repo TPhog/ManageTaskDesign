@@ -20,6 +20,7 @@ public class SettingsConfiguration : IEntityTypeConfiguration<Settings>
             t.HasCheckConstraint("ck_settings_watermark_opacity", "watermark_opacity BETWEEN 10 AND 40");
             t.HasCheckConstraint("ck_settings_watermark_text",
                 "watermark_text IS NULL OR char_length(watermark_text) <= 100");
+            t.HasCheckConstraint("ck_settings_digest_hour", "digest_hour_vn BETWEEN 0 AND 23");
         });
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id").HasColumnType("smallint").ValueGeneratedNever();
@@ -38,6 +39,8 @@ public class SettingsConfiguration : IEntityTypeConfiguration<Settings>
         b.Property(x => x.WatermarkEnabled).HasColumnName("watermark_enabled").HasDefaultValue(true);
         b.Property(x => x.WatermarkText).HasColumnName("watermark_text");
         b.Property(x => x.WatermarkOpacity).HasColumnName("watermark_opacity").HasDefaultValue(18);
+        b.Property(x => x.DigestEnabled).HasColumnName("digest_enabled").HasDefaultValue(true);
+        b.Property(x => x.DigestHourVn).HasColumnName("digest_hour_vn").HasDefaultValue(8);
 
         b.HasOne(x => x.Bank).WithMany().HasForeignKey(x => x.BankBin).HasPrincipalKey(bk => bk.Bin);
         b.HasOne<ProjectFile>().WithMany().HasForeignKey(x => x.LogoFileId);

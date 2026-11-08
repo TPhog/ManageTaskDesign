@@ -260,6 +260,7 @@ app.MapDashboardEndpoints();
 app.MapImagesEndpoints();
 app.MapStorageEndpoints();
 app.MapWatermarkEndpoints();
+app.MapDigestSettingsEndpoints();
 app.MapProjectFlowEndpoints();
 app.MapPortalSessionEndpoints();
 app.MapPortalProjectsEndpoints();

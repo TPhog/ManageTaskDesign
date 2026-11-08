@@ -31,6 +31,7 @@ public class ActivityLogConfiguration : IEntityTypeConfiguration<ActivityLog>
             .HasDatabaseName("ix_activity_project");
         b.HasIndex(x => new { x.ClientId, x.OccurredAt }).IsDescending(false, true)
             .HasDatabaseName("ix_activity_client");
+        b.HasIndex(x => x.OccurredAt).IsDescending().HasDatabaseName("ix_activity_occurred");
         b.HasIndex(x => new { x.EntityType, x.EntityId }).HasDatabaseName("ix_activity_entity");
 
         b.HasOne<Client>().WithMany().HasForeignKey(x => x.ClientId);
