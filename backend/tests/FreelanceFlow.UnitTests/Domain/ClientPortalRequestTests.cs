@@ -61,5 +61,6 @@ public class ClientPortalRequestTests
     {
         ClientRequest.DayStartUtc(new DateOnly(2026, 11, 8))
             .Should().Be(new DateTimeOffset(2026, 11, 7, 17, 0, 0, TimeSpan.Zero));
+        ClientRequest.DayStartUtc(new DateOnly(2026, 11, 8)).Offset.Should().Be(TimeSpan.Zero);
     }
 }

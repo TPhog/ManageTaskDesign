@@ -35,9 +35,9 @@ public class ClientRequest : IAuditable
         var text = content.Trim();
         if (text.Length is < 1 or > MaxContent) throw Invalid($"Nội dung dài 1–{MaxContent} ký tự");
         if (!OpenProjectStatuses.Contains(projectStatus))
-            throw new DomainException("BUSINESS_RULE", "Dự án đã hoàn thành hoặc đã huỷ — không gửi yêu cầu mới được (BR-21)");
+            throw new DomainException("BUSINESS_RULE", "Dự án đã hoàn thành hoặc đã huỷ — không gửi yêu cầu mới được");
         if (sentToday >= DailyClientLimit)
-            throw new DomainException("RATE_LIMITED", $"Mỗi ngày bạn gửi được tối đa {DailyClientLimit} yêu cầu (BR-54)");
+            throw new DomainException("RATE_LIMITED", $"Mỗi ngày bạn gửi được tối đa {DailyClientLimit} yêu cầu");
         return new ClientRequest
         {
             ProjectId = projectId,

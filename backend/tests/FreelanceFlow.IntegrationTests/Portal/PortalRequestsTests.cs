@@ -91,6 +91,42 @@ public class PortalRequestsTests(AppFactory factory) : PortalTestBase(factory)
     }
 
     [Fact]
+    public async Task Cancelled_deliverable_is_refused_like_a_foreign_one()
+    {
+        var (portal, _, projectId) = await ArrangeAsync();
+        var logo = await CreateDeliverableAsync(projectId, "Logo");
+        await MoveDeliverableAsync(logo, "CANCELLED");
+
+        var resp = await SendAsync(portal, projectId, "Sửa logo", logo);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors")
+            .TryGetProperty("deliverableId", out _).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Malformed_multipart_is_400_not_500()
+    {
+        var (portal, _, projectId) = await ArrangeAsync();
+        var body = new StringContent("--xyz\r\nContent-Disposition: form-data; name=\"content\"\r\n\r\ntruncated");
+        body.Headers.ContentType = MediaTypeHeaderValue.Parse("multipart/form-data; boundary=xyz");
+
+        var resp = await portal.PostAsync($"/api/portal/projects/{projectId}/requests", body);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest, await resp.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
+    public async Task Body_over_64KB_is_413_not_500()
+    {
+        var (portal, _, projectId) = await ArrangeAsync();
+
+        var resp = await SendAsync(portal, projectId, new string('a', 70 * 1024));
+
+        resp.StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge, await resp.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Completed_or_cancelled_projects_refuse_new_requests_but_stay_visible()   // BR-21, AC-R2
     {
         var (portal, clientId, cancelled) = await ArrangeAsync();

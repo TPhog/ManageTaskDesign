@@ -12,12 +12,19 @@ namespace FreelanceFlow.Api.Features.Portal;
 /// <summary>REQ-01 / REQ-06: the client sends change requests and follows their status.</summary>
 public static class PortalRequestsEndpoints
 {
+    /// <summary>
+    /// Text-only until images arrive (plan 08). An over-limit body is answered 413 (Payload Too Large),
+    /// whether detected via Content-Length or while streaming the form.
+    /// </summary>
+    private const int MaxBodyBytes = 64 * 1024;
+
     public static void MapPortalRequestsEndpoints(this IEndpointRouteBuilder app)
     {
         var portal = app.MapGroup("/api/portal").RequireAuthorization(PortalPrincipal.Policy);
 
         portal.MapGet("requests", ListRequests);
-        portal.MapPost("projects/{id:guid}/requests", SendRequest);
+        portal.MapPost("projects/{id:guid}/requests", SendRequest)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxBodyBytes));
     }
 
     private static async Task<IResult> ListRequests(
@@ -62,7 +69,23 @@ public static class PortalRequestsEndpoints
             {
                 ["content"] = ["Gửi yêu cầu dạng multipart/form-data"],
             });
-        var form = await http.ReadFormAsync();
+        if (http.ContentLength > MaxBodyBytes) return TooLarge();
+        IFormCollection form;
+        try
+        {
+            form = await http.ReadFormAsync();
+        }
+        catch (BadHttpRequestException ex) when (ex.StatusCode == StatusCodes.Status413PayloadTooLarge)
+        {
+            return TooLarge();
+        }
+        catch (Exception ex) when (ex is InvalidDataException or BadHttpRequestException or IOException)
+        {
+            return Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["content"] = ["Dữ liệu gửi lên không hợp lệ"],
+            });
+        }
         var content = form["content"].ToString();
 
         var errors = new Dictionary<string, string[]>();
@@ -72,7 +95,7 @@ public static class PortalRequestsEndpoints
         var rawDeliverable = form["deliverableId"].ToString();
         if (rawDeliverable.Length > 0)
         {
-            if (Guid.TryParse(rawDeliverable, out var did) && await db.Deliverables.AnyAsync(d => d.Id == did && d.ProjectId == id))
+            if (Guid.TryParse(rawDeliverable, out var did) && await db.Deliverables.AnyAsync(d => d.Id == did && d.ProjectId == id && d.Status != "CANCELLED"))
                 deliverableId = did;
             else
                 errors["deliverableId"] = ["Hạng mục không thuộc dự án này"];
@@ -111,6 +134,10 @@ public static class PortalRequestsEndpoints
         var dto = (await ToDtosAsync(db, [(request, project.Name)])).Single();
         return Results.Json(dto, statusCode: StatusCodes.Status201Created);
     }
+
+    private static IResult TooLarge() =>
+        Results.Json(new { code = "PAYLOAD_TOO_LARGE", detail = "Nội dung gửi lên quá lớn" },
+            statusCode: StatusCodes.Status413PayloadTooLarge);
 
     private static async Task<List<PortalRequestDto>> ToDtosAsync(
         AppDbContext db, IReadOnlyList<(ClientRequest Request, string ProjectName)> rows)
