@@ -21,6 +21,15 @@ export interface ProjectListItem {
   createdAt: string
 }
 
+/** GET /admin/projects/{id} deliverables[].quotedIn - live quotations already containing the deliverable (QA D-02) */
+export interface DeliverableQuoteRef {
+  quotationId: string
+  number: string | null
+  version: number
+  status: 'DRAFT' | 'SENT' | 'ACCEPTED'
+  kind: 'INITIAL' | 'ADDITIONAL'
+}
+
 export interface Deliverable {
   id: string
   name: string
@@ -33,6 +42,8 @@ export interface Deliverable {
   status: DeliverableStatus
   dueDate: string | null
   sortOrder: number
+  /** Plan 06c Task 1; optional so older fixtures keep compiling */
+  quotedIn?: DeliverableQuoteRef[]
   /** plan 06b: tasks linked to the deliverable (DONE / all) */
   taskTotal: number
   taskDone: number
@@ -85,6 +96,10 @@ export interface ClientListItem {
   phone: string | null
   status: 'ACTIVE' | 'INACTIVE'
   projectCount: number
+  portalEnabled: boolean
+  acceptedTotal: number
+  /** BR-73 */
+  outstanding: number
 }
 
 export interface ClientDetail {
@@ -101,6 +116,14 @@ export interface ClientDetail {
   portalTokenCreatedAt: string | null
   archivedAt: string | null
   projectCount: number
+  /** internal - never shown to the client */
+  notes: string
+  acceptedTotal: number
+  outstanding: number
+  pendingQuotationTotal: number
+  newRequests: number
+  rowVersion: number
+  createdAt: string
 }
 
 /** POST /admin/clients/{id}/portal-link — the URL is returned only this once (07-security §4.1). */
@@ -182,6 +205,12 @@ export interface TaskListParams {
   projectId?: string
   status?: TaskStatus
   due?: TaskDueFilter
+  /** title or project name (Plan 06c Task 1) */
+  q?: string
+  clientId?: string
+  page?: number
+  /** default 100 (Kanban loads a whole project) */
+  pageSize?: number
 }
 
 /** PUT /admin/tasks/{id} body */

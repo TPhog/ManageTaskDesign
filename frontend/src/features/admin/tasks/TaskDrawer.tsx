@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { MarkdownField } from './MarkdownField'
 import { Skeleton } from '@/components/ui/skeleton'
+import { DateInput } from '@/components/DateInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { api } from '@/lib/api'
 import { qk } from '@/lib/queryKeys'
@@ -193,11 +194,11 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
         </div>
         <div className="space-y-2">
           <Label htmlFor="task-startDate">Ngày bắt đầu</Label>
-          <Input id="task-startDate" type="date" {...register('startDate')} />
+          <DateInput id="task-startDate" value={watch('startDate')} onChange={v => setValue('startDate', v, { shouldDirty: true })} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="task-dueDate">Hạn hoàn thành</Label>
-          <Input id="task-dueDate" type="date" {...register('dueDate')} />
+          <DateInput id="task-dueDate" value={watch('dueDate')} onChange={v => setValue('dueDate', v, { shouldDirty: true })} />
         </div>
       </div>
 

@@ -22,13 +22,14 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ title: res.statusText })) as {
-      title?: string; detail?: string; code?: string; errors?: Record<string, string[]>
+      title?: string; detail?: string; code?: string; errors?: Record<string, string[]>; warnings?: string[]
     }
     throw Object.assign(new Error(err.title ?? res.statusText), {
       status: res.status,
       detail: err.detail,
       code: err.code,
       errors: err.errors,
+      warnings: err.warnings,
     }) as ApiError
   }
 
@@ -43,6 +44,8 @@ export type ApiError = Error & {
   code?: string
   /** ValidationProblem field errors, keyed by camelCase field name */
   errors?: Record<string, string[]>
+  /** 422 BUSINESS_RULE that the designer may confirm (docs/05 section 3.4 confirmWarnings) */
+  warnings?: string[]
 }
 
 /** Optional form fields: map '' (empty input) to null so the API never receives blank strings. */

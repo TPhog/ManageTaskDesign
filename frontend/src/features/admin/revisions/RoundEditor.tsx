@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { BillingChip } from '@/components/BillingChip'
+import { DateInput } from '@/components/DateInput'
 import { billingLabel, itemTypeLabel } from '@/lib/revisionLabels'
 import type { Billing, RevisionItemInput, RevisionItemType, RoundInput } from '@/lib/revisionTypes'
 import { emptyItem } from './revisionUtils'
@@ -63,11 +64,10 @@ export function RoundEditor({ index, value, deliverables, onChange, onRemove }: 
         </div>
         <div className="space-y-1.5">
           <Label htmlFor={`round-${n}-received`}>Ngày nhận</Label>
-          <Input
+          <DateInput
             id={`round-${n}-received`}
-            type="date"
             value={value.receivedAt ?? ''}
-            onChange={e => onChange({ ...value, receivedAt: e.target.value || null })}
+            onChange={iso => onChange({ ...value, receivedAt: iso || null })}
           />
         </div>
       </div>

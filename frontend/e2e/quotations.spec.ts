@@ -13,6 +13,7 @@ async function apiPut(page: Page, url: string, data: unknown) {
 /** Sending needs a receiving account (docs/06 §5); settings.spec may clear it, so set it before each test. */
 async function configureBank(page: Page) {
   const settings = await (await page.request.get('/api/admin/settings')).json()
+  if (settings.bankBin && settings.bankAccountNo && settings.bankAccountName) return   // keep the designer's real account
   await apiPut(page, '/api/admin/settings', {
     ...settings,
     bankBin: '970436',

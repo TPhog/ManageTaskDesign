@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
+import { DateInput } from '@/components/DateInput'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import type { ApiError } from '@/lib/api'
@@ -59,7 +59,7 @@ export function AcceptDialog({ quotation, open, onClose }: DialogProps) {
         <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label htmlFor="accept-date">Ngày chấp nhận</Label>
-            <Input id="accept-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
+            <DateInput id="accept-date" value={date} onChange={setDate} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="accept-note">Ghi chú</Label>
@@ -109,7 +109,7 @@ export function RejectDialog({ quotation, open, onClose }: DialogProps) {
         <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label htmlFor="reject-date">Ngày từ chối</Label>
-            <Input id="reject-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
+            <DateInput id="reject-date" value={date} onChange={setDate} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="reject-reason">Lý do từ chối</Label>
@@ -165,7 +165,7 @@ export function PaymentDialog({ quotation, action, onClose }: { quotation: Quota
         <div className="space-y-4 py-2">
           <div className="space-y-2">
             <Label htmlFor="payment-date">Ngày</Label>
-            <Input id="payment-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
+            <DateInput id="payment-date" value={date} onChange={setDate} />
           </div>
           {action?.undo && (
             <div className="space-y-2">

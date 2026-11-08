@@ -1,10 +1,19 @@
 import { test, expect } from '@playwright/test'
 import { expectToast } from './helpers'
+import { readSettings, restoreSettings, type SettingsSnapshot } from './settingsHelpers'
 
 test.describe('Settings', () => {
+  let saved: SettingsSnapshot
+
   test.beforeEach(async ({ page }) => {
     await page.goto('/admin/settings')
     await expect(page.getByRole('heading', { name: 'Cài đặt', level: 1 })).toBeVisible()
+    saved = await readSettings(page)
+  })
+
+  // e2e runs against the designer's dev DB: put the studio name, bank account and terms back (QA D-26)
+  test.afterEach(async ({ page }) => {
+    await restoreSettings(page, saved)
   })
 
   test('settings page loads with labelled form fields', async ({ page }) => {
