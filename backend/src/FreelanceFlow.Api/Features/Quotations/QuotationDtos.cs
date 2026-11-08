@@ -4,8 +4,13 @@ namespace FreelanceFlow.Api.Features.Quotations;
 
 // ---------- requests (docs/05 §3.10) ----------
 
-/// <summary>D1: deliverableIds = quote only those finished deliverables; omitted = every deliverable except CANCELLED.</summary>
-public sealed record CreateQuotationRequest(string? Kind, string? Title, bool FromDeliverables, Guid[]? DeliverableIds);
+/// <summary>Plan 09: typed unit price for a deliverable line (wins over service.base_price).</summary>
+public sealed record DeliverablePrice(Guid DeliverableId, long UnitPrice);
+
+/// <summary>D1: deliverableIds = quote only those finished deliverables; omitted = every deliverable except CANCELLED.
+/// Plan 09: deliverablePrices = typed unit prices, typically for deliverables without a service.</summary>
+public sealed record CreateQuotationRequest(string? Kind, string? Title, bool FromDeliverables, Guid[]? DeliverableIds,
+    DeliverablePrice[]? DeliverablePrices = null);
 
 public sealed record QuotationItemRequest(
     Guid? Id, string? Description, string? Details, int Quantity, long UnitPrice, string? SourceType, Guid? SourceId);

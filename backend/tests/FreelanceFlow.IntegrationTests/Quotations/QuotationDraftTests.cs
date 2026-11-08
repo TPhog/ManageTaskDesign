@@ -271,4 +271,49 @@ public class QuotationDraftTests(AppFactory factory) : QuotationTestBase(factory
 
         (await Client.GetAsync($"/api/admin/quotations/{Guid.NewGuid()}")).StatusCode.Should().Be(HttpStatusCode.NotFound);
     }
+
+    [Fact]
+    public async Task Typed_deliverable_prices_fill_lines_before_the_service_price()   // AC-B20, plan 09
+    {
+        await LoginAsync();
+        var projectId = await CreateProjectAsync();
+        var logo = await CreateDeliverableAsync(projectId, "Logo", LogoServiceId);
+        var invitation = await CreateDeliverableAsync(projectId, "Thiệp mời");
+        await CreateDeliverableAsync(projectId, "Sticker");
+
+        var resp = await PostQuotationAsync(projectId, new
+        {
+            kind = "INITIAL", fromDeliverables = true,
+            deliverablePrices = new[] { new { deliverableId = invitation, unitPrice = 450_000L }, new { deliverableId = logo, unitPrice = 1_800_000L } },
+        });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.Created, await resp.Content.ReadAsStringAsync());
+        var id = (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var q = await GetQuotationAsync(id);
+        q.GetProperty("items").EnumerateArray()
+            .Select(l => (l.GetProperty("description").GetString(), l.GetProperty("unitPrice").GetInt64()))
+            .Should().Equal(("Logo", 1_800_000L), ("Thiệp mời", 450_000L), ("Sticker", 0L));
+        q.GetProperty("total").GetInt64().Should().Be(2_250_000);
+    }
+
+    [Fact]
+    public async Task Deliverable_prices_are_validated()   // AC-B20
+    {
+        await LoginAsync();
+        var projectId = await CreateProjectAsync();
+        var a = await CreateDeliverableAsync(projectId, "A");
+        var b = await CreateDeliverableAsync(projectId, "B");
+        await MoveDeliverableAsync(a, "IN_PROGRESS", "IN_REVIEW", "APPROVED");
+
+        async Task ExpectDeliverablePricesError(object body)
+        {
+            var resp = await PostQuotationAsync(projectId, body);
+            resp.StatusCode.Should().Be(HttpStatusCode.BadRequest, await resp.Content.ReadAsStringAsync());
+            (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors").TryGetProperty("deliverablePrices", out _).Should().BeTrue();
+        }
+
+        await ExpectDeliverablePricesError(new { kind = "INITIAL", fromDeliverables = true, deliverablePrices = new[] { new { deliverableId = a, unitPrice = -5L } } });
+        await ExpectDeliverablePricesError(new { kind = "INITIAL", fromDeliverables = true, deliverableIds = new[] { a }, deliverablePrices = new[] { new { deliverableId = b, unitPrice = 100L } } });
+        await ExpectDeliverablePricesError(new { kind = "INITIAL", fromDeliverables = false, deliverablePrices = new[] { new { deliverableId = a, unitPrice = 100L } } });
+    }
 }

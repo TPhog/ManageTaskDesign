@@ -19,6 +19,13 @@ internal static class QuotationValidation
             errors["title"] = [$"Tối đa {MaxTitle} ký tự"];
         if (!body.FromDeliverables && body.DeliverableIds is { Length: > 0 })
             errors["deliverableIds"] = ["Chỉ dùng khi lập báo giá từ deliverable"];
+        if (body.DeliverablePrices is { Length: > 0 } prices)
+        {
+            if (!body.FromDeliverables)
+                errors["deliverablePrices"] = ["Chỉ dùng khi lập báo giá từ deliverable"];
+            else if (prices.Any(p => p.UnitPrice is < 0 or > MaxUnitPrice))
+                errors["deliverablePrices"] = ["Đơn giá từ 0 đến 100.000.000.000 ₫"];
+        }
         return errors;
     }
 

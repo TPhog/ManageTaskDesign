@@ -96,6 +96,9 @@ public static class QuotationsEndpoints
         var lines = new List<QuotationItemInput>();
         var warnings = new List<string>();
 
+        var typedPrices = (body.DeliverablePrices ?? [])
+            .GroupBy(p => p.DeliverableId)
+            .ToDictionary(g => g.Key, g => g.Last().UnitPrice);
         if (body.FromDeliverables)
         {
             List<Deliverable> deliverables;
@@ -123,15 +126,21 @@ public static class QuotationsEndpoints
                     .ToListAsync();
             }
             deliverables = deliverables.OrderBy(d => d.SortOrder).ThenBy(d => d.CreatedAt).ToList();
+            if (typedPrices.Keys.Any(id => deliverables.All(d => d.Id != id)))
+                return Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["deliverablePrices"] = ["Có hạng mục không nằm trong báo giá này"],
+                });
 
-            // QUO-01: line = deliverable, quantity × service.base_price (0 without a service; designer edits it)
+            // QUO-01 + plan 09: line = deliverable, quantity × (typed price → service.base_price → 0)
             var serviceIds = deliverables.Where(d => d.ServiceId != null).Select(d => d.ServiceId!.Value).Distinct().ToList();
             var prices = await db.Services.AsNoTracking()
                 .Where(s => serviceIds.Contains(s.Id))
                 .ToDictionaryAsync(s => s.Id, s => s.BasePrice);
             lines.AddRange(deliverables.Select(d => new QuotationItemInput(
                 null, d.Name, "", d.Quantity,
-                d.ServiceId is { } sid && prices.TryGetValue(sid, out var price) ? price : 0,
+                typedPrices.TryGetValue(d.Id, out var typed) ? typed
+                    : d.ServiceId is { } sid && prices.TryGetValue(sid, out var price) ? price : 0,
                 QuotationItemSources.Deliverable, d.Id)));
 
             // BR-01: warn, never block, when a deliverable is already on a draft/live quotation of this project
@@ -170,7 +179,11 @@ public static class QuotationsEndpoints
         db.Quotations.Add(quotation);
         activity.Write("quotation", quotation.Id, "quotation.created",
             clientId: project.ClientId, projectId: projectId,
-            data: new { kind = quotation.Kind, items = quotation.Items.Count, deliverableIds = subset ? body.DeliverableIds : null, total = quotation.Total });
+            data: new
+            {
+                kind = quotation.Kind, items = quotation.Items.Count, deliverableIds = subset ? body.DeliverableIds : null, total = quotation.Total,
+                deliverablePrices = typedPrices.Count > 0 ? typedPrices.Select(kv => new { deliverableId = kv.Key, unitPrice = kv.Value }) : null,
+            });
         await db.SaveChangesAsync();
 
         return Results.Created($"/api/admin/quotations/{quotation.Id}", new CreateQuotationResponse(quotation.Id, [.. warnings]));
