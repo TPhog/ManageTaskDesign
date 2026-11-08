@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { formatDate } from '@/lib/format'
 import { api, type ApiError } from '@/lib/api'
 import { BriefTab } from './BriefTab'
+import { QuotationsTab } from './QuotationsTab'
 import { DeliverablesTab } from './DeliverablesTab'
 import { TasksTab } from './TasksTab'
 import type { ProjectDetail, ProjectStatus } from '@/lib/types'
@@ -177,6 +178,7 @@ export default function ProjectDetailPage() {
           <TabsTrigger value="deliverables">Deliverables ({project.deliverables.length})</TabsTrigger>
           <TabsTrigger value="brief">Brief</TabsTrigger>
           <TabsTrigger value="tasks">Công việc</TabsTrigger>
+          <TabsTrigger value="quotations">Báo giá</TabsTrigger>
           <TabsTrigger value="activity">Lịch sử</TabsTrigger>
         </TabsList>
 
@@ -201,6 +203,10 @@ export default function ProjectDetailPage() {
 
         <TabsContent value="deliverables" className="mt-4">
           <DeliverablesTab project={project} />
+        </TabsContent>
+
+        <TabsContent value="quotations" className="mt-4">
+          <QuotationsTab project={project} />
         </TabsContent>
 
         <TabsContent value="brief" forceMount className="mt-4 data-[state=inactive]:hidden">

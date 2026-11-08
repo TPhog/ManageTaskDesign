@@ -1,0 +1,174 @@
+import { useState } from 'react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import type { ApiError } from '@/lib/api'
+import type { QuotationDetail } from '@/lib/quotationTypes'
+import { quotationErrorMessage, todayVn, type PaymentAction } from './quotationUtils'
+import { useQuotationCommand } from './useQuotations'
+
+interface DialogProps {
+  quotation: QuotationDetail
+  open: boolean
+  onClose: () => void
+}
+
+const failed = (err: Error) => toast.error(quotationErrorMessage(err as ApiError, 'Không thể cập nhật báo giá'))
+
+/** BR-36: designer records the client's agreement (ADR-004 — the client never clicks accept). */
+export function AcceptDialog({ quotation, open, onClose }: DialogProps) {
+  const command = useQuotationCommand(quotation.id)
+  const [date, setDate] = useState(todayVn())
+  const [note, setNote] = useState('')
+
+  function submit() {
+    command.mutate(
+      { action: 'accept', body: { acceptedAt: date, note: note.trim() || null, rowVersion: quotation.rowVersion } },
+      {
+        onSuccess: () => {
+          toast.success('Đã đánh dấu chấp nhận')
+          onClose()
+        },
+        onError: failed,
+      },
+    )
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Đánh dấu đã chấp nhận</DialogTitle>
+          <DialogDescription>Ghi nhận khách đã đồng ý báo giá {quotation.number} (qua Zalo, email…).</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="accept-date">Ngày chấp nhận</Label>
+            <Input id="accept-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="accept-note">Ghi chú</Label>
+            <Textarea id="accept-note" rows={3} value={note} placeholder="VD: Khách xác nhận qua Zalo lúc 14:30" onChange={e => setNote(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter className="gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>Huỷ</Button>
+          <Button type="button" disabled={!date || command.isPending} onClick={submit}>Xác nhận</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** BR-37: rejection always carries a reason. */
+export function RejectDialog({ quotation, open, onClose }: DialogProps) {
+  const command = useQuotationCommand(quotation.id)
+  const [date, setDate] = useState(todayVn())
+  const [reason, setReason] = useState('')
+
+  function submit() {
+    command.mutate(
+      { action: 'reject', body: { rejectedAt: date, reason: reason.trim(), rowVersion: quotation.rowVersion } },
+      {
+        onSuccess: () => {
+          toast.success('Đã ghi nhận từ chối')
+          onClose()
+        },
+        onError: failed,
+      },
+    )
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Từ chối báo giá</DialogTitle>
+          <DialogDescription>Báo giá {quotation.number} sẽ chuyển sang Từ chối; có thể tạo version mới sau.</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="reject-date">Ngày từ chối</Label>
+            <Input id="reject-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="reject-reason">Lý do từ chối</Label>
+            <Textarea id="reject-reason" rows={3} value={reason} onChange={e => setReason(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter className="gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>Huỷ</Button>
+          <Button type="button" variant="destructive" disabled={!reason.trim() || command.isPending} onClick={submit}>Từ chối</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** BR-70..72: a payment step; undo requires a reason. Open while action ≠ null. */
+export function PaymentDialog({ quotation, action, onClose }: { quotation: QuotationDetail; action: PaymentAction | null; onClose: () => void }) {
+  const command = useQuotationCommand(quotation.id)
+  const [date, setDate] = useState(todayVn())
+  const [reason, setReason] = useState('')
+
+  function close() {
+    setReason('')
+    onClose()
+  }
+
+  function submit() {
+    if (!action) return
+    command.mutate(
+      {
+        action: 'payment-status',
+        body: { to: action.to, date, reason: action.undo ? reason.trim() : null, rowVersion: quotation.rowVersion },
+      },
+      {
+        onSuccess: () => {
+          toast.success('Đã cập nhật thanh toán')
+          close()
+        },
+        onError: failed,
+      },
+    )
+  }
+
+  return (
+    <Dialog open={action !== null} onOpenChange={v => { if (!v) close() }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{action?.label ?? ''}</DialogTitle>
+          <DialogDescription>
+            App không tự xác nhận tiền về — hãy kiểm tra trên app ngân hàng trước khi đánh dấu.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="space-y-2">
+            <Label htmlFor="payment-date">Ngày</Label>
+            <Input id="payment-date" type="date" value={date} onChange={e => setDate(e.target.value)} />
+          </div>
+          {action?.undo && (
+            <div className="space-y-2">
+              <Label htmlFor="payment-reason">Lý do hoàn tác</Label>
+              <Textarea id="payment-reason" rows={3} value={reason} onChange={e => setReason(e.target.value)} />
+            </div>
+          )}
+        </div>
+        <DialogFooter className="gap-2">
+          <Button type="button" variant="outline" onClick={close}>Huỷ</Button>
+          <Button type="button" disabled={!date || (!!action?.undo && !reason.trim()) || command.isPending} onClick={submit}>Lưu</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
