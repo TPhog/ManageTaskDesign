@@ -2,6 +2,8 @@ using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Files;
 using FreelanceFlow.Api.Features.Images;
+using FreelanceFlow.Api.Infrastructure;
+using FreelanceFlow.Api.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 
 namespace FreelanceFlow.Api.Features.Storage;
@@ -16,6 +18,9 @@ public static class StorageEndpoints
         var admin = app.MapGroup("/api/admin/storage").RequireAuthorization();
         admin.MapGet("usage", async (StorageAlertService storage, CancellationToken ct) => Results.Ok(await storage.UsageAsync(ct)));
         admin.MapGet("images", ListImages);
+        admin.MapGet("projects", ListProjects);
+        admin.MapGet("original-cleanup", PreviewOriginalCleanup);
+        admin.MapPost("original-cleanup", RunOriginalCleanup);
     }
 
     private static async Task<IResult> ListImages(
@@ -71,5 +76,103 @@ public static class StorageEndpoints
             ImageDtos.AdminUrl(r.File.Id, ImageVariants.Thumb), ImageDtos.AdminUrl(r.File.Id, ImageVariants.Preview),
             r.File.OriginalDeletedAt)).ToList();
         return Results.Ok(new StorageImagePageDto(items, page, pageSize, total, totalBytes));
+    }
+
+    private static async Task<IResult> ListProjects(AppDbContext db, CancellationToken ct)
+    {
+        var usage = await db.Files.AsNoTracking()
+            .Where(f => f.DeletedAt == null && f.OwnerType != null && f.ProjectId != null)
+            .GroupBy(f => f.ProjectId!.Value)
+            .Select(g => new
+            {
+                ProjectId = g.Key,
+                ImageCount = g.Count(),
+                TotalBytes = g.Sum(f => f.SizeBytes),
+                OriginalBytes = g.Sum(f => f.OriginalDeletedAt == null && !f.PreviewIsOriginal ? f.OriginalBytes ?? 0 : 0),
+                OriginalsDeleted = g.Count(f => f.OriginalDeletedAt != null),
+            })
+            .ToListAsync(ct);
+        var ids = usage.Select(u => u.ProjectId).ToList();
+        var projects = await (from p in db.Projects.AsNoTracking()
+                              join c in db.Clients on p.ClientId equals c.Id
+                              where ids.Contains(p.Id)
+                              select new { p.Id, p.Name, p.Status, ClientName = c.Name })
+            .ToDictionaryAsync(p => p.Id, ct);
+        var completed = await OriginalCleanup.CompletedAtAsync(db, ids, ct);
+
+        var items = usage.Where(u => projects.ContainsKey(u.ProjectId))
+            .Select(u =>
+            {
+                var p = projects[u.ProjectId];
+                DateTimeOffset? completedAt = completed.TryGetValue(u.ProjectId, out var at) ? at : null;
+                return new StorageProjectDto(u.ProjectId, p.Name, p.ClientName, p.Status, completedAt,
+                    u.ImageCount, u.TotalBytes, u.OriginalBytes, u.OriginalsDeleted);
+            })
+            .OrderByDescending(x => x.TotalBytes).ThenBy(x => x.ProjectName, StringComparer.Ordinal)
+            .ToList();
+        return Results.Ok(items);
+    }
+
+    private static async Task<IResult> PreviewOriginalCleanup(
+        AppDbContext db, IClock clock, int olderThanMonths = 6, CancellationToken ct = default)
+    {
+        if (olderThanMonths is < OriginalCleanup.MinMonths or > OriginalCleanup.MaxMonths)
+            return Results.ValidationProblem(new Dictionary<string, string[]> { ["olderThanMonths"] = ["Từ 1 đến 120 tháng"] });
+        var cutoff = clock.UtcNow.AddMonths(-olderThanMonths);
+        var rows = await OriginalCleanup.CandidatesAsync(db, cutoff, ct);
+        return Results.Ok(OriginalCleanup.Summarize(olderThanMonths, cutoff, rows));
+    }
+
+    /// <summary>
+    /// P10 (BR-89): manual only. Re-reads the candidates and refuses (409) when they no longer match the preview the designer
+    /// confirmed; one transaction for the rows + one image.originals_deleted per project; objects go after the commit
+    /// (a failed delete is retried by the sweep as a stray variant); thresholds re-evaluated.
+    /// </summary>
+    private static async Task<IResult> RunOriginalCleanup(
+        OriginalCleanupBody body, AppDbContext db, IFileStorage storage, ActivityWriter activity, IClock clock,
+        StorageAlertService storageAlerts, ILoggerFactory loggers, CancellationToken ct)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (body.OlderThanMonths is not (>= OriginalCleanup.MinMonths and <= OriginalCleanup.MaxMonths))
+            errors["olderThanMonths"] = ["Từ 1 đến 120 tháng"];
+        if (body.ExpectedImageCount is not > 0) errors["expectedImageCount"] = ["Xem trước số ảnh trước khi xoá"];
+        if (body.ExpectedFreedBytes is not > 0) errors["expectedFreedBytes"] = ["Xem trước dung lượng trước khi xoá"];
+        if (errors.Count > 0) return Results.ValidationProblem(errors);
+
+        var months = body.OlderThanMonths!.Value;
+        var now = clock.UtcNow;
+        var candidates = await OriginalCleanup.CandidatesAsync(db, now.AddMonths(-months), ct);
+        if (candidates.Count != body.ExpectedImageCount || candidates.Sum(c => c.OriginalBytes) != body.ExpectedFreedBytes)
+            return Results.Json(new { code = "CONCURRENCY_CONFLICT", detail = "Số ảnh đã thay đổi — xem lại trước khi xoá" },
+                statusCode: StatusCodes.Status409Conflict);
+
+        var ids = candidates.Select(c => c.FileId).ToList();
+        var files = await db.Files.Where(f => ids.Contains(f.Id)).ToListAsync(ct);
+        long freed = 0;
+        foreach (var file in files) freed += file.DiscardOriginal(now);
+        var byProject = candidates.GroupBy(c => (c.ProjectId, c.ClientId)).ToList();
+        foreach (var g in byProject)
+            activity.Write("project", g.Key.ProjectId, "image.originals_deleted", clientId: g.Key.ClientId, projectId: g.Key.ProjectId,
+                data: new
+                {
+                    olderThanMonths = months, imageCount = g.Count(), freedBytes = g.Sum(c => c.OriginalBytes),
+                    fileIds = g.Select(c => c.FileId).ToArray(),
+                });
+        await db.SaveChangesAsync(ct);
+
+        try
+        {
+            var failed = await storage.DeleteManyAsync(files.Select(f => f.VariantKey(ImageVariants.Original)).ToList(), CancellationToken.None);
+            if (failed.Count > 0)
+                loggers.CreateLogger("FreelanceFlow.Storage")
+                    .LogWarning("Could not delete {Count} original(s); the daily sweep retries", failed.Count);
+        }
+        catch (Exception ex)
+        {
+            loggers.CreateLogger("FreelanceFlow.Storage")
+                .LogWarning("Could not delete originals ({ExceptionType}); the daily sweep retries", ex.GetType().Name);
+        }
+        await storageAlerts.EvaluateSafelyAsync(CancellationToken.None);
+        return Results.Ok(new OriginalCleanupResultDto(byProject.Count, files.Count, freed));
     }
 }
