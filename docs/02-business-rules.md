@@ -255,8 +255,12 @@ Nội dung chuyển khoản: `{number_no_dash} {COC|CONLAI|TT}` — ví dụ `BG
 | ID | Rule |
 |---|---|
 | BR-85 | File gắn với dự án (bắt buộc), deliverable/request/quotation (tùy chọn). |
-| BR-86 | Xóa file = xóa mềm (`deleted_at`); file vật lý bị dọn sau 30 ngày bởi job dọn dẹp (Phase 2; Phase 1 giữ nguyên). |
+| BR-86 | Xóa file = xóa mềm (`deleted_at`) rồi xóa object ngay sau commit. Object còn sót (xóa lỗi, row đã xóa, biến thể thừa, object không có row > 24 h, file ghi dở > 24 h) được job đối soát hằng ngày (`StorageSweeper`) dọn; job chỉ ghi `storage.reconciled` khi có phát hiện/thay đổi, và mỗi bước độc lập (một bước lỗi không dừng các bước khác). Key không đúng dạng ảnh không bao giờ bị xóa. Quota luôn tính từ DB. |
 | BR-87 | File là `evidence_file_id` của báo giá ACCEPTED không xóa được. |
+| BR-88 | Xóa task xóa luôn ảnh của task (xóa mềm cùng transaction, object xóa sau commit); ảnh là `evidence_file_id` của báo giá (BR-87) được giữ lại, `task.deleted` ghi `imagesDeleted`/`imagesKept`. Upload ảnh vào task khóa dòng task (share lock) nên không chạy chồng với xóa task. |
+| BR-89 | "Xóa bản gốc của dự án đã hoàn thành cũ hơn N tháng" (N 1–120) chỉ chạy khi designer bấm: xem trước (số ảnh/MB + `digest` của tập id) → xác nhận (không khôi phục được) gửi lại `expectedImageCount`, `expectedFreedBytes`, `expectedDigest`; khác bản xem trước → `409 CONCURRENCY_CONFLICT`. Giữ preview + thumb; khóa các dòng `FOR UPDATE` và kiểm lại BR-87; bỏ qua ảnh chứng từ và ảnh khách lưu một bản; ngày hoàn thành = lần `project.status_changed` cuối. Ghi `image.originals_deleted` mỗi dự án (`fileCount`, ≤ 200 `fileIds`). Không job nào tự chạy (BR-01). |
+
+**Biến thể ảnh (P10).** Chỉ áp cho ảnh mới. original ≤ 3000 px (q80), preview ≤ 2560 px (q78, watermark), thumb 480 px (q75). Ảnh phẳng (≤ 256 màu trên mẫu 64×64) thử thêm WebP lossless cho original và giữ bản nhỏ hơn. Ảnh khách gửi lưu **một bản** (preview là bí danh của original, `preview_is_original`) cộng thumb. Upload trùng SHA-256 trong cùng dự án vẫn lưu và trả cờ `duplicateOf`.
 
 ## 11. Dashboard metrics (BR-90)
 

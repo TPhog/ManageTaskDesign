@@ -170,7 +170,7 @@ Endpoint hỗ trợ UI xem trước gợi ý trước khi lưu:
 | POST | `/api/admin/projects/{id}/tasks` | `{ title, description, priority, startDate, dueDate, deliverableId?, revisionItemId? }` |
 | PUT | `/api/admin/tasks/{id}` | |
 | POST | `/api/admin/tasks/{id}/move` | `{ status, sortOrder }` (Kanban) |
-| DELETE | `/api/admin/tasks/{id}` | Xóa cứng (task không phải dữ liệu tài chính) + activity |
+| DELETE | `/api/admin/tasks/{id}` | Xóa cứng (task không phải dữ liệu tài chính) + activity; ảnh của task bị xóa theo (BR-88), trừ ảnh chứng từ báo giá (giữ lại, đếm trong `task.deleted`) |
 | POST/PUT/DELETE | `/api/admin/tasks/{id}/checklist[/{itemId}]` | |
 
 ### 3.10 Quotations
@@ -319,13 +319,16 @@ Tất cả dưới `/api/admin/*`, cookie `Designer`; POST/PUT/PATCH/DELETE cầ
 | POST | `/api/admin/projects/{projectId}/progress-updates` | Cập nhật tiến độ hiển thị cho khách |
 | GET/POST | `/api/admin/tasks/{id}/notes` | Ghi chú task |
 | PUT/DELETE | `/api/admin/tasks/{id}/notes/{noteId}` | |
-| POST/GET | `/api/admin/tasks/{taskId}/images` | Upload (multipart) / liệt kê ảnh của task; chặn upload khi dung lượng ≥ 90% |
+| POST/GET | `/api/admin/tasks/{taskId}/images` | Upload (multipart) / liệt kê ảnh của task; chặn upload khi dung lượng ≥ 90%; response upload có `duplicateOf` (`{ id, ownerType, ownerId, taskTitle, createdAt, sameUpload }` khi trùng SHA-256 trong dự án — vẫn lưu; `null` nếu không trùng); upload share-lock dòng task |
 | GET | `/api/admin/projects/{projectId}/images` | Ảnh theo dự án |
 | PATCH/DELETE | `/api/admin/images/{id}` | Sửa metadata / xóa |
 | POST | `/api/admin/images/bulk-delete` | Xóa nhiều ảnh |
-| GET | `/api/admin/images/{id}/{variant}` | Stream ảnh theo biến thể |
+| GET | `/api/admin/images/{id}/{variant}` | Stream ảnh theo biến thể; ETag theo object thật sự gửi là validator duy nhất (không `Last-Modified`). `Cache-Control`: preview/thumb `private, max-age=31536000, immutable`; original `private, max-age=600` (original đã dọn → trả preview; preview của ảnh khách → original) |
 | GET | `/api/admin/storage/usage` | Dung lượng đã dùng / hạn mức |
-| GET | `/api/admin/storage/images` | Liệt kê ảnh theo dung lượng để dọn |
+| GET | `/api/admin/storage/images` | Liệt kê ảnh theo dung lượng để dọn; item có `originalDeletedAt` |
+| GET | `/api/admin/storage/projects` | Dung lượng theo dự án (sắp `totalBytes` giảm dần): `projectId, projectName, clientName, projectStatus, completedAt, imageCount, totalBytes, originalBytes, originalsDeleted` |
+| GET | `/api/admin/storage/original-cleanup?olderThanMonths=` | Xem trước xóa bản gốc (BR-89): `olderThanMonths, cutoff, projectCount, imageCount, freedBytes, digest, projects[]`; N 1–120 |
+| POST | `/api/admin/storage/original-cleanup` | `{ olderThanMonths, expectedImageCount, expectedFreedBytes, expectedDigest }` → `{ projectCount, imageCount, freedBytes }`; `409 CONCURRENCY_CONFLICT` nếu số ảnh/MB/digest khác bản xem trước hoặc có dòng không còn đủ điều kiện |
 | GET/PUT | `/api/admin/settings/digest` | Nhắc việc hằng ngày (BR-94): GET trả `{ enabled, hourVn, channelConfigured }`; PUT nhận `{ enabled, hourVn }`, `hourVn` ngoài 0..23 → `400` (`errors.hourVn`); `channelConfigured` chỉ cho biết đã có Discord webhook hay chưa, không trả URL; ghi activity `settings.digest_updated`; policy `DesignerOnly` |
 | GET/PUT | `/api/admin/settings/watermark` | Cấu hình watermark ảnh (`enabled`, `text`, `opacityPercent`); policy `DesignerOnly` |
 
@@ -350,7 +353,7 @@ Mọi endpoint lấy `clientId` **từ session**, không nhận `clientId` từ 
 | GET | `/api/portal/quotations/{id}/qr/{purpose}.png` | Tải ảnh QR |
 | GET | `/api/portal/studio` | **Public** (`AllowAnonymous`, không cần session): `{ displayName, contactPhone, contactEmail }` — cho trang hết hạn/link lỗi. Rate limit 60/phút/IP (`RateLimit:PortalStudioPerMinute`) |
 | GET | `/api/portal/projects/{id}/images` | Ảnh dự án được chia sẻ cho khách (scope theo `clientId`) |
-| GET | `/api/portal/images/{id}/{variant}` | Stream ảnh; ngoài scope → 404 |
+| GET | `/api/portal/images/{id}/{variant}` | Stream ảnh `preview`/`thumb`; ảnh khách gửi lưu một bản nên `preview` là chính ảnh khách gửi; ngoài scope → 404. `Cache-Control: private, max-age=600` (ẩn/xóa/đăng xuất phải có hiệu lực sớm trên máy dùng chung); ETag là validator duy nhất |
 | POST | `/api/portal/deliverables/{id}/approve` | Khách duyệt hạng mục đang chờ duyệt; ngoài scope → 404 |
 | GET | `/api/portal/requests?projectId=` | `[{ id, createdAt, content, status, declineReason, attachments }]` |
 | POST | `/api/portal/projects/{id}/requests` | multipart `content`, `deliverableId?`, `files[]` (≤ 10, ≤ 20MB/file) — BR-53/54 |

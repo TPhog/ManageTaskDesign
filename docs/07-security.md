@@ -89,6 +89,9 @@ URL        = {PublicBaseUrl}/p/{token}
 | Kiểm tra | Phần mở rộng **và** magic bytes khớp; MIME từ server, không tin header client |
 | Lưu trữ | `storage_key = yyyy/MM/{uuid}` (không dùng tên gốc); thư mục ngoài web root |
 | Phục vụ | Qua API sau kiểm quyền; header `X-Content-Type-Options: nosniff`; `Content-Disposition: attachment` cho mọi loại **trừ** ảnh raster & PDF (inline) |
+| Cache ảnh | Portal: `private, max-age=600` (ẩn/xóa/đăng xuất phải có hiệu lực sớm trên máy dùng chung). Admin preview/thumb: `private, max-age=31536000, immutable` (object bất biến). Admin original: `private, max-age=600` (có thể chuyển sang preview sau khi dọn bản gốc). ETag là validator duy nhất, không `Last-Modified`; 404 không cache |
+| Biến thể ảnh | Designer: original ≤ 3000 px (chỉ designer), preview ≤ 2560 px có watermark, thumb 480 px. Khách không bao giờ nhận object `original` của designer (portal chặn `original`; DB `ck_files_preview_alias` chỉ cho alias preview→original ở ảnh `uploaded_by = CLIENT`) |
+| Dọn kho | Job hằng ngày chỉ xóa key đúng dạng ảnh của app, không bao giờ xóa key lạ; object không có row chỉ xóa sau 24 h; chỉ ghi `activity_logs` `storage.reconciled` (kèm số đếm) khi có phát hiện/thay đổi. Dọn bản gốc là thao tác thủ công của designer, khớp bản xem trước bằng digest (xem BR-89) |
 | SVG | Chỉ designer upload; luôn `attachment` (không render inline → tránh XSS) |
 | Tên file | `original_name` được sanitize khi đưa vào `Content-Disposition` (RFC 5987 `filename*`) |
 | Quota | Cảnh báo khi tổng dung lượng > 80% `App__StorageQuotaGb` |

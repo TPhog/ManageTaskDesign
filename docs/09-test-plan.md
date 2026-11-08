@@ -99,6 +99,21 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
 | AC-R6 | Upload `.html` / `.svg` / `.jpg` thực chất là exe | POST | `415` |
 | AC-R7 | File 21 MB | POST | `413` |
 
+
+### AC-STO — Lưu trữ ảnh (P10; BR-86, BR-88, BR-89)
+
+| ID | Given | When | Then |
+|---|---|---|---|
+| AC-STO1 | Designer, ảnh 3200×800 | Upload vào task | original 3000×750, preview 2560×640, thumb 480×120; variant trả `Cache-Control` đúng loại (preview/thumb immutable, original `max-age=600`), ETag là validator duy nhất (`ImageVariantPolicyTests`) |
+| AC-STO2 | Ảnh phẳng (sọc 2 màu) / ảnh nhiễu | `ImageProcessor.Process` | ảnh phẳng: original lossless (`VP8L`) nhỏ hơn lossy, pixel giữ nguyên; ảnh nhiễu: lossy, không thử lossless (`ImageProcessorTests`) |
+| AC-STO3 | Khách gửi request kèm ảnh | Upload | chỉ lưu `original` + `thumb`; `preview_is_original = true`; portal `preview` trả đúng byte của original khách gửi, `max-age=600`; portal `original` 404 (`ImageVariantPolicyTests`) |
+| AC-STO4 | Ảnh X đã có trong dự án | Upload lại X (task khác / tiến độ / cùng lần tải) | 201, ảnh vẫn lưu, `duplicateOf` trỏ bản sớm nhất (hoặc `sameUpload`); dự án khác: `null`; danh sách: `null` (`ImageVariantPolicyTests`) |
+| AC-STO5 | Task có 2 ảnh, 1 ảnh là chứng từ báo giá | Xóa task | 204; ảnh thường xóa mềm + object mất + quota giảm; ảnh chứng từ còn; `task.deleted` có `imagesDeleted 1, imagesKept 1`; upload song song với xóa task không để lại ảnh mồ côi (`TaskImageCleanupTests`) |
+| AC-STO6 | Object của row đã xóa, original thừa, mồ côi 25 h & 5 phút, `.tmp-` 30 h, key lạ, 1 thumb mất | Sweep | xóa object row đã xóa, original thừa, mồ côi 25 h, `.tmp-`; giữ mồ côi 5 phút và key lạ; `missingObjects 1`; quota không đổi; activity `storage.reconciled` chỉ khi có phát hiện; một bước lỗi không dừng bước khác (`StorageSweepTests`) |
+| AC-STO7 | Dự án hoàn thành 7 tháng trước (1 ảnh thường, 1 chứng từ, 1 ảnh khách), dự án hoàn thành 1 tháng | Xem trước N=6 rồi xác nhận | xem trước 1 ảnh + `digest`; gửi số/digest sai → 409; xác nhận → original mất, preview/thumb còn, quota giảm đúng `freedBytes`, `/original` trả preview, `originalDeletedAt` có giá trị, activity `image.originals_deleted` (`fileCount`, `fileIds`) (`OriginalCleanupTests`) |
+| AC-STO8 | Nhiều dự án có ảnh | `GET /api/admin/storage/projects` | sắp `totalBytes` giảm dần; dự án COMPLETED có `completedAt`; số ảnh/bytes/original đúng (`OriginalCleanupTests`) |
+| AC-STO9 | Designer trên UI | Upload ảnh trùng, xem "Theo dự án", xóa task, xem trước dọn bản gốc | toast cảnh báo trùng; dòng dự án "2 ảnh"; sau xóa task không còn ảnh; dự án vừa hoàn thành không nằm trong danh sách dọn (`e2e/storage-optimization.spec.ts`) |
+
 ### AC-DSH — Dashboard nâng cấp (P11)
 
 | ID | Tiêu chí | Kiểm bằng |
@@ -125,6 +140,8 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
 4. **Version báo giá:** báo giá SENT → tạo version mới, sửa giá → gửi → portal hiển thị v2, v1 ở lịch sử.
 5. **Thu hồi link:** designer tạo link mới → session khách cũ bị 401 → link mới vào được.
 6. **Dashboard nâng cấp (P11, `dashboard-upgrade.spec.ts`):** tick task quá hạn từ lịch 7 ngày rồi Hoàn tác; mở TaskDrawer từ lịch; đổi kỳ tiền đã thu và copy nhắc thanh toán; widget dung lượng dẫn tới trang Dung lượng; ẩn checklist (bỏ qua nếu DB dev đã xong/đã ẩn); lưu giờ digest; không tràn ngang ở 390px.
+7. **Báo giá phát sinh có giá (P09, `quotation-pricing.spec.ts`):** định giá báo giá phát sinh qua dialog → chấp nhận → hạng mục mới trong Deliverables (AC-Q9, AC-Q11); giá deliverable không dịch vụ + Chọn từ dịch vụ + xác nhận 0 ₫ (AC-B20, AC-B21).
+8. **Dung lượng ảnh (P10, `storage-optimization.spec.ts`):** upload ảnh trùng → cảnh báo; Cài đặt › Dung lượng › Theo dự án; xóa task → ảnh của task mất; xem trước xóa bản gốc của dự án đã hoàn thành (AC-STO9).
 
 ## 4. Test cô lập Portal (bắt buộc, tự động sinh)
 
@@ -140,7 +157,6 @@ Thêm:
 - Portal list endpoints của B không trả phần tử nào thuộc A.
 - B không xem được báo giá DRAFT của chính B; không xem được file `visible_to_client=false`.
 - Portal response không chứa khóa JSON `internalNotes`, `notes`, `scopeOverrideReason` (test snapshot schema).
-7. **Báo giá phát sinh có giá (P09, `quotation-pricing.spec.ts`):** định giá báo giá phát sinh qua dialog → chấp nhận → hạng mục mới trong Deliverables (AC-Q9, AC-Q11); giá deliverable không dịch vụ + Chọn từ dịch vụ + xác nhận 0 ₫ (AC-B20, AC-B21).
 - Portal bị tắt / khách archived / token version cũ → 401.
 - Request portal không có header CSRF → 403.
 

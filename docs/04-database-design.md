@@ -402,6 +402,14 @@ CREATE TABLE files (
 CREATE INDEX ix_files_project ON files (project_id, created_at DESC) WHERE deleted_at IS NULL;
 CREATE INDEX ix_files_request ON files (request_id);
 
+-- P10 (tối ưu lưu trữ ảnh) — migration 20261112100000_ImageStorageOptimization
+ALTER TABLE files ADD COLUMN preview_is_original boolean NOT NULL DEFAULT false;  -- ảnh khách: preview phục vụ từ original
+ALTER TABLE files ADD COLUMN original_deleted_at timestamptz;                     -- bản gốc đã dọn (BR-89); preview/thumb còn
+ALTER TABLE files ADD CONSTRAINT ck_files_preview_alias
+  CHECK (NOT preview_is_original OR (uploaded_by = 'CLIENT' AND original_deleted_at IS NULL));
+CREATE INDEX ix_files_project_sha256 ON files (project_id, sha256) WHERE deleted_at IS NULL;  -- cảnh báo ảnh trùng
+-- size_bytes của ảnh = tổng các biến thể ĐANG lưu (ảnh khách: original + thumb; sau BR-89: preview + thumb).
+
 ALTER TABLE quotations ADD CONSTRAINT fk_quotations_evidence FOREIGN KEY (evidence_file_id) REFERENCES files(id);
 ALTER TABLE settings   ADD CONSTRAINT fk_settings_logo FOREIGN KEY (logo_file_id) REFERENCES files(id);
 
