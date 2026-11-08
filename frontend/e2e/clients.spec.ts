@@ -3,6 +3,11 @@ import { createClient, expectToast, selectOption } from './helpers'
 import { archiveClient } from './cleanup'
 
 test.describe('Clients', () => {
+  const clientIds: string[] = []
+  test.afterEach(async ({ page }) => {
+    for (const id of clientIds.splice(0)) await archiveClient(page, id)
+  })
+
   test.beforeEach(async ({ page }) => {
     await page.goto('/admin/clients')
     await expect(page.getByRole('heading', { name: 'Khách hàng', level: 1 })).toBeVisible()
@@ -27,14 +32,15 @@ test.describe('Clients', () => {
     await expectToast(page, 'Đã tạo khách hàng')
     // does not depend on where the new row lands in a list of hundreds of clients
     await expect(page).toHaveURL(/\/admin\/clients\/[0-9a-f-]{36}$/)
+    clientIds.push(page.url().split('/').pop()!)
     await expect(page.getByRole('heading', { name: clientName, level: 1 })).toBeVisible()
     await expect(page.getByText('0901234567')).toBeVisible()
-    await archiveClient(page, page.url().split('/').pop()!)
   })
 
   test('finds a client by its unique name and edits it on the detail page', async ({ page }) => {
     const name = `Test Client ${Date.now()}`
     const id = await createClient(page, name)
+    clientIds.push(id)
     await page.getByRole('textbox', { name: 'Tìm khách hàng' }).fill(name)
     await expect(page.locator('tbody tr')).toHaveCount(1)
     await page.getByRole('link', { name, exact: true }).click()
@@ -47,7 +53,6 @@ test.describe('Clients', () => {
     await sheet.getByRole('button', { name: 'Lưu', exact: true }).click()
     await expectToast(page, 'Đã cập nhật khách hàng')
     await expect(page.getByText('0987654321')).toBeVisible()
-    await archiveClient(page, id)
   })
 
   test('long client lists are paged', async ({ page }) => {
@@ -82,12 +87,12 @@ test.describe('Clients', () => {
   test('portal link dialog previews the invitation before copying', async ({ page }) => {
     const name = `Test Client ${Date.now()}`
     const id = await createClient(page, name)
+    clientIds.push(id)
     await page.getByRole('textbox', { name: 'Tìm khách hàng' }).fill(name)
     await page.getByRole('button', { name: `Link portal của ${name}` }).click()
     const dialog = page.getByRole('dialog', { name: 'Link portal' })
     await dialog.getByRole('button', { name: 'Tạo link', exact: true }).click()
     await expect(dialog.getByLabel('Tin nhắn mẫu (xem trước)')).toHaveValue(new RegExp(`^Chào ${name},`))
     await expect(dialog.getByRole('button', { name: 'Mở thử như khách' })).toBeVisible()
-    await archiveClient(page, id)
   })
 })

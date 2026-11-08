@@ -8,6 +8,12 @@ async function openCreateDialog(page: Page, projectId: string) {
   return page.getByRole('dialog', { name: 'Tạo báo giá' })
 }
 
+/** One reusable service per dev DB instead of a new one every run. */
+async function ensureService(page: Page, name: string, basePrice: number): Promise<string> {
+  const list = (await (await page.request.get('/api/admin/services?includeInactive=true')).json()) as { id: string; name: string }[]
+  return list.find(s => s.name === name)?.id ?? (await createService(page, name, basePrice))
+}
+
 test.describe('Quotations QA (D-02, D-03, D-04, D-12)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/admin')
@@ -46,7 +52,7 @@ test.describe('Quotations QA (D-02, D-03, D-04, D-12)', () => {
 
   test('a deliverable already on a sent quotation needs an explicit acknowledgement', async ({ page }) => {
     const stamp = Date.now()
-    const service = await createService(page, `E2E Logo QA ${stamp}`, 1_500_000)
+    const service = await ensureService(page, 'E2E Logo QA', 1_500_000)
     const projectId = await createProject(page, `E2E BG trùng ${stamp}`)
     await apiPost(page.request, page, `/api/admin/projects/${projectId}/deliverables`, { name: 'Logo chính', quantity: 1, serviceId: service })
     const draft = await apiPost(page.request, page, `/api/admin/projects/${projectId}/quotations`, { kind: 'INITIAL', fromDeliverables: true })

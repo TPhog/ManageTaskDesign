@@ -1,14 +1,24 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { apiPost, createClient, createProjectForClient, createTask, expectToast } from './helpers'
 import { archiveClient } from './cleanup'
 import { pickOption } from './comboboxHelpers'
 
 test.describe('Lists — search, filters, pickers (QA D-06/D-07/D-18/D-21)', () => {
+  const clientIds: string[] = []
+  const makeClient = async (page: Page, name: string) => {
+    const id = await createClient(page, name)
+    clientIds.push(id)
+    return id
+  }
+  test.afterEach(async ({ page }) => {
+    for (const id of clientIds.splice(0)) await archiveClient(page, id)
+  })
+
   test('finds a project by its client and opens a new project right after creating it', async ({ page }) => {
     await page.goto('/admin')
     const tag = `${Date.now()}`
     const clientName = `E2E Tiệm bánh ${tag}`
-    const clientId = await createClient(page, clientName)
+    const clientId = await makeClient(page, clientName)
     await createProjectForClient(page, clientId, `E2E Menu ${tag}`)
 
     await page.goto('/admin/projects')
@@ -26,7 +36,6 @@ test.describe('Lists — search, filters, pickers (QA D-06/D-07/D-18/D-21)', () 
     await expectToast(page, 'Đã tạo dự án')
     await expect(page).toHaveURL(/\/admin\/projects\/[0-9a-f-]{36}\?tab=deliverables$/)
     await expect(page.getByRole('heading', { name: `E2E Logo ${tag}`, level: 1 })).toBeVisible()
-    await archiveClient(page, clientId)
   })
 
   test('long project lists are paged', async ({ page }) => {
@@ -42,7 +51,7 @@ test.describe('Lists — search, filters, pickers (QA D-06/D-07/D-18/D-21)', () 
   test('tasks page searches across projects and counts each quick filter', async ({ page }) => {
     await page.goto('/admin')
     const tag = `${Date.now()}`
-    const clientId = await createClient(page, `E2E Task KH ${tag}`)
+    const clientId = await makeClient(page, `E2E Task KH ${tag}`)
     const projectId = await createProjectForClient(page, clientId, `E2E Task DA ${tag}`)
     await createTask(page, projectId, { title: `Phác thảo ${tag}` })
     await createTask(page, projectId, { title: `Chốt màu ${tag}` })
@@ -53,13 +62,12 @@ test.describe('Lists — search, filters, pickers (QA D-06/D-07/D-18/D-21)', () 
     await expect(page.getByRole('row', { name: new RegExp(`Phác thảo ${tag}`) })).toBeVisible()
     await expect(page.getByRole('row', { name: new RegExp(`Chốt màu ${tag}`) })).toBeVisible()
     await expect(page.getByRole('group', { name: 'Lọc nhanh' }).getByRole('button', { name: /^Tất cả/ })).toContainText('2')
-    await archiveClient(page, clientId)
   })
 
   test('requests inbox filters by text', async ({ page }) => {
     await page.goto('/admin')
     const tag = `${Date.now()}`
-    const clientId = await createClient(page, `E2E Req KH ${tag}`)
+    const clientId = await makeClient(page, `E2E Req KH ${tag}`)
     const projectId = await createProjectForClient(page, clientId, `E2E Req DA ${tag}`)
     await apiPost(page.request, page, `/api/admin/projects/${projectId}/requests`, { content: `Đổi màu ${tag}`, source: 'ZALO' })
 
@@ -68,6 +76,5 @@ test.describe('Lists — search, filters, pickers (QA D-06/D-07/D-18/D-21)', () 
     await expect(page.getByRole('link', { name: new RegExp(`Đổi màu ${tag}`) })).toBeVisible()
     await page.getByRole('textbox', { name: 'Tìm yêu cầu' }).fill(`khong-co-${tag}`)
     await expect(page.getByText('Không có yêu cầu khớp bộ lọc')).toBeVisible()
-    await archiveClient(page, clientId)
   })
 })

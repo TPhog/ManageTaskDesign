@@ -6,6 +6,7 @@ import { archiveClient } from './cleanup'
 
 test.describe('Portal QA (C-04, C-06, C-12, C-14)', () => {
   let saved: SettingsSnapshot
+  const clientIds: string[] = []
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/admin')
@@ -15,11 +16,13 @@ test.describe('Portal QA (C-04, C-06, C-12, C-14)', () => {
 
   test.afterEach(async ({ page }) => {
     await restoreSettings(page, saved)
+    for (const id of clientIds.splice(0)) await archiveClient(page, id)
   })
 
   test('client sees what waits for them, designer messages by day and how to reach the studio', async ({ page, browser }) => {
     const tag = `${Date.now()}`
     const clientId = await createClient(page, `E2E Portal QA ${tag}`)
+    clientIds.push(clientId)
     const projectId = await createProjectForClient(page, clientId, `E2E Biển hiệu ${tag}`)
     const sign = await createDeliverable(page, projectId, 'Biển hiệu')
     await moveDeliverable(page, sign, 'IN_PROGRESS', 'IN_REVIEW')
@@ -44,6 +47,5 @@ test.describe('Portal QA (C-04, C-06, C-12, C-14)', () => {
     await expect(portal.getByText('Bạn đã thoát')).toBeVisible()
     await expect(portal.getByRole('link', { name: 'Gọi' })).toHaveAttribute('href', 'tel:0901234567')
     await context.close()
-    await archiveClient(page, clientId)
   })
 })
