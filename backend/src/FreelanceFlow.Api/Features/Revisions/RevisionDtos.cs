@@ -36,11 +36,13 @@ public sealed record LinkedQuotationDto(Guid Id, string? Number, int Version, st
 
 public sealed record LinkedTaskDto(Guid Id, string Title, string Status);
 
-/// <summary>SuggestedBilling/SuggestionReason are filled only in the response that created the item.</summary>
+/// <summary>SuggestedBilling/SuggestionReason are filled only in the response that created the item. Plan 09: service picked
+/// for a NEW_DELIVERABLE line and the deliverable it became on acceptance (BR-48).</summary>
 public sealed record RevisionItemDto(
     Guid Id, Guid RoundId, string Description, string Type, string Billing, string WorkStatus,
     Guid? QuotationItemId, LinkedQuotationDto? Quotation, string? ScopeOverrideReason, string InternalNotes,
-    int SortOrder, uint RowVersion, string? SuggestedBilling, string? SuggestionReason, IReadOnlyList<LinkedTaskDto> Tasks);
+    int SortOrder, uint RowVersion, string? SuggestedBilling, string? SuggestionReason, IReadOnlyList<LinkedTaskDto> Tasks,
+    Guid? ServiceId = null, string? ServiceName = null, Guid? CreatedDeliverableId = null, string? CreatedDeliverableName = null);
 
 public sealed record RoundDto(
     Guid Id, Guid ProjectId, Guid? DeliverableId, string? DeliverableName, int RoundNo, DateOnly ReceivedAt,

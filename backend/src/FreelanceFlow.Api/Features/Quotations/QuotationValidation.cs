@@ -8,7 +8,7 @@ internal static class QuotationValidation
     private const int MaxTitle = 200;
     private const int MaxText = 5000;
     private const int MaxQuantity = 10_000;
-    private const long MaxUnitPrice = 100_000_000_000; // 100 tỷ đồng: keeps quantity × unitPrice far from long overflow
+    internal const long MaxUnitPrice = 100_000_000_000; // 100 tỷ đồng: keeps quantity × unitPrice far from long overflow
 
     public static Dictionary<string, string[]> ValidateCreate(CreateQuotationRequest body)
     {

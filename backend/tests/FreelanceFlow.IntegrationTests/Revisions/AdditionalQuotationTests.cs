@@ -7,6 +7,16 @@ public class AdditionalQuotationTests(AppFactory factory) : RevisionTestBase(fac
 {
     private static Guid IdFrom(JsonElement created) => created.GetProperty("id").GetGuid();
 
+    /// <summary>
+    /// Item ids of a triage with a deliverable round then a project-level round, in body order: both rounds get
+    /// round_no 1 and the same created_at, so the request detail may list them either way.
+    /// </summary>
+    private static List<Guid> ItemIdsInBodyOrder(JsonElement detail) =>
+        detail.GetProperty("rounds").EnumerateArray()
+            .OrderBy(r => r.GetProperty("deliverableId").ValueKind == JsonValueKind.Null)
+            .SelectMany(r => r.GetProperty("items").EnumerateArray())
+            .Select(i => i.GetProperty("id").GetGuid()).ToList();
+
     private async Task<Guid> CreateAdditionalAsync(Guid projectId, object body)
     {
         var resp = await PostFromRevisionsAsync(projectId, body);
@@ -228,5 +238,102 @@ public class AdditionalQuotationTests(AppFactory factory) : RevisionTestBase(fac
             r.StatusCode == HttpStatusCode.Conflict || r.StatusCode == HttpStatusCode.UnprocessableEntity);
         var list = await Client.GetFromJsonAsync<JsonElement>($"/api/admin/quotations?projectId={projectId}");
         list.GetProperty("total").GetInt32().Should().Be(1, "the losing draft is rolled back with its transaction");
+    }
+
+    [Fact]
+    public async Task From_revisions_prices_each_line_typed_then_service_then_suggestion()   // AC-Q9, plan 09
+    {
+        await LoginAsync();
+        var projectId = await CreateProjectAsync();
+        var logo = await CreateQuotaDeliverableAsync(projectId, "Logo", 0);   // 0 free rounds → MINOR is chargeable
+        var ids = ItemIdsInBodyOrder(await TriageNewRequestAsync(projectId,
+                Round(logo, ("Đổi màu", "MINOR", null), ("Đổi font", "MINOR", null)),
+                Round(null, ("Banner FB", "NEW_DELIVERABLE", null), ("Thiệp mời", "NEW_DELIVERABLE", null),
+                    ("Bản tiếng Anh", "SCOPE_CHANGE", null), ("Poster", "NEW_DELIVERABLE", null))));
+
+        var quotationId = await CreateAdditionalAsync(projectId, new
+        {
+            revisionItemIds = ids,
+            newDeliverableServices = new object[]
+            {
+                new { revisionItemId = ids[2], serviceId = BannerServiceId, unitPrice = (long?)null },
+                new { revisionItemId = ids[3], serviceId = (Guid?)null, unitPrice = (long?)750_000 },
+                new { revisionItemId = ids[5], serviceId = BannerServiceId, unitPrice = (long?)900_000 },
+            },
+            linePrices = new[] { new { revisionItemId = ids[1], unitPrice = 350_000L }, new { revisionItemId = ids[4], unitPrice = 400_000L } },
+        });
+
+        var q = await GetQuotationAsync(quotationId);
+        q.GetProperty("items").EnumerateArray()
+            .Select(l => (l.GetProperty("description").GetString(), l.GetProperty("unitPrice").GetInt64()))
+            .Should().Equal(("Vòng sửa thứ 1 — Logo", 350_000L), ("Thiết kế Banner", 500_000L), ("Thiệp mời", 750_000L),
+                ("Bản tiếng Anh", 400_000L), ("Thiết kế Banner", 900_000L));
+        q.GetProperty("total").GetInt64().Should().Be(2_900_000);
+
+        var banner = await GetItemAsync(projectId, ids[2]);
+        banner.GetProperty("serviceId").GetGuid().Should().Be(BannerServiceId);
+        banner.GetProperty("serviceName").GetString().Should().Be("Thiết kế Banner");
+        (await GetItemAsync(projectId, ids[3])).GetProperty("serviceId").ValueKind.Should().Be(JsonValueKind.Null);
+        (await GetItemAsync(projectId, ids[4])).GetProperty("serviceId").ValueKind.Should().Be(JsonValueKind.Null);
+        (await GetItemAsync(projectId, ids[3])).GetProperty("createdDeliverableId").ValueKind.Should().Be(JsonValueKind.Null);
+
+        var created = (await ActivityRowsAsync(quotationId)).Single(a => a.Action == "quotation.created");
+        created.Data.Should().Contain("linePrices").And.Contain("400000").And.Contain("750000");
+    }
+
+    [Fact]
+    public async Task From_revisions_rejects_misplaced_or_out_of_range_prices_and_links_nothing()   // AC-Q10
+    {
+        await LoginAsync();
+        var projectId = await CreateProjectAsync();
+        var logo = await CreateQuotaDeliverableAsync(projectId, "Logo", 0);
+        var ids = ItemIdsInBodyOrder(await TriageNewRequestAsync(projectId,
+                Round(logo, ("Đổi màu", "MINOR", null), ("Đổi bố cục", "MAJOR", null)),
+                Round(null, ("Sticker", "NEW_DELIVERABLE", null))));
+
+        async Task ExpectField(object body, string field)
+        {
+            var resp = await PostFromRevisionsAsync(projectId, body);
+            resp.StatusCode.Should().Be(HttpStatusCode.BadRequest, await resp.Content.ReadAsStringAsync());
+            (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors").TryGetProperty(field, out _).Should().BeTrue();
+        }
+
+        await ExpectField(new { revisionItemIds = ids, newDeliverableServices = new[] { new { revisionItemId = ids[2], serviceId = (Guid?)null, unitPrice = (long?)-1 } } }, "newDeliverableServices");
+        await ExpectField(new { revisionItemIds = ids, newDeliverableServices = new[] { new { revisionItemId = ids[2], serviceId = (Guid?)Guid.NewGuid(), unitPrice = (long?)null } } }, "newDeliverableServices");
+        await ExpectField(new { revisionItemIds = ids, linePrices = new[] { new { revisionItemId = ids[2], unitPrice = 100L } } }, "linePrices");             // NEW_DELIVERABLE
+        await ExpectField(new { revisionItemIds = ids, linePrices = new[] { new { revisionItemId = Guid.NewGuid(), unitPrice = 100L } } }, "linePrices");      // not in the list
+        await ExpectField(new { revisionItemIds = ids, linePrices = new[] { new { revisionItemId = ids[0], unitPrice = 100_000_000_001L } } }, "linePrices");  // > 100 tỷ
+        await ExpectField(new { revisionItemIds = ids, linePrices = new[] { new { revisionItemId = ids[0], unitPrice = 300_000L }, new { revisionItemId = ids[1], unitPrice = 350_000L } } }, "linePrices");   // one round, two prices
+
+        foreach (var id in ids)
+            (await GetItemAsync(projectId, id)).GetProperty("quotationItemId").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
+    public async Task Preview_lists_the_planned_lines_with_suggested_prices_and_changes_nothing()   // AC-Q9 (preview)
+    {
+        await LoginAsync();
+        var projectId = await CreateProjectAsync();
+        var logo = await CreateQuotaDeliverableAsync(projectId, "Logo", 0, extraRoundPrice: 200_000);
+        var ids = ItemIdsInBodyOrder(await TriageNewRequestAsync(projectId,
+                Round(logo, ("Đổi màu", "MINOR", null), ("Đổi font", "MINOR", null)),
+                Round(null, ("Sticker", "NEW_DELIVERABLE", null), ("Bản tiếng Anh", "SCOPE_CHANGE", null))));
+
+        var resp = await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/quotations/from-revisions/preview",
+            new { revisionItemIds = ids });
+
+        resp.StatusCode.Should().Be(HttpStatusCode.OK, await resp.Content.ReadAsStringAsync());
+        var lines = (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("lines").EnumerateArray().ToList();
+        lines.Select(l => (l.GetProperty("kind").GetString(), l.GetProperty("description").GetString(), l.GetProperty("suggestedUnitPrice").GetInt64()))
+            .Should().Equal(("ROUND", "Vòng sửa thứ 1 — Logo", 200_000L), ("NEW_DELIVERABLE", "Sticker", 0L), ("SCOPE_CHANGE", "Bản tiếng Anh", 0L));
+        lines[0].GetProperty("revisionItemIds").EnumerateArray().Select(x => x.GetGuid()).Should().Equal(ids[0], ids[1]);
+        lines[0].GetProperty("details").GetString().Should().Be("• Đổi màu\n• Đổi font");
+        foreach (var id in ids)
+            (await GetItemAsync(projectId, id)).GetProperty("quotationItemId").ValueKind.Should().Be(JsonValueKind.Null);
+
+        var inQuota = await CreateQuotaDeliverableAsync(projectId, "Banner", 3);
+        var free = (await TriageItemsAsync(projectId, inQuota, ("Sửa nhỏ", "MINOR", null)))[0];
+        (await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/quotations/from-revisions/preview",
+            new { revisionItemIds = new[] { free } })).StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
     }
 }

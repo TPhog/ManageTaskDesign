@@ -43,7 +43,14 @@ internal static class RevisionReads
                 .ToListAsync())
             .ToLookup(t => t.ItemId, t => new LinkedTaskDto(t.Id, t.Title, t.Status));
 
-        var deliverableIds = rounds.Where(r => r.DeliverableId != null).Select(r => r.DeliverableId!.Value).Distinct().ToList();
+        var serviceIds = items.Where(x => x.Item.ServiceId != null).Select(x => x.Item.ServiceId!.Value).Distinct().ToList();
+        var serviceNames = await db.Services.AsNoTracking()
+            .Where(s => serviceIds.Contains(s.Id))
+            .ToDictionaryAsync(s => s.Id, s => s.Name);
+
+        var deliverableIds = rounds.Where(r => r.DeliverableId != null).Select(r => r.DeliverableId!.Value)
+            .Concat(items.Where(x => x.Item.CreatedDeliverableId != null).Select(x => x.Item.CreatedDeliverableId!.Value))
+            .Distinct().ToList();
         var names = await db.Deliverables.AsNoTracking()
             .Where(d => deliverableIds.Contains(d.Id))
             .ToDictionaryAsync(d => d.Id, d => d.Name);
@@ -58,7 +65,7 @@ internal static class RevisionReads
             byRound[r.Id].Select(x => ToItemDto(x.Item, x.RowVersion,
                 x.Item.QuotationItemId is { } line ? links.GetValueOrDefault(line) : null,
                 tasks[x.Item.Id].ToList(),
-                suggestions?.GetValueOrDefault(x.Item.Id))).ToList())).ToList();
+                suggestions?.GetValueOrDefault(x.Item.Id), serviceNames, names)).ToList())).ToList();
     }
 
     /// <summary>docs/08 …/revisions: deliverables (sort order) with quota + rounds, then project-level rounds.</summary>
@@ -94,7 +101,10 @@ internal static class RevisionReads
     }
 
     private static RevisionItemDto ToItemDto(RevisionItem i, uint rowVersion, LinkedQuotationDto? quotation,
-        IReadOnlyList<LinkedTaskDto> tasks, BillingSuggestion? suggestion) =>
+        IReadOnlyList<LinkedTaskDto> tasks, BillingSuggestion? suggestion,
+        IReadOnlyDictionary<Guid, string> serviceNames, IReadOnlyDictionary<Guid, string> deliverableNames) =>
         new(i.Id, i.RoundId, i.Description, i.Type, i.Billing, i.WorkStatus, i.QuotationItemId, quotation,
-            i.ScopeOverrideReason, i.InternalNotes, i.SortOrder, rowVersion, suggestion?.Billing, suggestion?.Reason, tasks);
+            i.ScopeOverrideReason, i.InternalNotes, i.SortOrder, rowVersion, suggestion?.Billing, suggestion?.Reason, tasks,
+            i.ServiceId, i.ServiceId is { } sid ? serviceNames.GetValueOrDefault(sid) : null,
+            i.CreatedDeliverableId, i.CreatedDeliverableId is { } did ? deliverableNames.GetValueOrDefault(did) : null);
 }
