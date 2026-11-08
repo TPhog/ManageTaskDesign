@@ -124,9 +124,10 @@ public static class StorageEndpoints
     }
 
     /// <summary>
-    /// P10 (BR-89): manual only. Re-reads the candidates and refuses (409) when they no longer match the preview the designer
-    /// confirmed; one transaction for the rows + one image.originals_deleted per project; objects go after the commit
-    /// (a failed delete is retried by the sweep as a stray variant); thresholds re-evaluated.
+    /// P10 (BR-89): manual only. In one transaction: re-reads the candidates, refuses (409) unless count, bytes and the
+    /// id-set digest match the preview the designer confirmed, locks the rows (FOR UPDATE, BR-87 re-checked) and refuses
+    /// again if any dropped out, then discards the originals with one image.originals_deleted per project. Objects go
+    /// after the commit (a failed delete is retried by the sweep as a stray variant); thresholds re-evaluated.
     /// </summary>
     private static async Task<IResult> RunOriginalCleanup(
         OriginalCleanupBody body, AppDbContext db, IFileStorage storage, ActivityWriter activity, IClock clock,
@@ -137,16 +138,23 @@ public static class StorageEndpoints
             errors["olderThanMonths"] = ["Từ 1 đến 120 tháng"];
         if (body.ExpectedImageCount is not > 0) errors["expectedImageCount"] = ["Xem trước số ảnh trước khi xoá"];
         if (body.ExpectedFreedBytes is not > 0) errors["expectedFreedBytes"] = ["Xem trước dung lượng trước khi xoá"];
+        if (string.IsNullOrWhiteSpace(body.ExpectedDigest)) errors["expectedDigest"] = ["Xem trước danh sách ảnh trước khi xoá"];
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
         var months = body.OlderThanMonths!.Value;
         var now = clock.UtcNow;
-        var candidates = await OriginalCleanup.CandidatesAsync(db, now.AddMonths(-months), ct);
-        if (candidates.Count != body.ExpectedImageCount || candidates.Sum(c => c.OriginalBytes) != body.ExpectedFreedBytes)
-            return Results.Json(new { code = "CONCURRENCY_CONFLICT", detail = "Số ảnh đã thay đổi — xem lại trước khi xoá" },
-                statusCode: StatusCodes.Status409Conflict);
+        var conflict = Results.Json(new { code = "CONCURRENCY_CONFLICT", detail = "Số ảnh đã thay đổi — xem lại trước khi xoá" },
+            statusCode: StatusCodes.Status409Conflict);
 
-        var ids = candidates.Select(c => c.FileId).ToList();
+        await using var tx = await db.Database.BeginTransactionAsync(ct);
+        var candidates = await OriginalCleanup.CandidatesAsync(db, now.AddMonths(-months), ct);
+        var ids = candidates.Select(c => c.FileId).ToArray();
+        if (candidates.Count != body.ExpectedImageCount || candidates.Sum(c => c.OriginalBytes) != body.ExpectedFreedBytes
+            || !string.Equals(OriginalCleanup.Digest(ids), body.ExpectedDigest!.Trim(), StringComparison.OrdinalIgnoreCase))
+            return conflict;
+        if ((await OriginalCleanup.LockEligibleAsync(db, ids, ct)).Count != ids.Length)
+            return conflict;   // a row changed between the read and the lock (e.g. became quotation evidence)
+
         var files = await db.Files.Where(f => ids.Contains(f.Id)).ToListAsync(ct);
         long freed = 0;
         foreach (var file in files) freed += file.DiscardOriginal(now);
@@ -156,9 +164,10 @@ public static class StorageEndpoints
                 data: new
                 {
                     olderThanMonths = months, imageCount = g.Count(), freedBytes = g.Sum(c => c.OriginalBytes),
-                    fileIds = g.Select(c => c.FileId).ToArray(),
+                    fileCount = g.Count(), fileIds = g.Select(c => c.FileId).Take(OriginalCleanup.MaxLoggedFileIds).ToArray(),
                 });
         await db.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
 
         try
         {

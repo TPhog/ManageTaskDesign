@@ -8,13 +8,13 @@ using SkiaSharp;
 
 namespace FreelanceFlow.IntegrationTests.Images;
 
-public class OriginalCleanupTests(AppFactory factory) : ImageTestBase(factory)
+public abstract class OriginalCleanupTestBase(AppFactory factory) : ImageTestBase(factory)
 {
-    private string VariantPath(Guid projectId, Guid id, string variant) =>
+    protected string VariantPath(Guid projectId, Guid id, string variant) =>
         Path.Combine(Factory.FilesRoot, "projects", projectId.ToString(), id.ToString(), variant + ".webp");
 
     /// <summary>COMPLETED at a chosen instant: status set directly + one backdated project.status_changed (the activity log is append-only).</summary>
-    private async Task CompleteProjectAtAsync(Guid projectId, DateTimeOffset completedAt)
+    protected async Task CompleteProjectAtAsync(Guid projectId, DateTimeOffset completedAt)
     {
         using var scope = Factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -28,7 +28,10 @@ public class OriginalCleanupTests(AppFactory factory) : ImageTestBase(factory)
         });
         await db.SaveChangesAsync();
     }
+}
 
+public class OriginalCleanupTests(AppFactory factory) : OriginalCleanupTestBase(factory)
+{
     [Fact]
     public async Task Originals_of_long_completed_projects_are_previewed_then_deleted_on_confirmation_keeping_previews()
     {
@@ -63,6 +66,8 @@ public class OriginalCleanupTests(AppFactory factory) : ImageTestBase(factory)
         preview.GetProperty("imageCount").GetInt32().Should().Be(1, "evidence (BR-87) and the client photo stored once are left out");
         preview.GetProperty("projectCount").GetInt32().Should().Be(1);
         preview.GetProperty("freedBytes").GetInt64().Should().Be(targetOriginal);
+        var digest = preview.GetProperty("digest").GetString();
+        digest.Should().MatchRegex("^[0-9a-f]{64}$");
         var listed = preview.GetProperty("projects").EnumerateArray().Should().ContainSingle().Subject;
         listed.GetProperty("projectId").GetGuid().Should().Be(old);
         listed.GetProperty("imageCount").GetInt32().Should().Be(1);
@@ -72,16 +77,21 @@ public class OriginalCleanupTests(AppFactory factory) : ImageTestBase(factory)
         (await Client.GetAsync("/api/admin/storage/original-cleanup?olderThanMonths=121")).StatusCode.Should().Be(HttpStatusCode.BadRequest);
 
         var stale = await Client.PostAsJsonAsync("/api/admin/storage/original-cleanup",
-            new { olderThanMonths = 6, expectedImageCount = 2, expectedFreedBytes = targetOriginal });
+            new { olderThanMonths = 6, expectedImageCount = 2, expectedFreedBytes = targetOriginal, expectedDigest = digest });
         stale.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await stale.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("CONCURRENCY_CONFLICT");
+        var otherSet = await Client.PostAsJsonAsync("/api/admin/storage/original-cleanup",
+            new { olderThanMonths = 6, expectedImageCount = 1, expectedFreedBytes = targetOriginal, expectedDigest = new string('0', 64) });
+        otherSet.StatusCode.Should().Be(HttpStatusCode.Conflict, "same count and bytes, different images");
         var missing = await Client.PostAsJsonAsync("/api/admin/storage/original-cleanup", new { olderThanMonths = 6 });
         missing.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await missing.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors").TryGetProperty("expectedImageCount", out _).Should().BeTrue();
+        var missingErrors = (await missing.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors");
+        missingErrors.TryGetProperty("expectedImageCount", out _).Should().BeTrue();
+        missingErrors.TryGetProperty("expectedDigest", out _).Should().BeTrue();
 
         var usedBefore = (await UsageAsync(Client)).GetProperty("usedBytes").GetInt64();
         var run = await Client.PostAsJsonAsync("/api/admin/storage/original-cleanup",
-            new { olderThanMonths = 6, expectedImageCount = 1, expectedFreedBytes = targetOriginal });
+            new { olderThanMonths = 6, expectedImageCount = 1, expectedFreedBytes = targetOriginal, expectedDigest = digest });
         run.StatusCode.Should().Be(HttpStatusCode.OK, await run.Content.ReadAsStringAsync());
         var result = await run.Content.ReadFromJsonAsync<JsonElement>();
         result.GetProperty("imageCount").GetInt32().Should().Be(1);
@@ -110,6 +120,7 @@ public class OriginalCleanupTests(AppFactory factory) : ImageTestBase(factory)
             entry.EntityType.Should().Be("project");
             var data = JsonDocument.Parse(entry.Data).RootElement;
             data.GetProperty("imageCount").GetInt32().Should().Be(1);
+            data.GetProperty("fileCount").GetInt32().Should().Be(1);
             data.GetProperty("olderThanMonths").GetInt32().Should().Be(6);
             data.GetProperty("fileIds")[0].GetGuid().Should().Be(target);
         }
@@ -144,5 +155,36 @@ public class OriginalCleanupTests(AppFactory factory) : ImageTestBase(factory)
             doneRow.GetProperty("originalBytes").GetInt64().Should().Be(originals);
         }
         rows.Single(r => r.GetProperty("projectId").GetGuid() == active).GetProperty("completedAt").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+}
+
+public class OriginalCleanupLargeProjectTests(AppFactory factory) : OriginalCleanupTestBase(factory)
+{
+    [Fact]
+    public async Task The_activity_lists_at_most_200_file_ids_and_counts_them_all()
+    {
+        await LoginAsync();
+        var (clientId, _) = await CreateClientWithPortalLinkAsync();
+        var projectId = await CreateProjectAsync(clientId, "Dự án nhiều ảnh " + Guid.NewGuid());
+        var taskId = await CreateTaskAsync(projectId);
+        for (var i = 0; i < 201; i++) await InsertFillerImageAsync(projectId, taskId, 10);
+        await CompleteProjectAtAsync(projectId, DateTimeOffset.UtcNow.AddMonths(-7));
+
+        var preview = await Client.GetFromJsonAsync<JsonElement>("/api/admin/storage/original-cleanup?olderThanMonths=6");
+        preview.GetProperty("imageCount").GetInt32().Should().Be(201);
+        var run = await Client.PostAsJsonAsync("/api/admin/storage/original-cleanup", new
+        {
+            olderThanMonths = 6, expectedImageCount = 201, expectedFreedBytes = preview.GetProperty("freedBytes").GetInt64(),
+            expectedDigest = preview.GetProperty("digest").GetString(),
+        });
+        run.StatusCode.Should().Be(HttpStatusCode.OK, await run.Content.ReadAsStringAsync());
+
+        using var scope = Factory.Services.CreateScope();
+        var entry = await scope.ServiceProvider.GetRequiredService<AppDbContext>().ActivityLogs.AsNoTracking()
+            .SingleAsync(a => a.ProjectId == projectId && a.Action == "image.originals_deleted");
+        var data = JsonDocument.Parse(entry.Data).RootElement;
+        data.GetProperty("fileCount").GetInt32().Should().Be(201);
+        data.GetProperty("imageCount").GetInt32().Should().Be(201);
+        data.GetProperty("fileIds").GetArrayLength().Should().Be(200);
     }
 }

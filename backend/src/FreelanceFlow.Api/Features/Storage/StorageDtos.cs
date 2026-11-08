@@ -32,11 +32,12 @@ public sealed record StorageProjectDto(
 
 public sealed record OriginalCleanupProjectDto(Guid ProjectId, string ProjectName, DateTimeOffset CompletedAt, int ImageCount, long FreedBytes);
 
+/// <summary>Digest = SHA-256 (hex) of the sorted candidate ids; the run must echo it with the count and bytes.</summary>
 public sealed record OriginalCleanupPreviewDto(
-    int OlderThanMonths, DateTimeOffset Cutoff, int ProjectCount, int ImageCount, long FreedBytes,
+    int OlderThanMonths, DateTimeOffset Cutoff, int ProjectCount, int ImageCount, long FreedBytes, string Digest,
     IReadOnlyList<OriginalCleanupProjectDto> Projects);
 
-/// <summary>The preview's numbers are sent back so a run never acts on figures the designer did not see.</summary>
-public sealed record OriginalCleanupBody(int? OlderThanMonths, int? ExpectedImageCount, long? ExpectedFreedBytes);
+/// <summary>The preview's numbers and digest are sent back so a run never acts on images the designer did not see.</summary>
+public sealed record OriginalCleanupBody(int? OlderThanMonths, int? ExpectedImageCount, long? ExpectedFreedBytes, string? ExpectedDigest);
 
 public sealed record OriginalCleanupResultDto(int ProjectCount, int ImageCount, long FreedBytes);

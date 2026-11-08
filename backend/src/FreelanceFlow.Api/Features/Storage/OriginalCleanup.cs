@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using FreelanceFlow.Api.Data;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,6 +13,8 @@ public static class OriginalCleanup
 {
     public const int MinMonths = 1;
     public const int MaxMonths = 120;
+    /// <summary>image.originals_deleted lists at most this many ids; fileCount always has the full number.</summary>
+    public const int MaxLoggedFileIds = 200;
 
     public sealed class OriginalCleanupCandidate
     {
@@ -60,6 +63,29 @@ public static class OriginalCleanup
             .Select(g => new OriginalCleanupProjectDto(g.Key, g.First().ProjectName, g.First().CompletedAt, g.Count(), g.Sum(r => r.OriginalBytes)))
             .OrderByDescending(p => p.FreedBytes).ThenBy(p => p.ProjectId)
             .ToList();
-        return new OriginalCleanupPreviewDto(months, cutoff, projects.Count, rows.Count, rows.Sum(r => r.OriginalBytes), projects);
+        return new OriginalCleanupPreviewDto(months, cutoff, projects.Count, rows.Count, rows.Sum(r => r.OriginalBytes),
+            Digest(rows.Select(r => r.FileId)), projects);
     }
+
+    /// <summary>Stable fingerprint of an id set: SHA-256 over the sorted ids (big-endian bytes), lowercase hex.</summary>
+    public static string Digest(IEnumerable<Guid> ids)
+    {
+        var sorted = ids.Distinct().Order().ToList();
+        var buffer = new byte[sorted.Count * 16];
+        for (var i = 0; i < sorted.Count; i++) sorted[i].TryWriteBytes(buffer.AsSpan(i * 16, 16), bigEndian: true, out _);
+        return Convert.ToHexStringLower(SHA256.HashData(buffer));
+    }
+
+    /// <summary>
+    /// Inside the run's transaction: locks the rows of <paramref name="ids"/> (FOR UPDATE) that are still eligible —
+    /// live, original stored, not a client photo stored once, not quotation evidence (BR-87, re-checked here).
+    /// </summary>
+    public static Task<List<Guid>> LockEligibleAsync(AppDbContext db, Guid[] ids, CancellationToken ct) =>
+        db.Database.SqlQuery<Guid>($"""
+            SELECT f.id AS "Value" FROM files f
+            WHERE f.id = ANY({ids}) AND f.deleted_at IS NULL AND f.original_deleted_at IS NULL
+              AND NOT f.preview_is_original
+              AND NOT EXISTS (SELECT 1 FROM quotations q WHERE q.evidence_file_id = f.id)
+            FOR UPDATE OF f
+            """).ToListAsync(ct);
 }
