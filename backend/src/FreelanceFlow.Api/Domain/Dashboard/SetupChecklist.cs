@@ -13,7 +13,7 @@ public static class SetupChecklist
 
     public static IReadOnlyList<SetupItem> Build(SetupFacts f) =>
     [
-        new("STUDIO", "Điền thông tin studio", "Tên studio hiện trên báo giá gửi khách", f.HasStudioName, "/admin/settings"),
+        new("STUDIO", "Điền thông tin studio", "Tên studio và SĐT hoặc email để khách liên hệ (hiện trên báo giá và portal)", f.HasStudioName, "/admin/settings"),
         new("BANK", "Nhập tài khoản ngân hàng", "Để báo giá có mã VietQR cho khách quét", f.HasBank, "/admin/settings"),
         new("SERVICE", "Xem lại bảng giá dịch vụ", "Giá mẫu chỉ để tham khảo — sửa theo giá của bạn", f.HasPricedService, "/admin/services"),
         new("TASK_TEMPLATE", "Thêm các bước công việc mẫu cho dịch vụ", "Task tự sinh khi bắt đầu dự án", f.HasTaskTemplate, "/admin/services"),
