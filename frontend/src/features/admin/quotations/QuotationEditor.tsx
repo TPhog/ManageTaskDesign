@@ -1,18 +1,20 @@
 import { useState, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Plus, Send, Trash2 } from 'lucide-react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { Plus, Send, Trash2, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { MoneyInput } from '@/components/MoneyInput'
 import { MoneyText } from '@/components/MoneyText'
 import { StatusBadge } from '@/components/StatusBadge'
-import type { ApiError } from '@/lib/api'
+import { api, type ApiError } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { QuotationDetail, QuotationItem, QuotationItemSource, UpdateQuotationBody } from '@/lib/quotationTypes'
-import { computeTotals, kindLabel, quotationErrorMessage } from './quotationUtils'
+import { computeTotals, kindLabel, quotationErrorMessage, zeroPriceRows } from './quotationUtils'
 import { useDeleteQuotation, useQuotationCommand, useUpdateQuotation } from './useQuotations'
 
 const panelClass = 'rounded-xl border bg-card p-5 shadow-card'
@@ -85,6 +87,15 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
   const preview = computeTotals(rows, header.discountAmount, header.vatPercent, header.depositPercent)
   const invalid = header.title.trim() === '' || rows.some(r => r.description.trim() === '')
   const busy = update.isPending || command.isPending || remove.isPending
+  const zeroRows = zeroPriceRows(rows)
+  // QA D-04: BR-31 allows 0 ₫, so warn clearly instead of blocking
+  const sendRisky = zeroRows.length > 0 || preview.total === 0
+  const { data: settings } = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => api.get<{ bankBin: string | null; bankAccountNo: string | null }>('/admin/settings'),
+  })
+  // QA D-26: sending needs the receiving account (docs/06 §5)
+  const bankMissing = !!settings && (!settings.bankBin || !settings.bankAccountNo)
 
   const setField = <K extends keyof Header>(key: K, value: Header[K]) => setHeader(h => ({ ...h, [key]: value }))
   const setRow = (key: string, patch: Partial<Row>) => setRows(rs => rs.map(r => (r.key === key ? { ...r, ...patch } : r)))
@@ -160,7 +171,7 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
               <Input id="q-validity" type="number" min={1} max={365} value={header.validityDays} onChange={e => setField('validityDays', toInt(e.target.value))} />
             </Field>
             <Field id="q-discount" label="Giảm giá (₫)">
-              <Input id="q-discount" type="number" min={0} step={1000} value={header.discountAmount} onChange={e => setField('discountAmount', toInt(e.target.value))} />
+              <MoneyInput id="q-discount" value={header.discountAmount} onChange={n => setField('discountAmount', n)} />
             </Field>
             <Field id="q-vat" label="VAT (%)">
               <Input id="q-vat" type="number" min={0} max={20} value={header.vatPercent} onChange={e => setField('vatPercent', toInt(e.target.value))} />
@@ -179,19 +190,60 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
               Thêm dòng
             </Button>
           </div>
+          {zeroRows.length > 0 && (
+            <p className="mb-3 flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              {zeroRows.length} dòng có đơn giá 0 ₫ — nhập giá trước khi gửi (hạng mục không có dịch vụ mẫu vào báo giá với giá 0).
+            </p>
+          )}
           {rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">Chưa có dòng nào — thêm ít nhất 1 dòng trước khi gửi.</p>
           ) : (
             <div className="space-y-3">
+              <div aria-hidden="true" className="hidden gap-3 px-3 text-xs font-medium text-muted-foreground sm:grid sm:grid-cols-[1fr_5rem_9rem_8rem_2.5rem]">
+                <span>Mô tả</span>
+                <span>SL</span>
+                <span>Đơn giá (₫)</span>
+                <span className="text-right">Thành tiền</span>
+                <span />
+              </div>
               {rows.map((r, i) => (
-                <div key={r.key} className="grid items-end gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_5rem_9rem_8rem_auto]">
-                  <Input aria-label={`Mô tả dòng ${i + 1}`} placeholder="Mô tả" value={r.description} maxLength={500} onChange={e => setRow(r.key, { description: e.target.value })} />
-                  <Input aria-label={`Số lượng dòng ${i + 1}`} type="number" min={1} value={r.quantity} onChange={e => setRow(r.key, { quantity: toInt(e.target.value) })} />
-                  <Input aria-label={`Đơn giá dòng ${i + 1}`} type="number" min={0} step={1000} value={r.unitPrice} onChange={e => setRow(r.key, { unitPrice: toInt(e.target.value) })} />
-                  <span className="pb-2 text-right text-sm tabular-nums text-foreground"><MoneyText amount={r.quantity * r.unitPrice} /></span>
-                  <Button type="button" variant="ghost" size="icon" aria-label={`Xóa dòng ${i + 1}`} onClick={() => removeRow(r.key)}>
+                <div
+                  key={r.key}
+                  className={cn(
+                    'relative grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_5rem_9rem_8rem_2.5rem] sm:items-end',
+                    r.unitPrice === 0 && 'border-amber-300 bg-amber-50/40',
+                  )}
+                >
+                  <div className="space-y-1 pr-12 sm:pr-0">
+                    <span aria-hidden="true" className="text-xs text-muted-foreground sm:hidden">Mô tả</span>
+                    <Input aria-label={`Mô tả dòng ${i + 1}`} placeholder="Mô tả" value={r.description} maxLength={500} onChange={e => setRow(r.key, { description: e.target.value })} />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 sm:contents">
+                    <div className="space-y-1">
+                      <span aria-hidden="true" className="text-xs text-muted-foreground sm:hidden">Số lượng</span>
+                      <Input aria-label={`Số lượng dòng ${i + 1}`} type="number" min={1} value={r.quantity} onChange={e => setRow(r.key, { quantity: toInt(e.target.value) })} />
+                    </div>
+                    <div className="space-y-1">
+                      <span aria-hidden="true" className="text-xs text-muted-foreground sm:hidden">Đơn giá (₫)</span>
+                      <MoneyInput aria-label={`Đơn giá dòng ${i + 1}`} value={r.unitPrice} onChange={n => setRow(r.key, { unitPrice: n })} />
+                    </div>
+                  </div>
+                  <p className="text-right text-sm tabular-nums text-foreground sm:pb-2">
+                    <span className="text-xs text-muted-foreground sm:hidden">Thành tiền: </span>
+                    <MoneyText amount={r.quantity * r.unitPrice} />
+                  </p>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2 top-2 h-11 w-11 sm:static sm:h-10 sm:w-10"
+                    aria-label={`Xóa dòng ${i + 1}`}
+                    onClick={() => removeRow(r.key)}
+                  >
                     <Trash2 aria-hidden="true" />
                   </Button>
+                  {r.unitPrice === 0 && <p className="text-xs text-amber-800 sm:col-span-5">Đơn giá đang là 0 ₫</p>}
                   <Textarea
                     aria-label={`Chi tiết dòng ${i + 1}`}
                     placeholder="Chi tiết (tùy chọn)"
@@ -234,6 +286,12 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
           )}
           <p className="mt-3 text-xs text-muted-foreground">Máy chủ tính lại khi lưu (làm tròn nửa lên đến đồng).</p>
         </div>
+        {bankMissing && (
+          <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+            Chưa có tài khoản nhận tiền — cần cấu hình trước khi gửi (mã VietQR lấy từ đây).{' '}
+            <Link to="/admin/settings" className="font-medium underline">Mở Cài đặt</Link>
+          </p>
+        )}
         <div className="flex flex-col gap-2">
           <Button onClick={() => setConfirmSend(true)} disabled={invalid || rows.length === 0 || busy}>
             <Send aria-hidden="true" />
@@ -251,8 +309,19 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
         open={confirmSend}
         onOpenChange={setConfirmSend}
         title="Gửi báo giá?"
-        description="Bản nháp được lưu rồi gửi: số báo giá được cấp và nội dung bị khóa. Muốn sửa sau đó phải tạo version mới."
-        confirmLabel="Gửi"
+        description={
+          <>
+            Bản nháp được lưu rồi gửi: số báo giá được cấp và nội dung bị khóa. Muốn sửa sau đó phải tạo version mới.
+            {sendRisky && (
+              <span className="mt-2 block rounded-lg bg-amber-50 p-2 font-medium text-amber-800">
+                {preview.total === 0 ? 'Tổng tiền đang là 0 ₫. ' : ''}
+                {zeroRows.length > 0 ? `${zeroRows.length} dòng có đơn giá 0 ₫. ` : ''}
+                Khách sẽ nhận đúng số tiền này.
+              </span>
+            )}
+          </>
+        }
+        confirmLabel={sendRisky ? 'Vẫn gửi' : 'Gửi'}
         pending={busy}
         onConfirm={saveAndSend}
       />

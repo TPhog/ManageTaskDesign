@@ -4,7 +4,9 @@ import {
   paymentActions,
   percentHalfUp,
   quotationErrorMessage,
+  quoteTargetWarnings,
   todayVn,
+  zeroPriceRows,
 } from '@/features/admin/quotations/quotationUtils'
 import type { QuotationListItem } from '@/lib/quotationTypes'
 
@@ -92,4 +94,21 @@ describe('quotationErrorMessage', () => {
     expect(quotationErrorMessage({ detail: 'Chưa cấu hình tài khoản nhận tiền' }, 'x')).toBe('Chưa cấu hình tài khoản nhận tiền')
     expect(quotationErrorMessage({}, 'Không thể lưu')).toBe('Không thể lưu')
   })
+})
+
+describe('quoteTargetWarnings (QA D-02/D-03)', () => {
+  it('lists deliverables without a service and those already on a live quotation', () => {
+    const w = quoteTargetWarnings([
+      { name: 'Logo', serviceId: 's1', quotedIn: [{ quotationId: 'q', number: 'BG-2026-0028', version: 1, status: 'SENT', kind: 'INITIAL' }] },
+      { name: 'Menu A4', serviceId: null, quotedIn: [{ quotationId: 'd', number: null, version: 1, status: 'DRAFT', kind: 'INITIAL' }] },
+      { name: 'Banner', serviceId: 's2' },
+    ])
+    expect(w.noPrice).toEqual(['Menu A4'])
+    expect(w.alreadyQuoted.map(a => a.name)).toEqual(['Logo'])
+    expect(w.alreadyQuoted[0].refs[0].number).toBe('BG-2026-0028')
+  })
+})
+
+describe('zeroPriceRows (QA D-03/D-04)', () => {
+  it('returns the indexes of 0 ₫ lines', () => expect(zeroPriceRows([{ unitPrice: 1 }, { unitPrice: 0 }, { unitPrice: 0 }])).toEqual([1, 2]))
 })

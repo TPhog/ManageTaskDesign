@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import {
@@ -14,8 +15,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { StatusBadge } from '@/components/StatusBadge'
 import type { ApiError } from '@/lib/api'
+import { liveQuoteRefs, quoteRefLabel } from '@/lib/quoteRefs'
 import type { ProjectDetail } from '@/lib/types'
-import { isFinishedDeliverable, quotationErrorMessage } from './quotationUtils'
+import { isFinishedDeliverable, quotationErrorMessage, quoteTargetWarnings } from './quotationUtils'
 import { useCreateQuotation } from './useQuotations'
 
 type Mode = 'all' | 'selected'
@@ -28,15 +30,21 @@ export function CreateQuotationDialog({ project, open, onClose }: { project: Pro
   const [mode, setMode] = useState<Mode>('all')
   const [selected, setSelected] = useState<string[]>([])
   const [title, setTitle] = useState('')
+  const [acknowledged, setAcknowledged] = useState(false)
 
   const active = project.deliverables.filter(d => d.status !== 'CANCELLED')
   const finished = project.deliverables.filter(d => isFinishedDeliverable(d.status))
-  const canSubmit = mode === 'all' || selected.length > 0
+  const targets = mode === 'all' ? active : finished.filter(d => selected.includes(d.id))
+  const warn = quoteTargetWarnings(targets)
+  // QA D-02: billing a deliverable twice needs an explicit decision (BR-01: warn, do not block)
+  const needsAck = warn.alreadyQuoted.length > 0
+  const canSubmit = (mode === 'all' || selected.length > 0) && (!needsAck || acknowledged)
 
   function close() {
     setMode('all')
     setSelected([])
     setTitle('')
+    setAcknowledged(false)
     onClose()
   }
 
@@ -66,7 +74,7 @@ export function CreateQuotationDialog({ project, open, onClose }: { project: Pro
 
   return (
     <Dialog open={open} onOpenChange={v => { if (!v) close() }}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Tạo báo giá</DialogTitle>
           <DialogDescription>
@@ -77,7 +85,7 @@ export function CreateQuotationDialog({ project, open, onClose }: { project: Pro
           <fieldset className="space-y-2">
             <legend className="mb-1 text-sm font-medium text-foreground">Lập báo giá cho</legend>
             <label className={optionClass}>
-              <input type="radio" name="quotation-mode" className="mt-1" checked={mode === 'all'} onChange={() => setMode('all')} />
+              <input type="radio" name="quotation-mode" className="mt-1" checked={mode === 'all'} onChange={() => { setMode('all'); setAcknowledged(false) }} />
               <span>
                 <span className="block text-sm font-medium text-foreground">Toàn bộ dự án</span>
                 <span className="block text-xs text-muted-foreground">{active.length} deliverable (trừ hạng mục đã huỷ)</span>
@@ -90,7 +98,7 @@ export function CreateQuotationDialog({ project, open, onClose }: { project: Pro
                 className="mt-1"
                 checked={mode === 'selected'}
                 disabled={finished.length === 0}
-                onChange={() => setMode('selected')}
+                onChange={() => { setMode('selected'); setAcknowledged(false) }}
               />
               <span>
                 <span className="block text-sm font-medium text-foreground">Chọn hạng mục đã xong</span>
@@ -106,16 +114,57 @@ export function CreateQuotationDialog({ project, open, onClose }: { project: Pro
           {mode === 'selected' && (
             <fieldset className="space-y-2">
               <legend className="mb-1 text-sm font-medium text-foreground">Hạng mục</legend>
-              {finished.map(d => (
-                <label key={d.id} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
-                  <span className="flex items-center gap-3">
-                    <input type="checkbox" checked={selected.includes(d.id)} onChange={() => toggle(d.id)} />
-                    <span className="text-sm text-foreground">{d.name}</span>
-                  </span>
-                  <StatusBadge status={d.status} />
-                </label>
-              ))}
+              {finished.map(d => {
+                const live = liveQuoteRefs(d.quotedIn)
+                return (
+                  <label key={d.id} className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2">
+                    <span className="flex min-w-0 items-center gap-3">
+                      <input type="checkbox" checked={selected.includes(d.id)} onChange={() => toggle(d.id)} />
+                      <span className="min-w-0">
+                        <span className="block text-sm text-foreground">{d.name}</span>
+                        {live.length > 0 && (
+                          <span className="block text-xs text-amber-800">Đã có trong {live.map(quoteRefLabel).join(', ')}</span>
+                        )}
+                      </span>
+                    </span>
+                    <StatusBadge status={d.status} />
+                  </label>
+                )
+              })}
             </fieldset>
+          )}
+
+          {(warn.noPrice.length > 0 || needsAck) && (
+            <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              {warn.noPrice.length > 0 && (
+                <p className="flex items-start gap-2">
+                  <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span>
+                    {warn.noPrice.length} hạng mục chưa có dịch vụ mẫu nên dòng báo giá sẽ là 0 ₫: {warn.noPrice.join(', ')}. Nhập đơn giá trong bản nháp trước khi gửi.
+                  </span>
+                </p>
+              )}
+              {needsAck && (
+                <>
+                  <div className="flex items-start gap-2">
+                    <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                    <div>
+                      <p>Đã có trong báo giá đã gửi hoặc đã chấp nhận — tạo thêm sẽ tính tiền lần nữa:</p>
+                      <ul className="mt-1 list-disc pl-5">
+                        {warn.alreadyQuoted.map(a => (
+                          <li key={a.name}>{a.name} ({a.refs.map(quoteRefLabel).join(', ')})</li>
+                        ))}
+                      </ul>
+                      <p className="mt-1 text-xs">Muốn sửa báo giá đã gửi? Mở báo giá đó và bấm “Tạo version mới”.</p>
+                    </div>
+                  </div>
+                  <label className="flex items-center gap-2 font-medium">
+                    <input type="checkbox" checked={acknowledged} onChange={e => setAcknowledged(e.target.checked)} />
+                    Tôi vẫn muốn báo giá lại các hạng mục này
+                  </label>
+                </>
+              )}
+            </div>
           )}
 
           <div className="space-y-2">

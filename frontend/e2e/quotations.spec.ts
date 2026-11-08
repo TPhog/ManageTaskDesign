@@ -59,7 +59,7 @@ test.describe('Quotations', () => {
     await expectToast(page, 'Đã tạo báo giá nháp')
     await expect(page).toHaveURL(/\/admin\/quotations\/[0-9a-f-]+$/)
     await expect(page.getByLabel('Mô tả dòng 1')).toHaveValue('Logo')
-    await expect(page.getByLabel('Đơn giá dòng 2')).toHaveValue('500000')
+    await expect(page.getByLabel('Đơn giá dòng 2')).toHaveValue('500.000')
 
     await page.getByLabel('Giảm giá (₫)').fill('100000')
     await page.getByLabel('Cọc (%)').fill('50')

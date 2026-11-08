@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import { FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -9,9 +8,9 @@ import { EmptyState } from '@/components/EmptyState'
 import { MoneyText } from '@/components/MoneyText'
 import { PageHeader } from '@/components/PageHeader'
 import { StatusBadge } from '@/components/StatusBadge'
-import { api } from '@/lib/api'
 import { formatDate } from '@/lib/format'
-import type { ClientListItem, PagedResult } from '@/lib/types'
+import { SearchCombobox } from '@/components/SearchCombobox'
+import { useClientOptions } from '@/lib/pickers'
 import type { EffectiveStatus, PaymentStatus } from '@/lib/quotationTypes'
 import { useQuotationSearch } from './useQuotations'
 
@@ -53,10 +52,9 @@ export default function QuotationsPage() {
     page,
     pageSize: PAGE_SIZE,
   })
-  const { data: clients } = useQuery({
-    queryKey: ['clients', 'options'],
-    queryFn: () => api.get<PagedResult<ClientListItem>>('/admin/clients?status=ACTIVE&pageSize=100'),
-  })
+  const [clientLabel, setClientLabel] = useState('')
+  const [clientSearch, setClientSearch] = useState('')
+  const clients = useClientOptions(clientSearch)
 
   const items = data?.items ?? []
   const pages = data ? Math.max(1, Math.ceil(data.total / PAGE_SIZE)) : 1
@@ -84,13 +82,22 @@ export default function QuotationsPage() {
             {paymentOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Select value={clientId} onValueChange={filter(setClientId)}>
-          <SelectTrigger aria-label="Lọc khách hàng" className="w-56"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL}>Tất cả khách hàng</SelectItem>
-            {(clients?.items ?? []).map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <SearchCombobox
+          id="quotations-client-filter"
+          ariaLabel="Lọc khách hàng"
+          className="w-56"
+          value={clientId === ALL ? '' : clientId}
+          selectedLabel={clientLabel}
+          options={clients.options}
+          loading={clients.loading}
+          search={clientSearch}
+          onSearchChange={setClientSearch}
+          onSelect={o => { filter(setClientId)(o?.value ?? ALL); setClientLabel(o?.label ?? '') }}
+          placeholder="Tất cả khách hàng"
+          clearLabel="Tất cả khách hàng"
+          searchPlaceholder="Tìm khách…"
+          emptyText="Không có khách khớp"
+        />
       </div>
 
       <div className="rounded-xl border bg-card shadow-card">
@@ -140,8 +147,11 @@ export default function QuotationsPage() {
                     <td className="px-4 py-3">
                       {q.status === 'ACCEPTED' ? <StatusBadge status={q.paymentStatus} /> : <span className="text-muted-foreground">—</span>}
                     </td>
-                    <td className="px-4 py-3 text-right"><MoneyText amount={q.outstanding} /></td>
-                    <td className="px-4 py-3 tabular-nums text-muted-foreground">{formatDate(q.expiryDate)}</td>
+                    <td className="px-4 py-3 text-right">
+                      {q.status === 'ACCEPTED' ? <MoneyText amount={q.outstanding} /> : <span className="text-muted-foreground">—</span>}
+                    </td>
+                    {/* the expiry only matters while the client has not answered */}
+                    <td className="px-4 py-3 tabular-nums text-muted-foreground">{q.status === 'SENT' ? formatDate(q.expiryDate) : '—'}</td>
                   </tr>
                 ))}
               </tbody>

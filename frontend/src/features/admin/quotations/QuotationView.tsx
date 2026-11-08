@@ -64,7 +64,8 @@ export function QuotationView({ quotation: q }: { quotation: QuotationDetail }) 
             {q.status === 'ACCEPTED' && <StatusBadge status={q.paymentStatus} />}
           </div>
           <p className="text-sm text-muted-foreground">
-            {s.number} · v{s.version} · {kindLabel[q.kind]} · Ngày báo giá {formatDate(s.issueDate)} · Hiệu lực đến {formatDate(s.expiryDate)}
+            {s.number} · v{s.version} · {kindLabel[q.kind]} · Ngày báo giá {formatDate(s.issueDate)}
+            {q.status === 'SENT' && ` · Hiệu lực đến ${formatDate(s.expiryDate)}`}
           </p>
           {q.effectiveStatus === 'EXPIRED' && (
             <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">

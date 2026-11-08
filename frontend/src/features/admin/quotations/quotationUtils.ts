@@ -1,5 +1,6 @@
 import type { ApiError } from '@/lib/api'
-import type { DeliverableStatus } from '@/lib/types'
+import { liveQuoteRefs } from '@/lib/quoteRefs'
+import type { Deliverable, DeliverableQuoteRef, DeliverableStatus } from '@/lib/types'
 import type { PaymentStatus, QuotationKind, QuotationListItem, QuotationStatus } from '@/lib/quotationTypes'
 
 /** BR-03 mirror for the editor preview only (the server is authoritative): percent of whole đồng, half-up. */
@@ -52,6 +53,27 @@ export function groupChains(items: QuotationListItem[]): QuotationChain[] {
 
 /** D1: only these deliverables can get their own quotation. */
 export const isFinishedDeliverable = (status: DeliverableStatus) => status === 'APPROVED' || status === 'DELIVERED'
+
+export interface QuoteTargetWarnings {
+  /** names of deliverables without a service → their line starts at 0 ₫ (QUO-01) */
+  noPrice: string[]
+  /** deliverables already on a sent/accepted quotation → quoting them again bills twice */
+  alreadyQuoted: { name: string; refs: DeliverableQuoteRef[] }[]
+}
+
+/** QA D-02/D-03: what to warn about before creating a draft from these deliverables. */
+export function quoteTargetWarnings(targets: Pick<Deliverable, 'name' | 'serviceId' | 'quotedIn'>[]): QuoteTargetWarnings {
+  return {
+    noPrice: targets.filter(d => !d.serviceId).map(d => d.name),
+    alreadyQuoted: targets
+      .map(d => ({ name: d.name, refs: liveQuoteRefs(d.quotedIn) }))
+      .filter(x => x.refs.length > 0),
+  }
+}
+
+/** QA D-03/D-04: indexes of the lines whose unit price is 0 ₫. */
+export const zeroPriceRows = (rows: { unitPrice: number }[]): number[] =>
+  rows.flatMap((r, i) => (r.unitPrice === 0 ? [i] : []))
 
 export interface PaymentAction {
   to: PaymentStatus
