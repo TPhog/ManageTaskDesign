@@ -16,6 +16,8 @@ RUN groupadd --gid 1001 appgroup && \
 
 COPY --from=build --chown=appuser:appgroup /app/publish .
 
+RUN mkdir -p /data/files /data/keys && chown -R appuser:appgroup /data
+
 USER appuser
 EXPOSE 8080
 ENTRYPOINT ["dotnet", "FreelanceFlow.Api.dll"]

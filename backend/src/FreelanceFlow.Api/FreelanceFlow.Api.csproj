@@ -23,7 +23,7 @@
   <ItemGroup>
     <!-- Plan 08: watermark font (SIL OFL 1.1, see OFL.txt); Linux NoDependencies has no fontconfig -->
     <EmbeddedResource Include="Infrastructure\Images\Fonts\NotoSans-Bold.ttf" LogicalName="FreelanceFlow.WatermarkFont.ttf" />
-    <None Include="Infrastructure\Images\Fonts\OFL.txt" />
+    <None Include="Infrastructure\Images\Fonts\OFL.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

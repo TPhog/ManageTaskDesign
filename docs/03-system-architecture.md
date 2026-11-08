@@ -139,13 +139,17 @@ Client(Portal)        API                         DB                     Designe
 |---|---|---|
 | `ConnectionStrings__Default` | `Host=db;Database=freelanceflow;Username=ff;Password=...` | |
 | `App__PublicBaseUrl` | `https://studio.example.com` | Dùng để dựng magic link |
-| `App__FilesRoot` | `/data/files` | Thư mục lưu file |
+| `Storage__Local__RootPath` | `/data/files` | Thư mục lưu ảnh (volume `files`) |
+| `Storage__QuotaBytes` | `10737418240` | Hạn mức dung lượng (byte); chặn upload ở 90 % |
+| `Notifications__Discord__WebhookUrl` | (secret) | Webhook cảnh báo cho designer; để trống = tắt |
 | `App__MaxUploadMb` | `20` | |
 | `Seed__DesignerEmail` | `me@example.com` | Chỉ dùng lần đầu khi chưa có tài khoản |
 | `Seed__DesignerPassword` | (secret) | Chỉ dùng lần đầu; xóa khỏi env sau khi seed |
 | `ASPNETCORE_ENVIRONMENT` | `Production` | |
 
 Data Protection keys (ký cookie) lưu vào volume `/data/keys` để cookie sống qua restart.
+
+Image `api` chạy bằng user `appuser` (uid/gid 1001); `/data/files` và `/data/keys` được tạo sẵn và thuộc user này nên volume mới tự đúng quyền. **Volume đã tồn tại từ trước** (root-owned) cần chạy một lần: `docker compose run --rm --user root --entrypoint chown api -R 1001:1001 /data`. Nếu thư mục ảnh không ghi được, API sẽ dừng ngay khi khởi động với thông báo rõ ràng.
 
 ## 6. Deploy
 

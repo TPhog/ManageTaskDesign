@@ -14,8 +14,26 @@ public sealed partial class LocalFileStorage : IFileStorage
     public LocalFileStorage(IOptions<StorageOptions> options, IHostEnvironment env)
     {
         var root = options.Value.Local.RootPath;
-        RootPath = Path.GetFullPath(Path.IsPathRooted(root) ? root : Path.Combine(env.ContentRootPath, root));
+        RootPath = Path.TrimEndingDirectorySeparator(
+            Path.GetFullPath(Path.IsPathRooted(root) ? root : Path.Combine(env.ContentRootPath, root)));
         Directory.CreateDirectory(RootPath);
+        EnsureWritable(RootPath);
+    }
+
+    /// <summary>Fail at startup (not on the first upload) when the volume is not writable by the app user.</summary>
+    private static void EnsureWritable(string root)
+    {
+        var probe = Path.Combine(root, ".write-probe-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            File.WriteAllBytes(probe, [0]);
+            File.Delete(probe);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new InvalidOperationException(
+                $"Storage root '{root}' is not writable by the app user. Fix the volume ownership (e.g. chown -R 1001:1001) or Storage:Local:RootPath.", ex);
+        }
     }
 
     public string RootPath { get; }

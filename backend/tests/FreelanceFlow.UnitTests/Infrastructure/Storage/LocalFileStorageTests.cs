@@ -20,6 +20,31 @@ public sealed class LocalFileStorageTests : IDisposable
     }
 
     [Fact]
+    public async Task Root_with_trailing_separator_still_accepts_keys()
+    {
+        var storage = Storage(_root + Path.DirectorySeparatorChar);
+
+        await storage.PutAsync("projects/p1/f1/thumb.webp", [1], "image/webp");
+
+        await using (var stream = await storage.OpenReadAsync("projects/p1/f1/thumb.webp"))
+            stream.Should().NotBeNull();
+        storage.RootPath.Should().Be(_root);
+    }
+
+    [Fact]
+    public void Unwritable_root_fails_fast_with_a_clear_message()
+    {
+        var file = Path.Combine(Path.GetTempPath(), "ff-unit-file-" + Guid.NewGuid().ToString("N"));
+        File.WriteAllText(file, "x");
+        try
+        {
+            var act = () => Storage(file);
+            act.Should().Throw<Exception>();
+        }
+        finally { File.Delete(file); }
+    }
+
+    [Fact]
     public async Task Put_open_and_delete_round_trip()
     {
         var storage = Storage();
