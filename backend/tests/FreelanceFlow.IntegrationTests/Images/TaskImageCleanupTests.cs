@@ -3,6 +3,7 @@ using System.Text.Json;
 using FreelanceFlow.Api.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 using SkiaSharp;
 
 namespace FreelanceFlow.IntegrationTests.Images;
@@ -50,5 +51,51 @@ public class TaskImageCleanupTests(AppFactory factory) : ImageTestBase(factory)
         var data = JsonDocument.Parse(deleted.Data).RootElement;
         data.GetProperty("imagesDeleted").GetInt32().Should().Be(1);
         data.GetProperty("imagesKept").GetInt32().Should().Be(1);
+    }
+
+    [Fact]
+    public async Task An_upload_racing_a_task_delete_never_leaves_a_live_image_on_the_deleted_task()
+    {
+        await LoginAsync();
+        var (clientId, _) = await CreateClientWithPortalLinkAsync();
+        var projectId = await CreateProjectAsync(clientId, "Dự án đua xoá " + Guid.NewGuid());
+        var taskId = await CreateTaskAsync(projectId, "Task bị xoá giữa chừng");
+
+        // Another transaction (standing in for DELETE /tasks) holds the task row; the upload must wait for it
+        await using var conn = new NpgsqlConnection(Factory.DatabaseConnectionString);
+        await conn.OpenAsync();
+        await using var tx = await conn.BeginTransactionAsync();
+        await using (var lockTask = new NpgsqlCommand("SELECT id FROM tasks WHERE id = @id FOR UPDATE", conn, tx))
+        {
+            lockTask.Parameters.AddWithValue("id", taskId);
+            await lockTask.ExecuteScalarAsync();
+        }
+
+        var upload = Client.PostAsync($"/api/admin/tasks/{taskId}/images", TestImages.Form(TestImages.Png(50, 50, SKColors.Tomato)));
+        var waited = false;
+        for (var i = 0; i < 100 && !waited && !upload.IsCompleted; i++)
+        {
+            await using var probe = new NpgsqlConnection(Factory.DatabaseConnectionString);
+            await probe.OpenAsync();
+            await using var cmd = new NpgsqlCommand("SELECT count(*) FROM pg_locks WHERE NOT granted", probe);
+            waited = (long)(await cmd.ExecuteScalarAsync())! > 0;
+            if (!waited) await Task.Delay(100);
+        }
+        waited.Should().BeTrue("the upload transaction waits on the task row before committing its images");
+
+        await using (var delete = new NpgsqlCommand("DELETE FROM tasks WHERE id = @id", conn, tx))
+        {
+            delete.Parameters.AddWithValue("id", taskId);
+            await delete.ExecuteNonQueryAsync();
+        }
+        await tx.CommitAsync();
+
+        (await upload).StatusCode.Should().Be(HttpStatusCode.NotFound);
+        using var scope = Factory.Services.CreateScope();
+        (await scope.ServiceProvider.GetRequiredService<AppDbContext>().Files.AsNoTracking()
+            .CountAsync(f => f.OwnerId == taskId)).Should().Be(0);
+        var projectFolder = Path.Combine(Factory.FilesRoot, "projects", projectId.ToString());
+        (Directory.Exists(projectFolder) ? Directory.EnumerateFiles(projectFolder, "*", SearchOption.AllDirectories) : [])
+            .Should().BeEmpty("the staged objects are discarded");
     }
 }

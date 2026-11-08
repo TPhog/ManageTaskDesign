@@ -53,7 +53,19 @@ public static class ImagesEndpoints
                 new ImageTarget(task.ProjectId, ImageOwnerTypes.Task, task.Id, null, "DESIGNER", visible), ct);
             activity.Write("task", task.Id, "image.uploaded", clientId: task.ClientId, projectId: task.ProjectId,
                 data: new { count = images.Count, bytes = images.Sum(i => i.SizeBytes), ownerType = ImageOwnerTypes.Task });
+            // P10: owner_id has no FK, so the task row is share-locked for the commit. A DELETE /tasks that got there
+            // first leaves no row (404, objects discarded); one that comes later waits and then sees these images.
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            var stillThere = await db.Database
+                .SqlQuery<Guid>($"SELECT id AS \"Value\" FROM tasks WHERE id = {task.Id} FOR SHARE")
+                .ToListAsync(ct);
+            if (stillThere.Count == 0)
+            {
+                await uploader.DiscardAsync();
+                return Results.NotFound();
+            }
             await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
         }
         catch (DomainException ex)
         {

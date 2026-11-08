@@ -221,10 +221,15 @@ public static class TasksEndpoints
 
     // Hard delete — tasks are not financial data (docs/05 §3.9); checklist rows and notes go with the FK cascade.
     // P10 (BR-88): the task's images go too, in the same transaction, except quotation evidence (BR-87), which stays.
+    // The task row is locked first, so an image upload committing concurrently (it share-locks the row) is either
+    // finished and included here, or finds the task gone.
     private static async Task<IResult> DeleteTask(
         Guid id, AppDbContext db, ActivityWriter activity, IFileStorage storage, IClock clock,
         StorageAlertService storageAlerts, ILoggerFactory loggers)
     {
+        await using var tx = await db.Database.BeginTransactionAsync();
+        var locked = await db.Database.SqlQuery<Guid>($"SELECT id AS \"Value\" FROM tasks WHERE id = {id} FOR UPDATE").ToListAsync();
+        if (locked.Count == 0) return Results.NotFound();
         var task = await db.Tasks.Include(t => t.ChecklistItems).FirstOrDefaultAsync(t => t.Id == id);
         if (task == null) return Results.NotFound();
 
@@ -239,6 +244,7 @@ public static class TasksEndpoints
             data: new { title = task.Title, imagesDeleted = images.Count, imagesKept = kept });
 
         await db.SaveChangesAsync();
+        await tx.CommitAsync();
 
         if (images.Count > 0)
         {
