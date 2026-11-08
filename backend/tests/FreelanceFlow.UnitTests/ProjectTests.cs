@@ -81,6 +81,30 @@ public class ProjectTests
     }
 
     [Fact]
+    public void ValidateTransition_QuotedToInProgressWithNoAcceptedQuotation_ReturnsWarning()
+    {
+        var warnings = Quoted.ValidateTransition("IN_PROGRESS", null, hasAcceptedInitialQuotation: false,
+            hasIncompleteDeliverables: false, hasUnpaidAcceptedQuotations: false);
+        Assert.Single(warnings);
+    }
+
+    [Fact]
+    public void ValidateTransition_OnHoldToInProgressWithNoAcceptedQuotation_NoWarning()
+    {
+        var warnings = OnHold.ValidateTransition("IN_PROGRESS", null, hasAcceptedInitialQuotation: false,
+            hasIncompleteDeliverables: false, hasUnpaidAcceptedQuotations: false);
+        Assert.Empty(warnings);
+    }
+
+    [Fact]
+    public void ValidateTransition_CompletedToInProgressWithNoAcceptedQuotation_NoWarning()
+    {
+        var warnings = Completed.ValidateTransition("IN_PROGRESS", "reopen", hasAcceptedInitialQuotation: false,
+            hasIncompleteDeliverables: false, hasUnpaidAcceptedQuotations: false);
+        Assert.Empty(warnings);
+    }
+
+    [Fact]
     public void ValidateTransition_ToInProgressWithAcceptedQuotation_NoWarnings()
     {
         var warnings = Draft.ValidateTransition("IN_PROGRESS", null, hasAcceptedInitialQuotation: true,

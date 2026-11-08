@@ -62,7 +62,7 @@ public class Project : IAuditable
             throw new DomainException("VALIDATION_FAILED", "Bắt buộc lý do mở lại dự án");
 
         // Warnings for DRAFT/QUOTED → IN_PROGRESS
-        if (to is "IN_PROGRESS" && !hasAcceptedInitialQuotation)
+        if (to is "IN_PROGRESS" && from is ("DRAFT" or "QUOTED") && !hasAcceptedInitialQuotation)
             warnings.Add("Chưa có báo giá gốc được khách chấp nhận.");
 
         // Warnings for IN_PROGRESS → COMPLETED
