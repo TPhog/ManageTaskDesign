@@ -111,6 +111,8 @@ export function useDeleteTask() {
     // The drawer closes right after (onDeleted) and nothing can reach the deleted id again.
     onSuccess: () => {
       toast.success('Đã xoá công việc')
+      // task counts drive project progress and the SUBMIT_REVIEW flow action
+      qc.invalidateQueries({ queryKey: qk.projects.all })
       return qc.invalidateQueries({ queryKey: qk.tasks.lists })
     },
     onError: (err: ApiError) => toast.error(errorText(err, 'Không thể xoá công việc')),

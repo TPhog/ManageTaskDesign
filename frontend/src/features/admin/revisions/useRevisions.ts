@@ -97,6 +97,8 @@ export function useDeclineRequest(id: string) {
       qc.invalidateQueries({ queryKey: qk.requests.detail(id) })
       qc.invalidateQueries({ queryKey: qk.requests.all })
       qc.invalidateQueries({ queryKey: qk.revisions.all })
+      // TRIAGE_REQUEST in the project flow depends on open requests
+      qc.invalidateQueries({ queryKey: qk.projects.all })
     },
   })
 }

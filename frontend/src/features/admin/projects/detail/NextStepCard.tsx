@@ -22,6 +22,16 @@ const panelClass = 'rounded-xl border bg-card p-5 shadow-card'
 const actionKey = (a: FlowAction) =>
   `${a.kind}-${a.target.deliverableId ?? a.target.quotationId ?? a.target.requestId ?? ''}`
 
+const HANDLED_KINDS = new Set<string>([
+  'START_PROJECT',
+  'SUBMIT_REVIEW',
+  'CONFIRM_APPROVAL',
+  'DELIVER',
+  'COMPLETE_PROJECT',
+  'COPY_QUOTATION_MESSAGE',
+  'COPY_PAYMENT_REMINDER',
+])
+
 interface Props {
   project: ProjectDetail
   flow: FlowState | undefined
@@ -87,6 +97,7 @@ export function NextStepCard({ project, flow, isLoading, isError }: Props) {
     const variant = action.primary ? 'default' : 'outline'
     const size = action.primary ? 'default' : 'sm'
     const href = actionHref(action.kind, project.id, action.target)
+    if (!href && !HANDLED_KINDS.has(action.kind)) return null // unknown kind: never a dead button
     if (href) {
       return (
         <Button key={actionKey(action)} asChild variant={variant} size={size}>

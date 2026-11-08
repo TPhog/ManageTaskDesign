@@ -17,6 +17,8 @@ const components: Components = {
     ) : (
       <span>{children}</span>
     ),
+  // the image host sees the request: never leak the portal/admin URL as Referer
+  img: ({ src, alt }) => <img src={src} alt={alt ?? ''} referrerPolicy="no-referrer" loading="lazy" className="max-w-full rounded" />,
 }
 
 /** Task description (plan 06b F5): Markdown + GFM autolinks, raw HTML skipped (no rehype-raw). */

@@ -31,6 +31,10 @@ export function useStartPreview(projectId: string, enabled: boolean) {
     queryKey: qk.flow.startPreview(projectId),
     queryFn: () => api.get<StartPreviewItem[]>(`/admin/projects/${projectId}/start-preview`),
     enabled,
+    // the form is seeded once per open: a refetch must not be able to discard the designer's edits
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnMount: 'always',
   })
 }
 
@@ -40,6 +44,7 @@ export function useStartProject(projectId: string) {
     mutationFn: (body: StartProjectBody) => api.post<StartProjectResult>(`/admin/projects/${projectId}/start`, body),
     onSuccess: result => {
       toast.success(`Đã bắt đầu dự án · tạo ${result.createdTasks} công việc`)
+      if (result.warnings.length > 0) toast.warning(result.warnings.join(' · '))
       return refresh()
     },
     onError: (err: ApiError) => toast.error(flowErrorText(err, 'Không thể bắt đầu dự án')),

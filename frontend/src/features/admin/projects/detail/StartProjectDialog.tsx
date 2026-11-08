@@ -26,8 +26,6 @@ interface Props {
 
 /** Plan 06b F3: preview the template tasks per NOT_STARTED deliverable, untick or rename, then start. */
 export function StartProjectDialog({ project, open, onOpenChange, warnings }: Props) {
-  const preview = useStartPreview(project.id, open)
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
@@ -37,22 +35,21 @@ export function StartProjectDialog({ project, open, onOpenChange, warnings }: Pr
             Các hạng mục chưa bắt đầu sẽ chuyển sang Đang làm. Công việc được đề xuất theo mẫu của dịch vụ — bỏ chọn hoặc sửa tên trước khi tạo.
           </DialogDescription>
         </DialogHeader>
-        {preview.isLoading ? (
-          <Skeleton className="h-32 w-full" />
-        ) : preview.isError || !preview.data ? (
-          <p className="text-sm text-muted-foreground">Không tải được danh sách công việc mẫu.</p>
-        ) : (
-          <StartForm
-            key={preview.dataUpdatedAt}
-            project={project}
-            preview={preview.data}
-            warnings={warnings}
-            onClose={() => onOpenChange(false)}
-          />
-        )}
+        {/* mounted per open: each open fetches a fresh preview once and seeds the form from it; a later refetch can't reset edits */}
+        {open && <StartPreviewBody project={project} warnings={warnings} onClose={() => onOpenChange(false)} />}
       </DialogContent>
     </Dialog>
   )
+}
+
+function StartPreviewBody({ project, warnings, onClose }: { project: ProjectDetail; warnings: FlowWarning[]; onClose: () => void }) {
+  const preview = useStartPreview(project.id, true)
+  // StartForm seeds its drafts once on mount (no key): later refetches/invalidations can't reset edits.
+  if (preview.isFetchedAfterMount && preview.data) {
+    return <StartForm project={project} preview={preview.data} warnings={warnings} onClose={onClose} />
+  }
+  if (preview.isError) return <p className="text-sm text-muted-foreground">Không tải được danh sách công việc mẫu.</p>
+  return <Skeleton className="h-32 w-full" />
 }
 
 interface FormProps {

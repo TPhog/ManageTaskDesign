@@ -29,6 +29,7 @@ export type FlowWarningKind =
   | 'TASKS_OVERDUE'
   | 'QUOTA_EXCEEDED'
   | 'BALANCE_DUE'
+  | 'DELIVERED_WITH_OPEN_REVISIONS'
 
 export interface FlowTarget {
   deliverableId: string | null
