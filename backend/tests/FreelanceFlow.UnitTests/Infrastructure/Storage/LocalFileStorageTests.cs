@@ -110,6 +110,72 @@ public sealed class LocalFileStorageTests : IDisposable
         var read = () => Storage().OpenReadAsync(key);
         await read.Should().ThrowAsync<ArgumentException>();
     }
+
+    [Fact]
+    public async Task List_returns_committed_objects_with_sizes_and_skips_temp_files()
+    {
+        var storage = Storage();
+        await storage.PutAsync("projects/p1/f1/original.webp", [1, 2, 3], "image/webp");
+        await storage.PutAsync("projects/p1/f1/thumb.webp", [1], "image/webp");
+        await storage.PutAsync("other/x.webp", [9], "image/webp");
+        await File.WriteAllBytesAsync(Path.Combine(_root, "projects", "p1", "f1", "preview.webp.tmp-abc"), [7]);
+
+        var listed = await storage.ListAsync("projects/");
+
+        listed.Select(o => (o.Key, o.SizeBytes)).Should().BeEquivalentTo(new[]
+        {
+            ("projects/p1/f1/original.webp", 3L),
+            ("projects/p1/f1/thumb.webp", 1L),
+        });
+        listed.Should().OnlyContain(o => o.LastModified > DateTimeOffset.UtcNow.AddMinutes(-5));
+        (await storage.ListAsync("missing/")).Should().BeEmpty();
+        (await storage.ListAsync("")).Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task Delete_many_removes_every_key_and_is_idempotent()
+    {
+        var storage = Storage();
+        await storage.PutAsync("projects/p1/f1/original.webp", [1], "image/webp");
+        await storage.PutAsync("projects/p1/f1/thumb.webp", [1], "image/webp");
+
+        var failed = await storage.DeleteManyAsync(["projects/p1/f1/original.webp", "projects/p1/f1/thumb.webp", "projects/p1/f9/thumb.webp"]);
+
+        failed.Should().BeEmpty();
+        (await storage.ListAsync("projects/")).Should().BeEmpty();
+        Directory.Exists(Path.Combine(_root, "projects", "p1", "f1")).Should().BeFalse("the image folder goes with its last variant");
+        (await storage.DeleteManyAsync(["projects/p1/f1/original.webp"])).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task Purge_incomplete_removes_old_temp_files_and_old_empty_image_folders_only()
+    {
+        var storage = Storage();
+        var f1 = Path.Combine(_root, "projects", "p1", "f1");
+        var f2 = Path.Combine(_root, "projects", "p1", "f2");
+        var f3 = Path.Combine(_root, "projects", "p1", "f3");
+        Directory.CreateDirectory(f1);
+        Directory.CreateDirectory(f2);
+        Directory.CreateDirectory(f3);
+        var oldTemp = Path.Combine(f1, "original.webp.tmp-old");
+        await File.WriteAllBytesAsync(oldTemp, [1]);
+        File.SetLastWriteTimeUtc(oldTemp, DateTime.UtcNow.AddHours(-30));
+        var freshTemp = Path.Combine(f2, "thumb.webp.tmp-new");
+        await File.WriteAllBytesAsync(freshTemp, [1]);
+        Directory.SetLastWriteTimeUtc(f3, DateTime.UtcNow.AddHours(-30));
+        var emptyProject = Path.Combine(_root, "projects", "p2");
+        Directory.CreateDirectory(emptyProject);
+        Directory.SetLastWriteTimeUtc(emptyProject, DateTime.UtcNow.AddHours(-30));
+
+        var removed = await storage.PurgeIncompleteAsync(DateTimeOffset.UtcNow.AddHours(-24));
+
+        removed.Should().Be(1);
+        File.Exists(oldTemp).Should().BeFalse();
+        File.Exists(freshTemp).Should().BeTrue("a write may still be in progress");
+        Directory.Exists(f3).Should().BeFalse("old empty image folder");
+        Directory.Exists(f1).Should().BeTrue("changed just now by the purge itself");
+        Directory.Exists(emptyProject).Should().BeTrue("project folders are never removed");
+    }
 }
 
 internal sealed class TestHostEnvironment(string contentRoot) : IHostEnvironment

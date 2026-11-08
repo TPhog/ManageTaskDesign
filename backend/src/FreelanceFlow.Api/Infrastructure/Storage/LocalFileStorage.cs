@@ -90,6 +90,79 @@ public sealed partial class LocalFileStorage : IFileStorage
         return Task.FromResult(total);
     }
 
+    public Task<IReadOnlyList<StoredObject>> ListAsync(string prefix, CancellationToken ct = default)
+    {
+        var folder = prefix.Length == 0 ? RootPath : PathOf(prefix.TrimEnd('/'));
+        if (!Directory.Exists(folder)) return Task.FromResult<IReadOnlyList<StoredObject>>([]);
+        var objects = new List<StoredObject>();
+        foreach (var file in new DirectoryInfo(folder).EnumerateFiles("*", SearchOption.AllDirectories))
+        {
+            ct.ThrowIfCancellationRequested();
+            if (file.Name.Contains(TempMarker, StringComparison.Ordinal)) continue;
+            var key = Path.GetRelativePath(RootPath, file.FullName).Replace(Path.DirectorySeparatorChar, '/');
+            if (!KeyPattern().IsMatch(key)) continue;   // e.g. the startup write probe — never a key the app wrote
+            objects.Add(new StoredObject(key, file.Length, new DateTimeOffset(file.LastWriteTimeUtc, TimeSpan.Zero)));
+        }
+        return Task.FromResult<IReadOnlyList<StoredObject>>(objects);
+    }
+
+    public async Task<IReadOnlyList<string>> DeleteManyAsync(IReadOnlyCollection<string> keys, CancellationToken ct = default)
+    {
+        var failed = new List<string>();
+        foreach (var key in keys)
+        {
+            ct.ThrowIfCancellationRequested();
+            try
+            {
+                await DeleteAsync(key, ct);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                failed.Add(key);
+            }
+        }
+        return failed;
+    }
+
+    public Task<int> PurgeIncompleteAsync(DateTimeOffset olderThan, CancellationToken ct = default)
+    {
+        var cutoff = olderThan.UtcDateTime;
+        var root = new DirectoryInfo(RootPath);
+        var removed = 0;
+        foreach (var temp in root.EnumerateFiles("*" + TempMarker + "*", SearchOption.AllDirectories).ToList())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (temp.LastWriteTimeUtc >= cutoff) continue;
+            try
+            {
+                temp.Delete();
+                removed++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // still held by a writer — next run
+            }
+        }
+        // Empty image folders (projects/{p}/{f}); deepest first; never the root, "projects" or a project folder
+        var folders = root.EnumerateDirectories("*", SearchOption.AllDirectories)
+            .Where(d => Path.GetRelativePath(RootPath, d.FullName).Split(Path.DirectorySeparatorChar).Length >= 3)
+            .OrderByDescending(d => d.FullName.Length)
+            .ToList();
+        foreach (var folder in folders)
+        {
+            try
+            {
+                folder.Refresh();
+                if (folder.Exists && folder.LastWriteTimeUtc < cutoff && !folder.EnumerateFileSystemInfos().Any()) folder.Delete();
+            }
+            catch (IOException)
+            {
+                // a concurrent write re-used the folder — leave it
+            }
+        }
+        return Task.FromResult(removed);
+    }
+
     private string PathOf(string key)
     {
         if (!KeyPattern().IsMatch(key) || key.Contains("..", StringComparison.Ordinal))
