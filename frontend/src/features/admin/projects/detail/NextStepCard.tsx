@@ -8,9 +8,10 @@ import type { ProjectDetail } from '@/lib/types'
 import type { FlowState } from '@/lib/flowTypes'
 import { FlowActionButton } from '@/features/admin/flow/FlowActionControls'
 import { flowActionKey, stepFromParam, type FlowDialogKind } from '@/features/admin/flow/flowUtils'
-import { useCompleteProject } from '@/features/admin/flow/useFlow'
 import { useFlowActionRunner } from '@/features/admin/flow/useFlowActionRunner'
 import { StartProjectDialog } from './StartProjectDialog'
+import { completeTransition } from './projectStatus'
+import { useProjectStatusChange } from './useProjectStatusChange'
 
 const panelClass = 'rounded-xl border bg-card p-5 shadow-card'
 
@@ -24,11 +25,13 @@ interface Props {
 /** Plan 06b F1: one primary next step, warnings (never blocking, F4) and secondary links. BR-01: every step is a click. */
 export function NextStepCard({ project, flow, isLoading, isError }: Props) {
   const [startOpen, setStartOpen] = useState(false)
+  // only the ?step= deep link asks first (it opens without a click); the button goes straight to the server check
   const [completeOpen, setCompleteOpen] = useState(false)
-  const complete = useCompleteProject(project.id)
-  const openDialog = (kind: FlowDialogKind) => (kind === 'START_PROJECT' ? setStartOpen(true) : setCompleteOpen(true))
+  // COMPLETE_PROJECT shares the status menu's flow: server warnings are shown in the same confirmation dialog
+  const statusChange = useProjectStatusChange(project)
+  const openDialog = (kind: FlowDialogKind) => (kind === 'START_PROJECT' ? setStartOpen(true) : statusChange.request(completeTransition))
   const runner = useFlowActionRunner(openDialog)
-  const busy = runner.busy || complete.isPending
+  const busy = runner.busy || statusChange.pending
   const [searchParams, setSearchParams] = useSearchParams()
   const step = stepFromParam(searchParams.get('step'))
 
@@ -63,7 +66,6 @@ export function NextStepCard({ project, flow, isLoading, isError }: Props) {
   }
 
   const [primary, ...others] = flow.actions
-  const completeWarning = flow.warnings.map(w => w.message).join(' · ')
 
   return (
     <section aria-labelledby="next-step-heading" className={panelClass}>
@@ -114,15 +116,14 @@ export function NextStepCard({ project, flow, isLoading, isError }: Props) {
         open={completeOpen}
         onOpenChange={setCompleteOpen}
         title="Hoàn thành dự án?"
-        description={
-          completeWarning
-            ? `Lưu ý: ${completeWarning}. Hệ thống chỉ cảnh báo, không chặn.`
-            : 'Dự án sẽ chuyển sang Hoàn thành.'
-        }
+        description="Hệ thống sẽ kiểm tra và cảnh báo nếu còn việc dở, bạn vẫn quyết định được."
         confirmLabel="Hoàn thành"
-        pending={complete.isPending}
-        onConfirm={() => complete.mutate({ rowVersion: project.rowVersion }, { onSuccess: () => setCompleteOpen(false) })}
+        onConfirm={() => {
+          setCompleteOpen(false)
+          statusChange.request(completeTransition)
+        }}
       />
+      {statusChange.dialogs}
     </section>
   )
 }

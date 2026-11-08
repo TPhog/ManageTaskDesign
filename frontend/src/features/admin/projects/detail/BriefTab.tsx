@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/EmptyState'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { StatusBadge } from '@/components/StatusBadge'
 import { api, type ApiError } from '@/lib/api'
 import { formatDate } from '@/lib/format'
@@ -22,6 +23,8 @@ export function BriefTab({ projectId, brief }: Props) {
   const [content, setContent] = useState(brief?.content ?? '')
   const refresh = () => qc.invalidateQueries({ queryKey: ['projects', projectId] })
   const dirty = !!brief && content !== brief.content
+  const empty = content.trim() === ''
+  const [asking, setAsking] = useState(false)
 
   const saveMutation = useMutation({
     mutationFn: () => api.put(`/admin/briefs/${brief!.id}`, { content }),
@@ -40,11 +43,13 @@ export function BriefTab({ projectId, brief }: Props) {
       return api.post(`/admin/briefs/${brief!.id}/confirm`, {})
     },
     onSuccess: () => {
+      setAsking(false)
       refresh()
       toast.success('Đã xác nhận brief')
     },
     // the save step may have succeeded before confirm failed, so refresh the cache either way
     onError: (err: ApiError) => {
+      setAsking(false)
       refresh()
       toast.error(err.detail ?? 'Không thể xác nhận brief')
     },
@@ -116,11 +121,23 @@ export function BriefTab({ projectId, brief }: Props) {
             <Button variant="outline" onClick={() => saveMutation.mutate()} disabled={!dirty || busy}>
               {saveMutation.isPending ? 'Đang lưu…' : 'Lưu brief'}
             </Button>
-            <Button onClick={() => confirmMutation.mutate()} disabled={busy}>
+            <Button onClick={() => setAsking(true)} disabled={busy || empty} aria-describedby={empty ? 'brief-empty-hint' : undefined}>
               <CheckCircle2 aria-hidden="true" />
               Xác nhận brief
             </Button>
           </div>
+          {empty && (
+            <p id="brief-empty-hint" className="text-right text-xs text-muted-foreground">Nhập nội dung trước khi xác nhận.</p>
+          )}
+          <ConfirmDialog
+            open={asking}
+            onOpenChange={setAsking}
+            title={`Xác nhận brief phiên bản ${brief.version}?`}
+            description="Brief đã xác nhận không sửa được (muốn đổi phải tạo phiên bản mới) và khách sẽ thấy nội dung này trên portal."
+            confirmLabel="Xác nhận"
+            pending={confirmMutation.isPending}
+            onConfirm={() => confirmMutation.mutate()}
+          />
         </>
       )}
     </div>

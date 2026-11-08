@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { CheckCircle2, MoreHorizontal, Package, Pencil, Plus, Send, Truck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -8,9 +9,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { EmptyState } from '@/components/EmptyState'
+import { MoneyText } from '@/components/MoneyText'
 import { QuotaMeter } from '@/components/QuotaMeter'
 import { StatusBadge } from '@/components/StatusBadge'
 import { formatDate } from '@/lib/format'
+import { quoteRefLabel } from '@/lib/quoteRefs'
 import type { Deliverable, DeliverableStatus, ProjectDetail } from '@/lib/types'
 import { useConfirmApproval, useDeliverableStatus, useSubmitReview } from '@/features/admin/flow/useFlow'
 import { DeliverableDialog } from './DeliverableDialog'
@@ -82,7 +85,23 @@ export function DeliverablesTab({ project }: { project: ProjectDetail }) {
               <li key={d.id} className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-4">
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-foreground">{d.name}</p>
-                  <p className="text-xs text-muted-foreground">Số lượng: {d.quantity}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Số lượng: {d.quantity} · Vòng thêm: <MoneyText amount={d.extraRoundPrice} />
+                  </p>
+                  {(d.quotedIn ?? []).length > 0 && (
+                    <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+                      <span>Đã có trong:</span>
+                      {(d.quotedIn ?? []).map(r => (
+                        <Link
+                          key={r.quotationId}
+                          to={`/admin/quotations/${r.quotationId}`}
+                          className="rounded-full bg-secondary px-2 py-0.5 font-medium text-secondary-foreground hover:underline"
+                        >
+                          {quoteRefLabel(r)}
+                        </Link>
+                      ))}
+                    </p>
+                  )}
                   {d.progressPercent !== null && d.progressPercent !== undefined && (
                     <div className="mt-1.5 flex items-center gap-2">
                       <div

@@ -70,6 +70,7 @@ test.describe('Brief', () => {
   test('can confirm a brief and start a new version', async ({ page }) => {
     await page.getByLabel('Nội dung brief').fill('Brief v1 E2E')
     await page.getByRole('button', { name: 'Xác nhận brief' }).click()
+    await page.getByRole('dialog', { name: /Xác nhận brief phiên bản 1/ }).getByRole('button', { name: 'Xác nhận', exact: true }).click()
     await expectToast(page, 'Đã xác nhận brief')
     await expect(page.getByLabel('Nội dung brief')).toHaveCount(0)
     await expect(page.getByRole('tabpanel')).toContainText('Brief v1 E2E')

@@ -1,20 +1,13 @@
 import { useParams, useSearchParams, Link } from 'react-router-dom'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, History, SearchX } from 'lucide-react'
-import { toast } from 'sonner'
+import { useQuery } from '@tanstack/react-query'
+import { ChevronRight, History, SearchX } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { StatusBadge } from '@/components/StatusBadge'
 import { EmptyState } from '@/components/EmptyState'
 import { formatDate } from '@/lib/format'
-import { api, type ApiError } from '@/lib/api'
+import { api } from '@/lib/api'
 import { BriefTab } from './BriefTab'
 import { QuotationsTab } from './QuotationsTab'
 import { DeliverablesTab } from './DeliverablesTab'
@@ -23,36 +16,17 @@ import { RevisionsTab } from './RevisionsTab'
 import { ProgressUpdateCard } from './ProgressUpdateCard'
 import { FlowStepper } from './FlowStepper'
 import { NextStepCard } from './NextStepCard'
+import { ProjectStatusControl } from './ProjectStatusControl'
 import { useProjectFlow } from '@/features/admin/flow/useFlow'
-import type { ProjectDetail, ProjectStatus } from '@/lib/types'
+import type { ProjectDetail } from '@/lib/types'
 
 const designTypeLabel: Record<string, string> = {
   LOGO: 'Logo', BANNER: 'Banner', POSTER: 'Poster', BRANDING: 'Thương hiệu',
   UI_UX: 'UI/UX', SOCIAL_MEDIA: 'Mạng xã hội', PACKAGING: 'Bao bì', PRINT: 'In ấn', OTHER: 'Khác',
 }
 
-const statusTransitions: Record<ProjectStatus, { to: ProjectStatus; label: string }[]> = {
-  DRAFT: [
-    { to: 'QUOTED', label: 'Chuyển sang Đã báo giá' },
-    { to: 'IN_PROGRESS', label: 'Bắt đầu làm' },
-    { to: 'CANCELLED', label: 'Huỷ dự án' },
-  ],
-  QUOTED: [
-    { to: 'IN_PROGRESS', label: 'Bắt đầu làm' },
-    { to: 'CANCELLED', label: 'Huỷ dự án' },
-  ],
-  IN_PROGRESS: [
-    { to: 'ON_HOLD', label: 'Tạm dừng' },
-    { to: 'COMPLETED', label: 'Hoàn thành' },
-    { to: 'CANCELLED', label: 'Huỷ dự án' },
-  ],
-  ON_HOLD: [
-    { to: 'IN_PROGRESS', label: 'Tiếp tục làm' },
-    { to: 'CANCELLED', label: 'Huỷ dự án' },
-  ],
-  COMPLETED: [],
-  CANCELLED: [{ to: 'DRAFT', label: 'Mở lại' }],
-}
+/** QA D-17: 44px tall tabs on touch screens */
+const tabTrigger = 'min-h-11 px-4 sm:min-h-0 sm:px-3'
 
 const panelClass = 'rounded-xl border bg-card p-5 shadow-card'
 
@@ -67,7 +41,6 @@ function InfoItem({ label, value }: { label: string; value: string }) {
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const qc = useQueryClient()
   // ?tab=… deep-links into a tab (all-tasks page, NextStepCard links) and follows tab clicks
   const [searchParams, setSearchParams] = useSearchParams()
   const tab = searchParams.get('tab') ?? 'overview'
@@ -77,20 +50,6 @@ export default function ProjectDetailPage() {
     queryKey: ['projects', id],
     queryFn: () => api.get<ProjectDetail>(`/admin/projects/${id}`),
     enabled: !!id,
-  })
-
-  const statusMutation = useMutation({
-    mutationFn: (body: { to: ProjectStatus; rowVersion: number }) =>
-      api.post(`/admin/projects/${id}/status`, body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['projects'] })
-      toast.success('Đã cập nhật trạng thái')
-    },
-    onError: (err: ApiError) => {
-      if (err.code === 'INVALID_TRANSITION') toast.error('Chuyển trạng thái không hợp lệ')
-      else if (err.code === 'CONCURRENCY_CONFLICT' || err.status === 409) toast.error('Dữ liệu đã thay đổi, vui lòng tải lại')
-      else toast.error('Không thể cập nhật trạng thái')
-    },
   })
 
   if (isLoading) {
@@ -120,7 +79,6 @@ export default function ProjectDetailPage() {
     )
   }
 
-  const transitions = statusTransitions[project.status] ?? []
   const designType = designTypeLabel[project.designType] ?? project.designType
 
   return (
@@ -153,28 +111,11 @@ export default function ProjectDetailPage() {
                 </>
               )}
             </div>
+            {project.statusReason && (project.status === 'ON_HOLD' || project.status === 'CANCELLED' || project.status === 'IN_PROGRESS') && (
+              <p className="mt-2 text-sm text-amber-800">Lý do: {project.statusReason}</p>
+            )}
           </div>
-          {transitions.length > 0 && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" disabled={statusMutation.isPending} className="shrink-0">
-                  Đổi trạng thái
-                  <ChevronDown aria-hidden="true" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {transitions.map(t => (
-                  <DropdownMenuItem
-                    key={t.to}
-                    className={t.to === 'CANCELLED' ? 'text-red-700 focus:text-red-700' : undefined}
-                    onClick={() => statusMutation.mutate({ to: t.to, rowVersion: project.rowVersion })}
-                  >
-                    {t.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          <ProjectStatusControl project={project} />
         </div>
       </div>
 
@@ -192,15 +133,19 @@ export default function ProjectDetailPage() {
           }, { replace: true })
         }
       >
-        <TabsList className="h-auto w-full justify-start overflow-x-auto sm:w-auto">
-          <TabsTrigger value="overview">Tổng quan</TabsTrigger>
-          <TabsTrigger value="deliverables">Deliverables ({project.deliverables.length})</TabsTrigger>
-          <TabsTrigger value="revisions">Yêu cầu & Revision</TabsTrigger>
-          <TabsTrigger value="brief">Brief</TabsTrigger>
-          <TabsTrigger value="tasks">Công việc</TabsTrigger>
-          <TabsTrigger value="quotations">Báo giá</TabsTrigger>
-          <TabsTrigger value="activity">Lịch sử</TabsTrigger>
-        </TabsList>
+        {/* the fade hints that the tab bar scrolls on narrow screens */}
+        <div className="relative">
+          <TabsList className="h-auto w-full justify-start overflow-x-auto sm:w-auto">
+            <TabsTrigger value="overview" className={tabTrigger}>Tổng quan</TabsTrigger>
+            <TabsTrigger value="deliverables" className={tabTrigger}>Deliverables ({project.deliverables.length})</TabsTrigger>
+            <TabsTrigger value="revisions" className={tabTrigger}>Yêu cầu & Revision</TabsTrigger>
+            <TabsTrigger value="brief" className={tabTrigger}>Brief</TabsTrigger>
+            <TabsTrigger value="tasks" className={tabTrigger}>Công việc</TabsTrigger>
+            <TabsTrigger value="quotations" className={tabTrigger}>Báo giá</TabsTrigger>
+            <TabsTrigger value="activity" className={tabTrigger}>Lịch sử</TabsTrigger>
+          </TabsList>
+          <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 w-8 rounded-r-md bg-linear-to-l from-muted sm:hidden" />
+        </div>
 
         <TabsContent value="overview" className="mt-4 space-y-4">
           <div className={`${panelClass} space-y-5`}>
