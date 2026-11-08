@@ -12,6 +12,7 @@ import type { PagedResult } from '@/lib/types'
 import type { PortalProjectDetail, PortalTimelineItem } from '@/lib/portalTypes'
 import { designTypeLabel, portalDeliverableStatus, portalProjectStatus } from './labels'
 import { ProgressBar } from './ProgressBar'
+import { DeliverableReview } from './DeliverableReview'
 import { deliveredText, progressOf, remainingRoundsText } from './progress'
 import { cn } from '@/lib/utils'
 import { PortalQuotationList } from './PortalQuotationList'
@@ -142,6 +143,7 @@ export default function PortalProjectPage() {
                     {remainingRoundsText(d)}
                     {d.dueDate && ` · Hạn ${formatDate(d.dueDate)}`}
                   </p>
+                  <DeliverableReview projectId={project.id} projectStatus={project.status} deliverable={d} />
                 </div>
                 <StatusBadge status={d.status} label={portalDeliverableStatus[d.status]} />
               </li>

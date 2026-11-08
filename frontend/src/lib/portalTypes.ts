@@ -48,6 +48,18 @@ export interface PortalDeliverable {
   usedRounds: number
   remainingRounds: number
   dueDate: string | null
+  /** plan 06b: % of the designer's tasks that are DONE; null = no task yet */
+  progressPercent: number | null
+  /** 'APPROVED' after the client pressed "Duyệt" (still IN_REVIEW until the designer confirms) */
+  clientDecision: 'APPROVED' | null
+}
+
+/** POST /api/portal/deliverables/{id}/approve */
+export interface PortalDeliverableDecision {
+  id: string
+  status: DeliverableStatus
+  clientDecision: 'APPROVED' | null
+  clientDecisionAt: string | null
 }
 
 export interface PortalBrief {
