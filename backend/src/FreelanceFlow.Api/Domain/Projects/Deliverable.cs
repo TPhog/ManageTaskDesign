@@ -2,6 +2,12 @@ using FreelanceFlow.Api.Domain.Common;
 
 namespace FreelanceFlow.Api.Domain.Projects;
 
+/// <summary>deliverables.client_decision (plan 06b F2): what the client said on the portal, before the designer confirms.</summary>
+public static class ClientDecisions
+{
+    public const string Approved = "APPROVED";
+}
+
 public class Deliverable : IAuditable
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
@@ -14,6 +20,9 @@ public class Deliverable : IAuditable
     public string Status { get; set; } = "NOT_STARTED";
     public DateOnly? DueDate { get; set; }
     public int SortOrder { get; set; }
+    /// <summary>Only set while IN_REVIEW (portal "Duyệt"); cleared whenever the deliverable leaves IN_REVIEW.</summary>
+    public string? ClientDecision { get; set; }
+    public DateTimeOffset? ClientDecisionAt { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 
@@ -46,4 +55,48 @@ public class Deliverable : IAuditable
 
         return allowed ? null : $"Không thể chuyển từ {Status} sang {to}";
     }
+
+    /// <summary>
+    /// The one place a deliverable changes status (BR-01: always a designer command). Throws INVALID_TRANSITION
+    /// outside the table of <see cref="ValidateStatusTransition"/>; leaving IN_REVIEW drops the client's decision.
+    /// </summary>
+    public void ChangeStatus(string to)
+    {
+        var error = ValidateStatusTransition(to);
+        if (error != null) throw new DomainException("INVALID_TRANSITION", error);
+        if (Status == "IN_REVIEW")
+        {
+            ClientDecision = null;
+            ClientDecisionAt = null;
+        }
+        Status = to;
+    }
+
+    /// <summary>"Bắt đầu dự án": NOT_STARTED → IN_PROGRESS only.</summary>
+    public void Start()
+    {
+        if (Status != "NOT_STARTED")
+            throw new DomainException("INVALID_TRANSITION", $"Không thể chuyển từ {Status} sang IN_PROGRESS");
+        ChangeStatus("IN_PROGRESS");
+    }
+
+    /// <summary>"Gửi duyệt": IN_PROGRESS → IN_REVIEW.</summary>
+    public void SubmitForReview() => ChangeStatus("IN_REVIEW");
+
+    /// <summary>
+    /// Portal "Duyệt": records the client's opinion only — the status stays IN_REVIEW until the designer confirms (BR-01).
+    /// Returns false when the approval was already recorded (nothing changes).
+    /// </summary>
+    public bool RecordClientApproval(IClock clock)
+    {
+        if (Status != "IN_REVIEW")
+            throw new DomainException("INVALID_TRANSITION", "Hạng mục không ở trạng thái chờ duyệt");
+        if (ClientDecision == ClientDecisions.Approved) return false;
+        ClientDecision = ClientDecisions.Approved;
+        ClientDecisionAt = clock.UtcNow;
+        return true;
+    }
+
+    /// <summary>Designer confirms: IN_REVIEW → APPROVED, with or without a portal decision.</summary>
+    public void ConfirmApproval() => ChangeStatus("APPROVED");
 }

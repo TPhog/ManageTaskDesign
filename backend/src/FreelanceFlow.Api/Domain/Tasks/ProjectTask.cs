@@ -11,6 +11,9 @@ public class ProjectTask : IAuditable
     /// <summary>Gap used when a task is appended to a column. sortOrder is a double: inserts take the midpoint (docs/10 M6.1).</summary>
     public const double SortStep = 1024;
 
+    /// <summary>Plan 06b F5: the description is Markdown, rendered without raw HTML on the client.</summary>
+    public const int MaxDescription = 20_000;
+
     public Guid Id { get; set; } = Guid.CreateVersion7();
     public Guid ProjectId { get; set; }
     public Guid? DeliverableId { get; set; }
@@ -53,6 +56,8 @@ public class ProjectTask : IAuditable
             throw new DomainException("VALIDATION_FAILED", "Tiêu đề không được để trống");
         if (!Priorities.Contains(priority))
             throw new DomainException("VALIDATION_FAILED", $"Mức ưu tiên không hợp lệ: {priority}");
+        if (description.Length > MaxDescription)
+            throw new DomainException("VALIDATION_FAILED", $"Mô tả tối đa {MaxDescription} ký tự");
 
         Title = title.Trim();
         Description = description;
@@ -85,29 +90,40 @@ public class ProjectTask : IAuditable
     public static DateOnly EndOfWeek(DateOnly todayVn) =>
         todayVn.AddDays(6 - ((int)todayVn.DayOfWeek + 6) % 7);
 
-    public TaskChecklistItem AddChecklistItem(string text)
+    public TaskChecklistItem AddChecklistItem(string text, string description = "")
     {
         if (string.IsNullOrWhiteSpace(text))
             throw new DomainException("VALIDATION_FAILED", "Nội dung checklist không được để trống");
+        CheckChecklistDescription(description);
 
         var item = new TaskChecklistItem
         {
             TaskId = Id,
             Text = text.Trim(),
+            Description = description,
             SortOrder = ChecklistItems.Count == 0 ? 0 : ChecklistItems.Max(i => i.SortOrder) + 1,
         };
         ChecklistItems.Add(item);
         return item;
     }
 
-    public void UpdateChecklistItem(Guid itemId, string text, bool done)
+    /// <summary><paramref name="description"/> null = keep the current one (the checkbox toggle does not send it).</summary>
+    public void UpdateChecklistItem(Guid itemId, string text, bool done, string? description = null)
     {
         if (string.IsNullOrWhiteSpace(text))
             throw new DomainException("VALIDATION_FAILED", "Nội dung checklist không được để trống");
+        if (description != null) CheckChecklistDescription(description);
 
         var item = FindChecklistItem(itemId);
         item.Text = text.Trim();
         item.Done = done;
+        if (description != null) item.Description = description;
+    }
+
+    private static void CheckChecklistDescription(string description)
+    {
+        if (description.Length > TaskChecklistItem.MaxDescription)
+            throw new DomainException("VALIDATION_FAILED", $"Mô tả mục checklist tối đa {TaskChecklistItem.MaxDescription} ký tự");
     }
 
     public TaskChecklistItem RemoveChecklistItem(Guid itemId)

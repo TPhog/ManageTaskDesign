@@ -84,4 +84,17 @@ public class Project : IAuditable
         StatusReason = reason;
         StatusReasonPublic = reasonPublic ?? false;
     }
+
+    /// <summary>
+    /// "Bắt đầu dự án" (plan 06b): DRAFT/QUOTED → IN_PROGRESS. Warnings never block (F4) and are returned to the caller;
+    /// any other status → INVALID_TRANSITION (ON_HOLD / COMPLETED keep using the normal status command).
+    /// </summary>
+    public string[] Start(bool hasAcceptedInitialQuotation)
+    {
+        if (Status is not ("DRAFT" or "QUOTED"))
+            throw new DomainException("INVALID_TRANSITION", $"{Status} → IN_PROGRESS");
+        var warnings = ValidateTransition("IN_PROGRESS", null, hasAcceptedInitialQuotation, false, false);
+        ApplyStatusChange("IN_PROGRESS", null, null);
+        return warnings;
+    }
 }
