@@ -399,6 +399,19 @@ public class ProjectFlowTests
         s.Actions.Single(a => a.Kind == "COPY_PAYMENT_REMINDER").Label.Should().Be("Sao chép tin nhắn nhắc thanh toán");
     }
 
+    [Theory]   // P12 notice pending: CONFIRM_CLIENT_PAYMENT already is the "mark received" step for that quotation
+    [InlineData(null, true)]
+    [InlineData("deposit", false)]
+    [InlineData("full", false)]
+    public void Record_deposit_is_skipped_while_a_client_payment_notice_is_pending(string? notice, bool offered)
+    {
+        var accepted = Q("ACCEPTED") with { PaymentNoticePurpose = notice };
+        var s = Eval(Facts("IN_PROGRESS", true, [D("IN_PROGRESS")], [accepted]));
+        Kinds(s).Contains("RECORD_DEPOSIT").Should().Be(offered);
+        Kinds(s).Should().Contain("COPY_PAYMENT_REMINDER");
+        if (!offered) Kinds(s)[0].Should().Be("CONFIRM_CLIENT_PAYMENT");
+    }
+
     [Fact]
     public void Unpaid_without_deposit_percent_says_payment_not_deposit()
     {

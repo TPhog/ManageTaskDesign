@@ -221,9 +221,11 @@ public static class ProjectFlow
                     ? $"Chưa nhận cọc {RevisionQuota.Vnd(unpaid.DepositAmount)} của báo giá {Ref(unpaid)}"
                     : $"Chưa nhận thanh toán báo giá {Ref(unpaid)}",
                 FlowSeverities.Warning);
-            b.Act(FlowActionKinds.RecordDeposit,
-                unpaid.DepositPercent > 0 ? "Đánh dấu đã nhận cọc" : "Đánh dấu đã nhận thanh toán",
-                new FlowTarget(QuotationId: unpaid.Id));
+            // a pending client payment notice already offers CONFIRM_CLIENT_PAYMENT for this quotation
+            if (!ClientStatements.IsPending(unpaid.Status, unpaid.PaymentStatus, unpaid.PaymentNoticePurpose))
+                b.Act(FlowActionKinds.RecordDeposit,
+                    unpaid.DepositPercent > 0 ? "Đánh dấu đã nhận cọc" : "Đánh dấu đã nhận thanh toán",
+                    new FlowTarget(QuotationId: unpaid.Id));
             b.Act(FlowActionKinds.CopyPaymentReminder, "Sao chép tin nhắn nhắc thanh toán", new FlowTarget(QuotationId: unpaid.Id));
         }
         if (f.OverdueTasks > 0)
