@@ -3,11 +3,11 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, FileText, Lock, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/EmptyState'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { StatusBadge } from '@/components/StatusBadge'
+import { MarkdownView } from '@/components/MarkdownView'
+import { MarkdownField } from '@/features/admin/tasks/MarkdownField'
 import { api, type ApiError } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 import type { Brief } from '@/lib/types'
@@ -98,7 +98,7 @@ export function BriefTab({ projectId, brief }: Props) {
             Brief đã xác nhận nên không sửa được. Tạo phiên bản mới để thay đổi.
           </div>
           {brief.content ? (
-            <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{brief.content}</div>
+            <MarkdownView source={brief.content} />
           ) : (
             <p className="text-sm italic text-muted-foreground">Brief chưa có nội dung</p>
           )}
@@ -106,14 +106,13 @@ export function BriefTab({ projectId, brief }: Props) {
       ) : (
         <>
           <div className="space-y-2">
-            <Label htmlFor="brief-content">Nội dung brief</Label>
-            <Textarea
+            <MarkdownField
               id="brief-content"
-              rows={12}
+              label="Nội dung brief"
               value={content}
-              onChange={e => setContent(e.target.value)}
-              placeholder="Mục tiêu, đối tượng, phong cách, màu sắc, định dạng bàn giao…"
-              className="font-[inherit] leading-relaxed"
+              onChange={setContent}
+              maxLength={20000}
+              placeholder="Mục tiêu, đối tượng, phong cách, màu sắc, định dạng bàn giao… (hỗ trợ Markdown)"
             />
             {dirty && <p className="text-xs text-muted-foreground">Có thay đổi chưa lưu</p>}
           </div>

@@ -43,6 +43,17 @@ export function emptyItem(): RevisionItemInput {
   return { description: '', type: 'MINOR', billing: null }
 }
 
+/** One revision item per non-empty line of a request ("- ", "2) " list prefixes stripped); never an empty list. */
+export function itemsFromRequestText(content: string, max = 20): RevisionItemInput[] {
+  const items = content
+    .split('\n')
+    .map(line => line.replace(/^\s*(?:[-*•+]|\d+[.)])\s+/, '').trim())
+    .filter(line => line.length > 0)
+    .slice(0, max)
+    .map(line => ({ ...emptyItem(), description: line.slice(0, 2000) }))
+  return items.length > 0 ? items : [emptyItem()]
+}
+
 export function emptyRound(deliverableId: string | null, receivedAt: string): RoundInput {
   return { deliverableId, receivedAt, items: [emptyItem()] }
 }

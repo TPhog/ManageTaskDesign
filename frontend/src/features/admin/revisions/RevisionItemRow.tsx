@@ -129,7 +129,7 @@ export function RevisionItemRow({ item, projectId, deliverableId, selectable, se
         open={guardTo !== null}
         onOpenChange={open => { if (!open) setGuardTo(null) }}
         title="Mục này tính phí nhưng báo giá chưa được chấp nhận"
-        description="Bạn vẫn có thể làm trước — lý do được lưu vào lịch sử (BR-60)."
+        description="Bạn vẫn có thể làm trước — lý do được lưu vào lịch sử."
         label="Lý do vẫn làm"
         confirmLabel={guardTo === 'DONE' ? 'Vẫn hoàn thành' : 'Vẫn bắt đầu'}
         minLength={5}

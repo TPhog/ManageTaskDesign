@@ -6,6 +6,7 @@ import {
   emptyRound,
   errorText,
   isQuotable,
+  itemsFromRequestText,
   needsScopeOverride,
   quotableItems,
   workStatusTransitions,
@@ -98,5 +99,21 @@ describe('quotaTone', () => {
     expect(quotaTone(3, 3)).toBe('over')
     expect(quotaTone(4, 3)).toBe('over')
     expect(quotaTone(0, 0)).toBe('over')
+  })
+})
+
+describe('itemsFromRequestText', () => {
+  it('makes one revision item per non-empty line, bullets and numbering stripped', () => {
+    const items = itemsFromRequestText('- Sửa logo to hơn\n\n2) Đổi màu nền\n* Thêm 1 mẫu menu A5\n  \nThiết kế thêm sticker')
+    expect(items.map(i => i.description)).toEqual(['Sửa logo to hơn', 'Đổi màu nền', 'Thêm 1 mẫu menu A5', 'Thiết kế thêm sticker'])
+    expect(items.every(i => i.type === 'MINOR' && i.billing === null)).toBe(true)
+  })
+
+  it('gives a single blank item for empty content', () => {
+    expect(itemsFromRequestText('  \n ')).toEqual([{ description: '', type: 'MINOR', billing: null }])
+  })
+
+  it('caps at 20 items', () => {
+    expect(itemsFromRequestText(Array.from({ length: 30 }, (_, i) => `y ${i}`).join('\n'))).toHaveLength(20)
   })
 })

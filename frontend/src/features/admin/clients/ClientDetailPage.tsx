@@ -18,6 +18,7 @@ import type { ClientDetail, PagedResult, ProjectListItem } from '@/lib/types'
 import { useQuotationSearch } from '@/features/admin/quotations/useQuotations'
 import { ClientFields } from './ClientFields'
 import { clientSchema, type ClientForm } from './clientForm'
+import { CreateProjectDialog } from '@/features/admin/projects/CreateProjectDialog'
 import { PortalLinkDialog } from './PortalLinkDialog'
 
 const panelClass = 'rounded-xl border bg-card p-5 shadow-card'
@@ -45,6 +46,7 @@ export default function ClientDetailPage() {
   const { id = '' } = useParams<{ id: string }>()
   const [editOpen, setEditOpen] = useState(false)
   const [portalOpen, setPortalOpen] = useState(false)
+  const [projectOpen, setProjectOpen] = useState(false)
 
   const { data: client, isLoading, error } = useQuery({
     queryKey: qk.clients.detail(id),
@@ -143,7 +145,10 @@ export default function ClientDetailPage() {
         {!projects ? (
           <Skeleton className="m-4 h-16" />
         ) : projects.items.length === 0 ? (
-          <p className="p-4 text-sm text-muted-foreground">Chưa có dự án nào.</p>
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <p className="text-sm text-muted-foreground">Chưa có dự án nào.</p>
+            <Button size="sm" onClick={() => setProjectOpen(true)}>Tạo dự án cho khách này</Button>
+          </div>
         ) : (
           <ul className="divide-y">
             {projects.items.map(p => (
@@ -192,6 +197,13 @@ export default function ClientDetailPage() {
       </section>
 
       <ClientEditSheet client={client} open={editOpen} onClose={() => setEditOpen(false)} />
+      <CreateProjectDialog
+        key={client.id}
+        open={projectOpen}
+        onClose={() => setProjectOpen(false)}
+        defaultClientId={client.id}
+        defaultClientLabel={client.name}
+      />
       <PortalLinkDialog client={portalOpen ? { id: client.id, name: client.name } : null} onClose={() => setPortalOpen(false)} />
     </div>
   )

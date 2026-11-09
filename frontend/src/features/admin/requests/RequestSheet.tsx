@@ -21,7 +21,7 @@ import type { ProjectDetail } from '@/lib/types'
 import { todayVn } from '@/features/admin/tasks/taskUtils'
 import { AdditionalQuotationDialog } from '@/features/admin/revisions/AdditionalQuotationDialog'
 import { RoundEditor } from '@/features/admin/revisions/RoundEditor'
-import { cleanRounds, emptyRound, errorText, quotableItems } from '@/features/admin/revisions/revisionUtils'
+import { cleanRounds, emptyRound, errorText, itemsFromRequestText, quotableItems } from '@/features/admin/revisions/revisionUtils'
 import {
   useDeclineRequest,
   useRequest,
@@ -87,7 +87,7 @@ function RequestSheetBody({ requestId }: { requestId: string }) {
 
 function TriagePanel({ detail }: { detail: RequestDetail }) {
   const r = detail.request
-  const [rounds, setRounds] = useState<RoundInput[]>(() => [emptyRound(r.deliverableId, todayVn())])
+  const [rounds, setRounds] = useState<RoundInput[]>(() => [{ ...emptyRound(r.deliverableId, todayVn()), items: itemsFromRequestText(r.content) }])
   const [declineOpen, setDeclineOpen] = useState(false)
   const triage = useTriageRequest(r.id)
   const decline = useDeclineRequest(r.id)
@@ -109,6 +109,19 @@ function TriagePanel({ detail }: { detail: RequestDetail }) {
   return (
     <section aria-label="Tiếp nhận yêu cầu" className="space-y-3">
       <h3 className="text-sm font-semibold text-foreground">Tách thành vòng sửa</h3>
+      {rounds[0] && rounds[0].items.length > 1 && (
+        <p className="text-xs text-muted-foreground">Đã tách {rounds[0].items.length} mục từ nội dung — sửa hoặc xoá nếu chưa đúng</p>
+      )}
+      {r.content.split('\n').filter(l => l.trim()).length >= 2 && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setRounds(prev => prev.map((x, k) => (k === 0 ? { ...x, items: itemsFromRequestText(r.content) } : x)))}
+        >
+          Tạo lại mục từ nội dung yêu cầu
+        </Button>
+      )}
       {rounds.map((round, i) => (
         <RoundEditor
           key={i}

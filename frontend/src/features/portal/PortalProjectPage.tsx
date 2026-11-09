@@ -5,6 +5,8 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/StatusBadge'
 import { EmptyState } from '@/components/EmptyState'
+import { LinkifiedText } from '@/components/LinkifiedText'
+import { MarkdownView } from '@/components/MarkdownView'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 import { qk } from '@/lib/queryKeys'
@@ -216,8 +218,8 @@ export default function PortalProjectPage() {
             <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-primary">
               Nội dung đã thống nhất · phiên bản {project.brief.version} · xác nhận {formatDate(project.brief.confirmedAt)}
             </summary>
-            <div className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-foreground">
-              {project.brief.content || 'Chưa có nội dung'}
+            <div className="mt-2">
+              <MarkdownView source={project.brief.content || 'Chưa có nội dung'} />
             </div>
             {canRequest && (
               <p className="mt-3 text-xs text-slate-600">Muốn đổi yêu cầu thiết kế? Bấm “Gửi yêu cầu chỉnh sửa”.</p>
@@ -252,10 +254,10 @@ export default function PortalProjectPage() {
                       {t.kind === 'MESSAGE' ? (
                         <div className="rounded-lg bg-amber-50 px-3 py-2">
                           <p className="text-xs font-medium text-amber-800">Nhà thiết kế nhắn</p>
-                          <p className="mt-0.5 whitespace-pre-wrap text-sm text-foreground">{t.message}</p>
+                          <LinkifiedText text={t.message} className="mt-0.5 block text-sm text-foreground" />
                         </div>
                       ) : (
-                        <p className="text-sm text-foreground">{t.message}</p>
+                        <LinkifiedText text={t.message} className="block text-sm text-foreground" />
                       )}
                       <PortalImageStrip images={t.images ?? []} />
                       <time dateTime={t.occurredAt} className="text-xs text-muted-foreground">{timeOfDay(t.occurredAt)}</time>

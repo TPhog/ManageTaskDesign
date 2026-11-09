@@ -131,7 +131,7 @@ export function RevisionsTab({ project }: { project: ProjectDetail }) {
         <section aria-label="Cấp dự án" className={panelClass}>
           <header className="border-b p-4">
             <h3 className="text-sm font-semibold text-foreground">Cấp dự án</h3>
-            <p className="text-xs text-muted-foreground">Không dùng quota (BR-41)</p>
+            <p className="text-xs text-muted-foreground">Cấp dự án — không dùng vòng sửa miễn phí</p>
           </header>
           {roundList(data.projectRounds)}
         </section>

@@ -54,6 +54,7 @@ function CreateRequestForm({ onClose, onCreated }: Omit<Props, 'open'>) {
   const [deliverableId, setDeliverableId] = useState(NO_DELIVERABLE)
   const [source, setSource] = useState<DesignerRequestSource>('ZALO')
   const [content, setContent] = useState('')
+  const [errors, setErrors] = useState<{ project?: string; content?: string }>({})
   const create = useCreateRequest()
   // QA D-07/D-28: searchable by project or client name, newest first, not capped at 100
   const projects = useProjectOptions(projectSearch)
@@ -67,8 +68,9 @@ function CreateRequestForm({ onClose, onCreated }: Omit<Props, 'open'>) {
 
   function submit(e: FormEvent) {
     e.preventDefault()
-    if (!projectId) { toast.error('Chọn dự án'); return }
-    if (!content.trim()) { toast.error('Nhập nội dung yêu cầu'); return }
+    const next = { project: projectId ? undefined : 'Chọn dự án', content: content.trim() ? undefined : 'Nhập nội dung yêu cầu' }
+    setErrors(next)
+    if (next.project || next.content) return
     create.mutate(
       { projectId, body: { content: content.trim(), source, deliverableId: deliverableId === NO_DELIVERABLE ? null : deliverableId } },
       {
@@ -96,13 +98,17 @@ function CreateRequestForm({ onClose, onCreated }: Omit<Props, 'open'>) {
           onSearchChange={setProjectSearch}
           onSelect={o => {
             setProjectId(o?.value ?? '')
+            setErrors(prev => ({ ...prev, project: undefined }))
             setProjectLabel(o ? `${o.label}${o.hint ? ` — ${o.hint}` : ''}` : '')
             setDeliverableId(NO_DELIVERABLE)
           }}
           placeholder="Chọn dự án"
           searchPlaceholder="Tìm dự án hoặc khách…"
           emptyText="Không có dự án khớp"
+          invalid={!!errors.project}
+          describedBy={errors.project ? 'request-project-error' : undefined}
         />
+        {errors.project && <p id="request-project-error" role="alert" className="text-sm text-destructive">{errors.project}</p>}
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
@@ -137,8 +143,11 @@ function CreateRequestForm({ onClose, onCreated }: Omit<Props, 'open'>) {
           maxLength={5000}
           placeholder="Mỗi ý một dòng"
           value={content}
-          onChange={e => setContent(e.target.value)}
+          onChange={e => { setContent(e.target.value); setErrors(prev => ({ ...prev, content: undefined })) }}
+          aria-invalid={!!errors.content || undefined}
+          aria-describedby={errors.content ? 'request-content-error' : undefined}
         />
+        {errors.content && <p id="request-content-error" role="alert" className="text-sm text-destructive">{errors.content}</p>}
       </div>
       <DialogFooter className="gap-2 pt-2">
         <Button type="button" variant="outline" onClick={onClose}>Huỷ</Button>

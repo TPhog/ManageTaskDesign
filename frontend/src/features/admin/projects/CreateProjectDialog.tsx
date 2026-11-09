@@ -50,13 +50,16 @@ const designTypeOptions = [
 interface Props {
   open: boolean
   onClose: () => void
+  /** pre-selected client (still changeable); pass defaultClientLabel too so the picker can show its name */
+  defaultClientId?: string
+  defaultClientLabel?: string
 }
 
-export function CreateProjectDialog({ open, onClose }: Props) {
+export function CreateProjectDialog({ open, onClose, defaultClientId = '', defaultClientLabel = '' }: Props) {
   const qc = useQueryClient()
   const navigate = useNavigate()
   const [clientSearch, setClientSearch] = useState('')
-  const [clientLabel, setClientLabel] = useState('')
+  const [clientLabel, setClientLabel] = useState(defaultClientLabel)
   // QA D-07: searchable, newest clients first, not capped at 100
   const clients = useClientOptions(clientSearch, open)
 
@@ -69,12 +72,12 @@ export function CreateProjectDialog({ open, onClose }: Props) {
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: { clientId: '', designType: 'OTHER', startDate: '', dueDate: '' },
+    defaultValues: { clientId: defaultClientId, designType: 'OTHER', startDate: '', dueDate: '' },
   })
 
   function close() {
     reset()
-    setClientLabel('')
+    setClientLabel(defaultClientLabel)
     setClientSearch('')
     onClose()
   }
