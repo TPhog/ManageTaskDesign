@@ -5,9 +5,16 @@ describe('parseMoneyInput', () => {
     expect(parseMoneyInput('2.000.000')).toBe(2_000_000)
     expect(parseMoneyInput('12a3')).toBe(123)
   })
-  it('drops a pasted decimal part', () => {
-    expect(parseMoneyInput('1.500.000,5')).toBe(1_500_000)
-    expect(parseMoneyInput('2.000,00')).toBe(2000)
+  it('reads both "." and "," groups of three as thousands', () => {
+    expect(parseMoneyInput('2,500,000')).toBe(2_500_000)
+    expect(parseMoneyInput('2.500.000 ₫')).toBe(2_500_000)
+    expect(parseMoneyInput('2500000')).toBe(2_500_000)
+    expect(parseMoneyInput('2.500')).toBe(2500)
+  })
+  it('rejects decimals (null)', () => {
+    expect(parseMoneyInput('1,5')).toBeNull()
+    expect(parseMoneyInput('1.500.000,5')).toBeNull()
+    expect(parseMoneyInput('2.000,00')).toBeNull()
   })
   it('treats empty as 0', () => expect(parseMoneyInput('')).toBe(0))
 })

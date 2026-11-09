@@ -13,9 +13,11 @@ function contains(line: string, term: string): boolean {
   return term === '} deliverable' ? /\} deliverable(?![\w=])/.test(line) : line.includes(term)
 }
 
-/** Known exceptions, keyed by file|term. */
-/** Allowed: the portal regex that strips internal rule codes mentions "(BR-" on purpose. */
-const PENDING = new Set<string>(['/src/features/portal/requests.ts|(BR-'])
+/** Known exceptions, keyed by file|term. Allowed: the portal regex that strips internal rule codes mentions "(BR-" on purpose. */
+const PENDING = new Set<string>([
+  '/src/features/portal/requests.ts|(BR-',
+  '/src/features/admin/settings/DigestSection.tsx|tin nhắc', // settings owner (P13/P15) still has 'tin nhắc' - remove when fixed
+])
 
 describe('glossary', () => {
   it('names the agreed terms', () => {

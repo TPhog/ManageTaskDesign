@@ -56,4 +56,26 @@ describe('MoneyInput typing', () => {
     expect(input).toHaveValue('12.000')
     expect(input.selectionStart).toBe(2)
   })
+
+  it('pastes en-US grouping and rejects decimals', async () => {
+    const onValue = vi.fn()
+    render(<Harness onValue={onValue} />)
+    await userEvent.click(screen.getByLabelText('Giá'))
+    await userEvent.paste('2,500,000')
+    expect(onValue).toHaveBeenLastCalledWith(2_500_000)
+    await userEvent.clear(screen.getByLabelText('Giá'))
+    onValue.mockClear()
+    await userEvent.paste('1,5')
+    expect(onValue).not.toHaveBeenCalled()
+  })
+
+  it('backspace over a separator deletes the digit before it and keeps the caret', async () => {
+    render(<Harness initial={12_345} />)
+    const input = screen.getByLabelText('Giá') as HTMLInputElement
+    await userEvent.click(input)
+    input.setSelectionRange(3, 3) // "12.|345"
+    await userEvent.keyboard('{Backspace}')
+    expect(input).toHaveValue('1.345')
+    expect(input.selectionStart).toBe(1)
+  })
 })

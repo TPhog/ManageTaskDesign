@@ -3,7 +3,19 @@ import { safeHref } from '@/lib/markdown'
 import { cn } from '@/lib/utils'
 
 const URL_PATTERN = /(https?:\/\/[^\s<>"']+)/g
-const TRAILING_PUNCTUATION = /[.,;:!?)]+$/
+
+/** Peels trailing punctuation off a URL; a ")" stays when the URL has a matching "(" (wikipedia style). */
+function splitTrailing(part: string): [string, string] {
+  let end = part.length
+  while (end > 0 && /[.,;:!?)]/.test(part[end - 1])) {
+    if (part[end - 1] === ')') {
+      const head = part.slice(0, end)
+      if (head.split('(').length >= head.split(')').length) break
+    }
+    end--
+  }
+  return [part.slice(0, end), part.slice(end)]
+}
 
 /**
  * Plain text where http(s) URLs become safe links (the delivery link on the portal timeline).
@@ -15,8 +27,7 @@ export function LinkifiedText({ text, className }: { text: string; className?: s
       {text.split(URL_PATTERN).map((part, i) => {
         // odd indexes are the captured URLs
         if (i % 2 === 0) return <Fragment key={i}>{part}</Fragment>
-        const trailing = TRAILING_PUNCTUATION.exec(part)?.[0] ?? ''
-        const url = trailing ? part.slice(0, -trailing.length) : part
+        const [url, trailing] = splitTrailing(part)
         const href = safeHref(url)
         if (!href) return <Fragment key={i}>{part}</Fragment>
         return (

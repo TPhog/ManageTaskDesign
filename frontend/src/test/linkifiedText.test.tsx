@@ -20,3 +20,8 @@ test('several links in one message', () => {
   render(<LinkifiedText text="A https://a.example/1, B (https://b.example/2)" />)
   expect(screen.getAllByRole('link').map(a => a.getAttribute('href'))).toEqual(['https://a.example/1', 'https://b.example/2'])
 })
+
+test('a closing parenthesis that matches one in the URL stays in the link', () => {
+  render(<LinkifiedText text="Xem https://vi.wikipedia.org/wiki/Foo_(bar) nhé" />)
+  expect(screen.getByRole('link')).toHaveAttribute('href', 'https://vi.wikipedia.org/wiki/Foo_(bar)')
+})
