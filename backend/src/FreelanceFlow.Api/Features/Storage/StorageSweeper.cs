@@ -22,7 +22,7 @@ public sealed record StorageSweepReport(
 }
 
 /// <summary>
-/// P10 storage hygiene (BR-86), run by StorageReconciliationService: lists the objects under "projects/" and repairs the
+/// P10 storage hygiene (BR-86), run by StorageReconciliationService: lists the objects under "projects/" and "intake/" (plan 13) and repairs the
 /// drift against the files rows — objects of soft-deleted rows (failed deletes are retried here), variants a live row no
 /// longer keeps (discarded originals), objects without any row once older than <see cref="OrphanGrace"/> (an upload
 /// commits within seconds of writing), and interrupted writes. Keys that do not look like an image variant are only
@@ -37,7 +37,8 @@ public sealed partial class StorageSweeper(
 {
     public static readonly TimeSpan OrphanGrace = TimeSpan.FromHours(24);
     private const long DriftToleranceBytes = 1_048_576;
-    private const string ImagesPrefix = "projects/";
+    /// <summary>Plan 13: intake photos keep their "intake/" key for life, also after they join a project.</summary>
+    private static readonly string[] ImagesPrefixes = ["projects/", "intake/"];
     private const string ReconciledAction = "storage.reconciled";
 
     private sealed record LiveImage(string StorageKey, bool PreviewIsOriginal, DateTimeOffset? OriginalDeletedAt);
@@ -54,7 +55,9 @@ public sealed partial class StorageSweeper(
         IReadOnlyList<StoredObject>? objects = null;
         try
         {
-            objects = await storage.ListAsync(ImagesPrefix, ct);
+            var listed = new List<StoredObject>();
+            foreach (var prefix in ImagesPrefixes) listed.AddRange(await storage.ListAsync(prefix, ct));
+            objects = listed;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -260,9 +263,9 @@ public sealed partial class StorageSweeper(
     private void LogStepFailure(string step, Exception ex) =>
         logger.LogWarning("Storage sweep step '{Step}' failed ({ExceptionType}); continuing", step, ex.GetType().Name);
 
-    /// <summary>projects/{projectId}/{fileId}/{variant}.webp — the only layout the sweep may delete.</summary>
+    /// <summary>projects/{projectId}/{fileId}/{variant}.webp or intake/{submissionId}/{fileId}/{variant}.webp — the only layouts the sweep may delete.</summary>
     [GeneratedRegex(
-        "^(?<prefix>projects/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/(original|preview|thumb)\\.webp$",
+        "^(?<prefix>(?:projects|intake)/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/(original|preview|thumb)\\.webp$",
         RegexOptions.CultureInvariant)]
     private static partial Regex VariantKeyPattern();
 }

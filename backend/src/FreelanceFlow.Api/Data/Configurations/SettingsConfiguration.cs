@@ -21,6 +21,8 @@ public class SettingsConfiguration : IEntityTypeConfiguration<Settings>
             t.HasCheckConstraint("ck_settings_watermark_text",
                 "watermark_text IS NULL OR char_length(watermark_text) <= 100");
             t.HasCheckConstraint("ck_settings_digest_hour", "digest_hour_vn BETWEEN 0 AND 23");
+            t.HasCheckConstraint("ck_settings_intake_slug", "intake_slug IS NULL OR intake_slug ~ '^[A-Za-z0-9_-]{22}$'");
+            t.HasCheckConstraint("ck_settings_intake_enabled", "NOT intake_enabled OR intake_slug IS NOT NULL");
         });
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id").HasColumnType("smallint").ValueGeneratedNever();
@@ -43,6 +45,10 @@ public class SettingsConfiguration : IEntityTypeConfiguration<Settings>
         b.Property(x => x.DigestHourVn).HasColumnName("digest_hour_vn").HasDefaultValue(8);
         b.Property(x => x.PortalResponseTime).HasColumnName("portal_response_time").HasMaxLength(60)
             .IsRequired().HasDefaultValue(FreelanceFlow.Api.Domain.Settings.Settings.DefaultPortalResponseTime);
+        // Plan 13 - public intake form (default false = CLR default, so no sentinel issue)
+        b.Property(x => x.IntakeEnabled).HasColumnName("intake_enabled").HasDefaultValue(false);
+        b.Property(x => x.IntakeSlug).HasColumnName("intake_slug");
+        b.HasIndex(x => x.IntakeSlug).IsUnique().HasDatabaseName("ux_settings_intake_slug");
 
         b.HasOne(x => x.Bank).WithMany().HasForeignKey(x => x.BankBin).HasPrincipalKey(bk => bk.Bin);
         b.HasOne<ProjectFile>().WithMany().HasForeignKey(x => x.LogoFileId);

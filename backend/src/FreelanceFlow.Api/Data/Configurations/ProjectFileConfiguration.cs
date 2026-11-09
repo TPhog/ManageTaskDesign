@@ -17,7 +17,12 @@ public class ProjectFileConfiguration : IEntityTypeConfiguration<ProjectFile>
             t.HasCheckConstraint("ck_files_size", "size_bytes > 0");
             t.HasCheckConstraint("ck_files_uploaded_by", "uploaded_by IN ('DESIGNER','CLIENT')");
             t.HasCheckConstraint("ck_files_owner_type",
-                "owner_type IS NULL OR owner_type IN ('TASK','PROGRESS_UPDATE','CLIENT_REQUEST','DELIVERABLE')");
+                "owner_type IS NULL OR owner_type IN ('TASK','PROGRESS_UPDATE','CLIENT_REQUEST','DELIVERABLE','INTAKE_SUBMISSION')");
+            // Plan 13: only intake photos live without a project (until conversion), and never on a request
+            t.HasCheckConstraint("ck_files_image_project",
+                "owner_type IS NULL OR owner_type = 'INTAKE_SUBMISSION' OR project_id IS NOT NULL");
+            t.HasCheckConstraint("ck_files_intake_request",
+                "owner_type IS DISTINCT FROM 'INTAKE_SUBMISSION' OR request_id IS NULL");
             t.HasCheckConstraint("ck_files_owner", "(owner_type IS NULL) = (owner_id IS NULL)");
             // P10: only a client's own photo may be served from its original, and its only copy is never discarded
             t.HasCheckConstraint("ck_files_preview_alias",

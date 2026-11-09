@@ -1,4 +1,5 @@
 using FreelanceFlow.Api.Domain.Common;
+using FreelanceFlow.Api.Domain.RequestTemplates;
 
 namespace FreelanceFlow.Api.Domain.Requests;
 
@@ -16,6 +17,13 @@ public class ClientRequest : IAuditable
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 
+    // Plan 13 — requests sent with a template (null / "[]" for free text)
+    public Guid? TemplateId { get; private set; }
+    public string? TemplateName { get; private set; }
+    public string AnswersJson { get; private set; } = "[]";
+
+    public IReadOnlyList<TemplateAnswer> Answers() => TemplateAnswers.ParseAnswers(AnswersJson);
+
     public const int MaxContent = 5000;
     public const int MaxDeclineReason = 2000;
 
@@ -30,7 +38,8 @@ public class ClientRequest : IAuditable
     /// <paramref name="sentToday"/> = portal requests this client already sent since <see cref="DayStartUtc"/>.
     /// </summary>
     public static ClientRequest CreateByClient(
-        Guid projectId, string projectStatus, Guid? deliverableId, string content, int sentToday)
+        Guid projectId, string projectStatus, Guid? deliverableId, string content, int sentToday,
+        Guid? templateId = null, string? templateName = null, IReadOnlyList<TemplateAnswer>? answers = null)
     {
         var text = content.Trim();
         if (text.Length is < 1 or > MaxContent) throw Invalid($"Nội dung dài 1–{MaxContent} ký tự");
@@ -38,6 +47,8 @@ public class ClientRequest : IAuditable
             throw new DomainException("BUSINESS_RULE", "Dự án đã hoàn thành hoặc đã huỷ — không gửi yêu cầu mới được");
         if (sentToday >= DailyClientLimit)
             throw new DomainException("RATE_LIMITED", $"Mỗi ngày bạn gửi được tối đa {DailyClientLimit} yêu cầu");
+        if (templateId is null && answers is { Count: > 0 }) throw Invalid("Câu trả lời cần một mẫu yêu cầu");
+        if (templateId is not null && string.IsNullOrWhiteSpace(templateName)) throw Invalid("Thiếu tên mẫu yêu cầu");
         return new ClientRequest
         {
             ProjectId = projectId,
@@ -46,6 +57,9 @@ public class ClientRequest : IAuditable
             Source = RequestSources.Portal,
             CreatedBy = "CLIENT",
             Status = RequestStatuses.New,
+            TemplateId = templateId,
+            TemplateName = templateName?.Trim(),
+            AnswersJson = TemplateAnswers.SerializeAnswers(answers ?? []),
         };
     }
 

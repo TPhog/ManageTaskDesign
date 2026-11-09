@@ -458,11 +458,15 @@ namespace FreelanceFlow.Api.Data.Migrations
 
                     b.ToTable("files", null, t =>
                         {
+                            t.HasCheckConstraint("ck_files_image_project", "owner_type IS NULL OR owner_type = 'INTAKE_SUBMISSION' OR project_id IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_files_intake_request", "owner_type IS DISTINCT FROM 'INTAKE_SUBMISSION' OR request_id IS NULL");
+
                             t.HasCheckConstraint("ck_files_kind", "kind IN ('REFERENCE','PREVIEW','FINAL','EVIDENCE','BRIEF','SYSTEM')");
 
                             t.HasCheckConstraint("ck_files_owner", "(owner_type IS NULL) = (owner_id IS NULL)");
 
-                            t.HasCheckConstraint("ck_files_owner_type", "owner_type IS NULL OR owner_type IN ('TASK','PROGRESS_UPDATE','CLIENT_REQUEST','DELIVERABLE')");
+                            t.HasCheckConstraint("ck_files_owner_type", "owner_type IS NULL OR owner_type IN ('TASK','PROGRESS_UPDATE','CLIENT_REQUEST','DELIVERABLE','INTAKE_SUBMISSION')");
 
                             t.HasCheckConstraint("ck_files_preview_alias", "NOT preview_is_original OR (uploaded_by = 'CLIENT' AND original_deleted_at IS NULL)");
 
@@ -491,6 +495,131 @@ namespace FreelanceFlow.Api.Data.Migrations
                     b.ToTable("storage_alerts", null, t =>
                         {
                             t.HasCheckConstraint("ck_storage_alerts_threshold", "threshold IN (50,70,85,90,95)");
+                        });
+                });
+
+            modelBuilder.Entity("FreelanceFlow.Api.Domain.Intake.IntakeSubmission", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("AnswersJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("answers")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("body");
+
+                    b.Property<string>("ContactEmail")
+                        .HasColumnType("text")
+                        .HasColumnName("contact_email");
+
+                    b.Property<string>("ContactName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("contact_name");
+
+                    b.Property<string>("ContactPhone")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("contact_phone");
+
+                    b.Property<DateTimeOffset?>("ConvertedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("converted_at");
+
+                    b.Property<Guid?>("ConvertedClientId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("converted_client_id");
+
+                    b.Property<Guid?>("ConvertedProjectId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("converted_project_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Note")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("")
+                        .HasColumnName("note");
+
+                    b.Property<string>("RejectReason")
+                        .HasColumnType("text")
+                        .HasColumnName("reject_reason");
+
+                    b.Property<DateTimeOffset?>("RejectedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("rejected_at");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("NEW")
+                        .HasColumnName("status");
+
+                    b.Property<Guid?>("TemplateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("template_id");
+
+                    b.Property<string>("TemplateName")
+                        .HasColumnType("text")
+                        .HasColumnName("template_name");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConvertedClientId");
+
+                    b.HasIndex("ConvertedProjectId");
+
+                    b.HasIndex("TemplateId");
+
+                    b.HasIndex("Status", "CreatedAt")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_intake_status");
+
+                    b.ToTable("intake_submissions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_intake_answers", "jsonb_typeof(answers) = 'array'");
+
+                            t.HasCheckConstraint("ck_intake_body", "char_length(body) BETWEEN 1 AND 10000");
+
+                            t.HasCheckConstraint("ck_intake_contact_email", "contact_email IS NULL OR char_length(contact_email) <= 200");
+
+                            t.HasCheckConstraint("ck_intake_contact_name", "char_length(contact_name) BETWEEN 1 AND 100");
+
+                            t.HasCheckConstraint("ck_intake_contact_phone", "char_length(contact_phone) BETWEEN 1 AND 20");
+
+                            t.HasCheckConstraint("ck_intake_converted", "(status = 'CONVERTED') = (converted_client_id IS NOT NULL AND converted_project_id IS NOT NULL AND converted_at IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_intake_note", "char_length(note) <= 2000");
+
+                            t.HasCheckConstraint("ck_intake_reject_reason", "reject_reason IS NULL OR char_length(reject_reason) <= 500");
+
+                            t.HasCheckConstraint("ck_intake_rejected", "(status = 'REJECTED') = (rejected_at IS NOT NULL)");
+
+                            t.HasCheckConstraint("ck_intake_status", "status IN ('NEW','CONVERTED','REJECTED')");
                         });
                 });
 
@@ -1074,12 +1203,95 @@ namespace FreelanceFlow.Api.Data.Migrations
                     b.ToTable("quotation_sequences", (string)null);
                 });
 
+            modelBuilder.Entity("FreelanceFlow.Api.Domain.RequestTemplates.RequestTemplate", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<bool>("Active")
+                        .HasColumnType("boolean")
+                        .HasColumnName("active");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("")
+                        .HasColumnName("description");
+
+                    b.Property<string>("DesignType")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("design_type");
+
+                    b.Property<string>("FieldsJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("fields")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<Guid?>("ServiceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("service_id");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<uint>("xmin")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ServiceId");
+
+                    b.HasIndex("SortOrder", "CreatedAt")
+                        .HasDatabaseName("ix_request_templates_order");
+
+                    b.ToTable("request_templates", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_request_templates_description", "char_length(description) <= 500");
+
+                            t.HasCheckConstraint("ck_request_templates_design_type", "design_type IN ('LOGO','BANNER','POSTER','BRANDING','UI_UX','SOCIAL_MEDIA','PACKAGING','PRINT','OTHER')");
+
+                            t.HasCheckConstraint("ck_request_templates_fields", "jsonb_typeof(fields) = 'array' AND jsonb_array_length(fields) <= 30");
+
+                            t.HasCheckConstraint("ck_request_templates_name", "char_length(name) BETWEEN 1 AND 100");
+                        });
+                });
+
             modelBuilder.Entity("FreelanceFlow.Api.Domain.Requests.ClientRequest", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid")
                         .HasColumnName("id");
+
+                    b.Property<string>("AnswersJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("answers")
+                        .HasDefaultValueSql("'[]'::jsonb");
 
                     b.Property<string>("Content")
                         .IsRequired()
@@ -1119,6 +1331,14 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasDefaultValue("NEW")
                         .HasColumnName("status");
 
+                    b.Property<Guid?>("TemplateId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("template_id");
+
+                    b.Property<string>("TemplateName")
+                        .HasColumnType("text")
+                        .HasColumnName("template_name");
+
                     b.Property<DateTimeOffset?>("TriagedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("triaged_at");
@@ -1140,12 +1360,16 @@ namespace FreelanceFlow.Api.Data.Migrations
                     b.HasIndex("ProjectId")
                         .HasDatabaseName("ix_requests_project");
 
+                    b.HasIndex("TemplateId");
+
                     b.HasIndex("Status", "CreatedAt")
                         .IsDescending(false, true)
                         .HasDatabaseName("ix_requests_status");
 
                     b.ToTable("client_requests", null, t =>
                         {
+                            t.HasCheckConstraint("ck_requests_answers", "jsonb_typeof(answers) = 'array'");
+
                             t.HasCheckConstraint("ck_requests_content", "length(content) BETWEEN 1 AND 5000");
 
                             t.HasCheckConstraint("ck_requests_created_by", "created_by IN ('CLIENT','DESIGNER')");
@@ -1421,6 +1645,16 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasColumnType("text")
                         .HasColumnName("display_name");
 
+                    b.Property<bool>("IntakeEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("intake_enabled");
+
+                    b.Property<string>("IntakeSlug")
+                        .HasColumnType("text")
+                        .HasColumnName("intake_slug");
+
                     b.Property<Guid?>("LogoFileId")
                         .HasColumnType("uuid")
                         .HasColumnName("logo_file_id");
@@ -1470,6 +1704,10 @@ namespace FreelanceFlow.Api.Data.Migrations
 
                     b.HasIndex("BankBin");
 
+                    b.HasIndex("IntakeSlug")
+                        .IsUnique()
+                        .HasDatabaseName("ux_settings_intake_slug");
+
                     b.HasIndex("LogoFileId");
 
                     b.ToTable("settings", null, t =>
@@ -1479,6 +1717,10 @@ namespace FreelanceFlow.Api.Data.Migrations
                             t.HasCheckConstraint("ck_settings_deposit", "default_deposit_percent BETWEEN 0 AND 100");
 
                             t.HasCheckConstraint("ck_settings_digest_hour", "digest_hour_vn BETWEEN 0 AND 23");
+
+                            t.HasCheckConstraint("ck_settings_intake_enabled", "NOT intake_enabled OR intake_slug IS NOT NULL");
+
+                            t.HasCheckConstraint("ck_settings_intake_slug", "intake_slug IS NULL OR intake_slug ~ '^[A-Za-z0-9_-]{22}$'");
 
                             t.HasCheckConstraint("ck_settings_prefix", "quotation_prefix ~ '^[A-Z]{1,5}$'");
 
@@ -1687,6 +1929,22 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasForeignKey("RequestId");
                 });
 
+            modelBuilder.Entity("FreelanceFlow.Api.Domain.Intake.IntakeSubmission", b =>
+                {
+                    b.HasOne("FreelanceFlow.Api.Domain.Clients.Client", null)
+                        .WithMany()
+                        .HasForeignKey("ConvertedClientId");
+
+                    b.HasOne("FreelanceFlow.Api.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ConvertedProjectId");
+
+                    b.HasOne("FreelanceFlow.Api.Domain.RequestTemplates.RequestTemplate", null)
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
             modelBuilder.Entity("FreelanceFlow.Api.Domain.Projects.Deliverable", b =>
                 {
                     b.HasOne("FreelanceFlow.Api.Domain.Projects.Project", null)
@@ -1748,6 +2006,14 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("FreelanceFlow.Api.Domain.RequestTemplates.RequestTemplate", b =>
+                {
+                    b.HasOne("FreelanceFlow.Api.Domain.Catalog.Service", null)
+                        .WithMany()
+                        .HasForeignKey("ServiceId")
+                        .OnDelete(DeleteBehavior.SetNull);
+                });
+
             modelBuilder.Entity("FreelanceFlow.Api.Domain.Requests.ClientRequest", b =>
                 {
                     b.HasOne("FreelanceFlow.Api.Domain.Projects.Deliverable", null)
@@ -1759,6 +2025,11 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("FreelanceFlow.Api.Domain.RequestTemplates.RequestTemplate", null)
+                        .WithMany()
+                        .HasForeignKey("TemplateId")
+                        .OnDelete(DeleteBehavior.SetNull);
                 });
 
             modelBuilder.Entity("FreelanceFlow.Api.Domain.Requests.RevisionItem", b =>

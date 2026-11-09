@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using FreelanceFlow.Api.Domain.Common;
 
 namespace FreelanceFlow.Api.Domain.Settings;
@@ -80,6 +81,34 @@ public class Settings
             throw new DomainException("VALIDATION_FAILED", $"Thời gian phản hồi tối đa {MaxPortalResponseTime} ký tự");
         PortalResponseTime = trimmed.Length == 0 ? DefaultPortalResponseTime : trimmed;
     }
+
+    // Plan 13 - public intake form /f/{slug} (BR-133). The slug is shared publicly, so it is stored as is.
+    public const int IntakeSlugLength = 22;
+
+    public bool IntakeEnabled { get; set; }
+    public string? IntakeSlug { get; set; }
+
+    /// <summary>Turning the form on for the first time creates the slug; off/on keeps the same link.</summary>
+    public void SetIntakeEnabled(bool enabled, DateTimeOffset now)
+    {
+        if (enabled && IntakeSlug is null) IntakeSlug = NewIntakeSlug();
+        IntakeEnabled = enabled;
+        UpdatedAt = now;
+    }
+
+    /// <summary>"Tạo link mới": the old link answers 404 at once (and its form tokens stop validating).</summary>
+    public void RegenerateIntakeSlug(DateTimeOffset now)
+    {
+        IntakeSlug = NewIntakeSlug();
+        UpdatedAt = now;
+    }
+
+    public static bool IsWellFormedIntakeSlug(string? slug) =>
+        slug is { Length: IntakeSlugLength } && slug.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_');
+
+    /// <summary>128 random bits, base64url without padding (22 characters).</summary>
+    private static string NewIntakeSlug() =>
+        Convert.ToBase64String(RandomNumberGenerator.GetBytes(16)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
 
     public Bank? Bank { get; set; }
 }

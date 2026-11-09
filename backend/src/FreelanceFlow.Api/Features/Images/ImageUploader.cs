@@ -11,7 +11,7 @@ using Microsoft.Extensions.Options;
 
 namespace FreelanceFlow.Api.Features.Images;
 
-public sealed record ImageTarget(Guid ProjectId, string OwnerType, Guid OwnerId, Guid? RequestId, string UploadedBy, bool VisibleToClient);
+public sealed record ImageTarget(Guid? ProjectId,string OwnerType, Guid OwnerId, Guid? RequestId, string UploadedBy, bool VisibleToClient);
 
 /// <summary>
 /// Stages uploaded images: quota check (STORAGE_FULL at ≥ 90 %), size and magic-byte checks, WebP variants (client photos: original + thumb only),
@@ -57,8 +57,8 @@ public sealed class ImageUploader(
                 target.UploadedBy, target.VisibleToClient, file.FileName, processed.Width, processed.Height,
                 processed.Original.LongLength, processed.Preview?.LongLength ?? 0, processed.Thumb.LongLength,
                 hash, clock.UtcNow, previewIsOriginal: processed.Preview is null);
-            if (target.UploadedBy == "DESIGNER"
-                && await FindDuplicateAsync(staged, target.ProjectId, hash, ct) is { } duplicate)
+            if (target.UploadedBy == "DESIGNER" && target.ProjectId is { } projectId
+                && await FindDuplicateAsync(staged, projectId, hash, ct) is { } duplicate)
                 _duplicates[image.Id] = duplicate;
             await PutAsync(image.VariantKey(ImageVariants.Original), processed.Original, ct);
             if (processed.Preview is not null) await PutAsync(image.VariantKey(ImageVariants.Preview), processed.Preview, ct);

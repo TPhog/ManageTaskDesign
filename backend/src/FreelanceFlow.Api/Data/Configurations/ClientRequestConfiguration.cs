@@ -1,5 +1,6 @@
 using FreelanceFlow.Api.Domain.Projects;
 using FreelanceFlow.Api.Domain.Requests;
+using FreelanceFlow.Api.Domain.RequestTemplates;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
@@ -17,6 +18,7 @@ public class ClientRequestConfiguration : IEntityTypeConfiguration<ClientRequest
             t.HasCheckConstraint("ck_requests_status", "status IN ('NEW','TRIAGED','DECLINED')");
             t.HasCheckConstraint("ck_requests_decline", "status <> 'DECLINED' OR decline_reason IS NOT NULL");
             t.HasCheckConstraint("ck_requests_portal", "created_by <> 'CLIENT' OR source = 'PORTAL'");
+            t.HasCheckConstraint("ck_requests_answers", "jsonb_typeof(answers) = 'array'");
         });
         b.HasKey(x => x.Id);
         b.Property(x => x.Id).HasColumnName("id");
@@ -30,6 +32,12 @@ public class ClientRequestConfiguration : IEntityTypeConfiguration<ClientRequest
         b.Property(x => x.TriagedAt).HasColumnName("triaged_at");
         b.Property(x => x.CreatedAt).HasColumnName("created_at");
         b.Property(x => x.UpdatedAt).HasColumnName("updated_at");
+        // Plan 13 - template snapshot
+        b.Property(x => x.TemplateId).HasColumnName("template_id");
+        b.Property(x => x.TemplateName).HasColumnName("template_name");
+        b.Property(x => x.AnswersJson).HasColumnName("answers").HasColumnType("jsonb")
+            .HasDefaultValueSql("'[]'::jsonb").IsRequired();
+        b.HasOne<RequestTemplate>().WithMany().HasForeignKey(x => x.TemplateId).OnDelete(DeleteBehavior.SetNull);
 
         b.HasIndex(x => new { x.Status, x.CreatedAt }).IsDescending(false, true).HasDatabaseName("ix_requests_status");
         b.HasIndex(x => x.ProjectId).HasDatabaseName("ix_requests_project");

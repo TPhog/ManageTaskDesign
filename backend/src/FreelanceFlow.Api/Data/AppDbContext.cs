@@ -4,9 +4,11 @@ using FreelanceFlow.Api.Domain.Catalog;
 using FreelanceFlow.Api.Domain.Clients;
 using FreelanceFlow.Api.Domain.Dashboard;
 using FreelanceFlow.Api.Domain.Files;
+using FreelanceFlow.Api.Domain.Intake;
 using FreelanceFlow.Api.Domain.Projects;
 using FreelanceFlow.Api.Domain.Quotations;
 using FreelanceFlow.Api.Domain.Requests;
+using FreelanceFlow.Api.Domain.RequestTemplates;
 using FreelanceFlow.Api.Domain.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Settings = FreelanceFlow.Api.Domain.Settings.Settings;
@@ -37,6 +39,8 @@ public class AppDbContext : DbContext
     public DbSet<QuotationItem> QuotationItems => Set<QuotationItem>();
     public DbSet<ProjectFile> Files => Set<ProjectFile>();
     public DbSet<StorageAlert> StorageAlerts => Set<StorageAlert>();
+    public DbSet<RequestTemplate> RequestTemplates => Set<RequestTemplate>();
+    public DbSet<IntakeSubmission> IntakeSubmissions => Set<IntakeSubmission>();
     public DbSet<DashboardState> DashboardStates => Set<DashboardState>();
     public DbSet<ActivityLog> ActivityLogs => Set<ActivityLog>();
 

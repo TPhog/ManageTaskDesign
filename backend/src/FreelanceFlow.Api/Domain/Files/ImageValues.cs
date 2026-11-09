@@ -7,7 +7,9 @@ public static class ImageOwnerTypes
     public const string ProgressUpdate = "PROGRESS_UPDATE";
     public const string ClientRequest = "CLIENT_REQUEST";
     public const string Deliverable = "DELIVERABLE";
-    public static readonly string[] All = [Task, ProgressUpdate, ClientRequest, Deliverable];
+    /// <summary>Plan 13: reference photos of a public intake submission (no project until converted).</summary>
+    public const string IntakeSubmission = "INTAKE_SUBMISSION";
+    public static readonly string[] All = [Task, ProgressUpdate, ClientRequest, Deliverable, IntakeSubmission];
 }
 
 /// <summary>The three WebP objects stored per image (spec §3).</summary>

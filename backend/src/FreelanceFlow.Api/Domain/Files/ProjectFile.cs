@@ -15,7 +15,7 @@ public class ProjectFile
     public string ContentType { get; set; } = "";
     /// <summary>Bytes stored for this row — for images the sum of the stored variants (quota source of truth).</summary>
     public long SizeBytes { get; set; }
-    /// <summary>Images: the object prefix "projects/{projectId}/{fileId}"; variants live under it.</summary>
+    /// <summary>Images: the object prefix "projects/{projectId}/{fileId}" (plan 13 intake: "intake/{submissionId}/{fileId}"); variants live under it.</summary>
     public string StorageKey { get; set; } = "";
     public byte[] Sha256 { get; set; } = [];
     public bool VisibleToClient { get; set; }
@@ -39,6 +39,9 @@ public class ProjectFile
     public DateTimeOffset? OriginalDeletedAt { get; set; }
 
     public static string ImageKeyPrefix(Guid projectId, Guid fileId) => $"projects/{projectId}/{fileId}";
+
+    /// <summary>Plan 13: photos of a public intake submission; the key stays when the photo joins a project.</summary>
+    public static string IntakeKeyPrefix(Guid submissionId, Guid fileId) => $"intake/{submissionId}/{fileId}";
 
     public string VariantKey(string variant) =>
         ImageVariants.All.Contains(variant)
@@ -84,7 +87,7 @@ public class ProjectFile
 
     /// <summary>A processed image (spec §3/§6). Client images are REFERENCE, delivery FINAL, the rest PREVIEW.</summary>
     public static ProjectFile CreateImage(
-        Guid projectId, string ownerType, Guid ownerId, Guid? requestId, string uploadedBy, bool visibleToClient,
+        Guid? projectId, string ownerType, Guid ownerId, Guid? requestId, string uploadedBy, bool visibleToClient,
         string? originalName, int width, int height, long originalBytes, long previewBytes, long thumbBytes,
         byte[] sha256, DateTimeOffset now, bool previewIsOriginal = false)
     {
@@ -94,6 +97,11 @@ public class ProjectFile
             throw new DomainException("VALIDATION_FAILED", "Người tải ảnh không hợp lệ");
         if (previewIsOriginal && uploadedBy != "CLIENT")
             throw new DomainException("VALIDATION_FAILED", "Ảnh của designer luôn có bản xem riêng");
+        var intake = ownerType == ImageOwnerTypes.IntakeSubmission;
+        if (intake != (projectId is null))
+            throw new DomainException("VALIDATION_FAILED", intake ? "Ảnh khách mới chưa thuộc dự án nào" : "Ảnh phải thuộc một dự án");
+        if (intake && requestId is not null)
+            throw new DomainException("VALIDATION_FAILED", "Ảnh khách mới không gắn với yêu cầu");
         if (width <= 0 || height <= 0 || originalBytes <= 0 || thumbBytes <= 0
             || (previewIsOriginal ? previewBytes != 0 : previewBytes <= 0))
             throw new DomainException("VALIDATION_FAILED", "Ảnh rỗng");
@@ -106,7 +114,7 @@ public class ProjectFile
             RequestId = requestId,
             Kind = ownerType switch
             {
-                ImageOwnerTypes.ClientRequest => "REFERENCE",
+                ImageOwnerTypes.ClientRequest or ImageOwnerTypes.IntakeSubmission => "REFERENCE",
                 ImageOwnerTypes.Deliverable => "FINAL",
                 _ => "PREVIEW",
             },
@@ -121,7 +129,7 @@ public class ProjectFile
             ThumbBytes = thumbBytes,
             PreviewIsOriginal = previewIsOriginal,
             SizeBytes = originalBytes + previewBytes + thumbBytes,
-            StorageKey = ImageKeyPrefix(projectId, id),
+            StorageKey = intake ? IntakeKeyPrefix(ownerId, id) : ImageKeyPrefix(projectId!.Value, id),
             Sha256 = sha256,
             VisibleToClient = visibleToClient,
             UploadedBy = uploadedBy,
@@ -138,7 +146,18 @@ public class ProjectFile
             throw new DomainException("BUSINESS_RULE", "Ảnh cập nhật tiến độ luôn hiển thị cho khách");
         if (OwnerType == ImageOwnerTypes.ClientRequest)
             throw new DomainException("BUSINESS_RULE", "Ảnh khách gửi không đổi chế độ hiển thị");
+        if (OwnerType == ImageOwnerTypes.IntakeSubmission)
+            throw new DomainException("BUSINESS_RULE", "Ảnh khách mới gửi không đổi chế độ hiển thị");
         VisibleToClient = visible;
+    }
+
+    /// <summary>BR-136: on conversion the submission's photos join the new project; the stored objects never move.</summary>
+    public void AttachToProject(Guid projectId)
+    {
+        if (OwnerType != ImageOwnerTypes.IntakeSubmission)
+            throw new DomainException("BUSINESS_RULE", "Chỉ ảnh khách mới gửi được gắn vào dự án khi chuyển đổi");
+        if (ProjectId is not null) throw new DomainException("BUSINESS_RULE", "Ảnh đã thuộc một dự án");
+        ProjectId = projectId;
     }
 
     private static string SanitizeName(string? name)
