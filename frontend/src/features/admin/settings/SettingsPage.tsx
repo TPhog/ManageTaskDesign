@@ -73,7 +73,8 @@ export default function SettingsPage() {
       <div className="space-y-6">
         <PageHeader eyebrow="Studio" title="Cài đặt" description="Mỗi mục có nút lưu riêng — lưu mục này không đổi các mục khác." />
 
-        <Tabs value={tab} onValueChange={selectTab}>
+        {/* manual: arrow keys only move focus, Enter/Space opens the tab, so browsing the tab list never triggers the discard dialog */}
+        <Tabs value={tab} onValueChange={selectTab} activationMode="manual">
           <div className="relative">
             <TabsList ref={tabListRef} aria-label="Nhóm cài đặt" className="flex w-full justify-start overflow-x-auto pr-10 [scrollbar-width:none] lg:inline-flex lg:w-auto lg:max-w-full lg:pr-1">
               {SETTINGS_TABS.map(({ key, label, icon: Icon }) => (

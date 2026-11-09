@@ -78,6 +78,19 @@ test.describe('Settings', () => {
     expect((await readSettings(page)).displayName).toBe(saved.displayName)
   })
 
+  test('arrow keys browse the tabs without the discard dialog; Enter opens one', async ({ page }) => {
+    await page.getByLabel('Tên hiển thị').fill('Chưa lưu')
+    await page.getByRole('tab', { name: 'Studio' }).focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(page.getByRole('tab', { name: 'Thanh toán' })).toBeFocused()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await page.keyboard.press('Enter')
+    const dialog = page.getByRole('dialog', { name: 'Bỏ thay đổi chưa lưu?' })
+    await expect(dialog).toBeVisible()
+    await dialog.getByRole('button', { name: 'Bỏ thay đổi' }).click()
+    await expect(page).toHaveURL(/\?tab=payment$/)
+  })
+
   test('wrong current password shows a field error', async ({ page }) => {
     await page.getByRole('tab', { name: 'Tài khoản' }).click()
     await page.getByLabel('Mật khẩu hiện tại').fill('definitely-wrong-password')

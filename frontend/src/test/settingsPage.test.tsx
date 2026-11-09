@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { createMemoryRouter, RouterProvider } from 'react-router-dom'
@@ -77,8 +77,12 @@ describe('buildSettingsPayload', () => {
     expect(body.bankBin).toBeNull()
     expect(body.bankAccountNo).toBeNull()
     expect(body.bankAccountName).toBeNull()
-    expect(body.defaultTerms).toBeNull() // '' from the server = keep, exactly as the old single form sent it
     expect(body.portalResponseTime).toBe('')
+  })
+
+  it('sends emptied default terms as an empty string so the API clears them (null would keep the old text)', () => {
+    expect(buildSettingsPayload({ ...base, defaultTerms: 'Cũ' }, { defaultTerms: '' }).defaultTerms).toBe('')
+    expect(buildSettingsPayload({ ...base, defaultTerms: 'Cũ' }, {}).defaultTerms).toBe('Cũ')
   })
 })
 
@@ -157,7 +161,69 @@ describe('SettingsPage per-section save', () => {
   })
 })
 
+describe('SettingsPage per-section save (continued)', () => {
+  it('a section save keeps the saved logo', async () => {
+    server = { ...base, logoFileId: 'logo-1' }
+    vi.mocked(api.put).mockResolvedValue(undefined)
+    renderPage()
+    await userEvent.type(await screen.findByLabelText('Tên hiển thị'), ' 3')
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu hồ sơ' }))
+    await waitFor(() => expect(api.put).toHaveBeenCalledTimes(1))
+    expect(vi.mocked(api.put).mock.calls[0][1]).toMatchObject({ logoFileId: 'logo-1', displayName: 'CamCam Studio 3' })
+  })
+
+  it('after a 409 the next save uses the refreshed rowVersion', async () => {
+    vi.mocked(api.put)
+      .mockImplementationOnce(async () => {
+        server = { ...server, displayName: 'Đổi ở tab khác', rowVersion: 9 }
+        throw Object.assign(new Error('conflict'), { status: 409, code: 'CONCURRENCY_CONFLICT' })
+      })
+      .mockResolvedValueOnce(undefined)
+    renderPage()
+    await userEvent.type(await screen.findByLabelText('Tên hiển thị'), ' X')
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu hồ sơ' }))
+    await waitFor(() => expect(screen.getByLabelText('Tên hiển thị')).toHaveValue('Đổi ở tab khác'))
+
+    await userEvent.type(screen.getByLabelText('Tên hiển thị'), ' Y')
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu hồ sơ' }))
+    await waitFor(() => expect(api.put).toHaveBeenCalledTimes(2))
+    expect(vi.mocked(api.put).mock.calls[0][1]).toMatchObject({ rowVersion: 7 })
+    expect(vi.mocked(api.put).mock.calls[1][1]).toMatchObject({ rowVersion: 9, displayName: 'Đổi ở tab khác Y' })
+  })
+})
+
 describe('SettingsPage unsaved-changes guard', () => {
+  const unloadBlocked = () => {
+    const e = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(e)
+    return e.defaultPrevented
+  }
+
+  it('blocks closing the browser tab only while a section is dirty', async () => {
+    vi.mocked(api.put).mockResolvedValue(undefined)
+    renderPage()
+    const name = await screen.findByLabelText('Tên hiển thị')
+    expect(unloadBlocked()).toBe(false)
+    await userEvent.type(name, ' 4')
+    expect(unloadBlocked()).toBe(true)
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu hồ sơ' }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Đã lưu hồ sơ'))
+    await waitFor(() => expect(unloadBlocked()).toBe(false))
+  })
+
+  it('arrow keys only move focus along the tabs; Enter opens one (and asks first when dirty)', async () => {
+    const router = renderPage()
+    await userEvent.type(await screen.findByLabelText('Tên hiển thị'), ' 5')
+    screen.getByRole('tab', { name: 'Studio' }).focus()
+    await userEvent.keyboard('{ArrowRight}')
+    expect(screen.getByRole('tab', { name: 'Thanh toán' })).toHaveFocus()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(router.state.location.search).toBe('')
+    // keydown only: user-event's synthetic Enter click would land on the dialog's focused button (the e2e spec covers a real browser)
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'Thanh toán' }), { key: 'Enter' })
+    expect(await screen.findByRole('dialog', { name: 'Bỏ thay đổi chưa lưu?' })).toBeInTheDocument()
+  })
+
   it('asks before switching tab with unsaved edits, and can keep or drop them', async () => {
     const router = renderPage()
     const name = await screen.findByLabelText('Tên hiển thị')

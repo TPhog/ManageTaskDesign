@@ -37,7 +37,7 @@ export function WatermarkSection() {
   }
 
   const sample = text.trim() || data?.effectiveText || ''
-  useReportDirty('watermark', !!data && (enabled !== data.enabled || text !== (data.text ?? '') || opacity !== data.opacityPercent))
+  useReportDirty('watermark', !!data && (enabled !== data.enabled || text.trim() !== (data.text ?? '').trim() || opacity !== data.opacityPercent))
 
   return (
     <SettingsSection

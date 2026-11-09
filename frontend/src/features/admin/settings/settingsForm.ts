@@ -30,8 +30,9 @@ export type SettingsFields = Omit<Settings, 'rowVersion' | 'logoFileId'>
 /**
  * PUT /api/admin/settings replaces every field, so each section sends the LATEST server settings with only its own
  * fields overridden (saving the bank account never resets the studio name). Same blank semantics as the old single form:
- * '' → null (e.g. '' fails the bank account format check; null quotation defaults mean "keep"), except
- * portalResponseTime, which must reach the API as a trimmed string ('' = back to "trong 24 giờ"; null would mean "keep").
+ * '' → null (e.g. '' fails the bank account format check; null quotation prefix/days/deposit mean "keep"), except:
+ * defaultTerms goes as is ('' clears the terms; the API keeps the old text only on null), and portalResponseTime goes
+ * as a trimmed string ('' = back to "trong 24 giờ"; null would mean "keep").
  */
 export function buildSettingsPayload(server: Settings, overrides: Partial<SettingsFields>) {
   const merged = {
@@ -49,7 +50,12 @@ export function buildSettingsPayload(server: Settings, overrides: Partial<Settin
     portalResponseTime: server.portalResponseTime,
     ...overrides,
   }
-  return { ...emptyToNull(merged), portalResponseTime: (merged.portalResponseTime ?? '').trim(), rowVersion: server.rowVersion }
+  return {
+    ...emptyToNull(merged),
+    defaultTerms: merged.defaultTerms ?? '',
+    portalResponseTime: (merged.portalResponseTime ?? '').trim(),
+    rowVersion: server.rowVersion,
+  }
 }
 
 /** Copy ValidationProblem field errors from the API onto the matching form fields. Returns true if any matched. */
