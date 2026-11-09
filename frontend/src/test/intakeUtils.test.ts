@@ -43,5 +43,7 @@ describe('contact links and notes', () => {
   it('extracts the "Ghi chú thêm" of a rendered template request', () => {
     expect(templateNote('Mẫu: Poster\n- Tiêu đề chính: A\n\nGhi chú thêm:\nGửi trước thứ 6\nCảm ơn')).toBe('Gửi trước thứ 6\nCảm ơn')
     expect(templateNote('Mẫu: Poster\n- Tiêu đề chính: A')).toBeNull()
+    // a note that itself contains the header is kept whole
+    expect(templateNote('Mẫu: Poster\n- Tiêu đề chính: A\n\nGhi chú thêm:\nDòng 1\n\nGhi chú thêm:\nDòng 2')).toBe('Dòng 1\n\nGhi chú thêm:\nDòng 2')
   })
 })

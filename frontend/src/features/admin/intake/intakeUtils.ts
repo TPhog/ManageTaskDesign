@@ -61,8 +61,8 @@ export function zaloHref(phone: string): string {
 
 const NOTE_MARK = '\n\nGhi chú thêm:\n'
 
-/** The note part of TemplateRenderer.Render's text (answers lines never contain a blank line + this header). */
+/** The note part of TemplateRenderer.Render's text: answer lines are indented, so the FIRST header is the real one (a note may repeat it). */
 export function templateNote(content: string): string | null {
-  const at = content.lastIndexOf(NOTE_MARK)
+  const at = content.indexOf(NOTE_MARK)
   return at >= 0 ? content.slice(at + NOTE_MARK.length) : null
 }
