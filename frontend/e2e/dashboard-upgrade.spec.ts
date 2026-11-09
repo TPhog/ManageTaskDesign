@@ -104,6 +104,8 @@ test.describe('Dashboard upgrade (P11)', () => {
     const hour = section.getByLabel('Giờ gửi (giờ Việt Nam)')
     await hour.selectOption('7')
     await section.getByRole('button', { name: 'Lưu' }).click()
+    // wait for the save to land before reloading, or the reload races the PUT
+    await expect(page.getByText('Đã lưu nhắc việc hằng ngày').last()).toBeVisible()
     await page.reload()
     await expect(hour).toHaveValue('7')
     // restore the default so other specs are unaffected

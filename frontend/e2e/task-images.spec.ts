@@ -18,6 +18,9 @@ test.describe('Images — task drawer and progress updates', () => {
     // thumbnails sit inside buttons (children presentational) → locate the <img> by alt
     await expect(section.locator('img[alt="mau-1.png"]')).toHaveAttribute('src', /\/api\/admin\/images\/[0-9a-f-]+\/thumb$/)
 
+    // DF-13: task uploads start hidden from the client; show one, then hide it again
+    await section.getByRole('button', { name: 'Cho khách xem mau-1.png' }).click()
+    await expect(section.getByRole('button', { name: 'Ẩn mau-1.png khỏi khách' })).toBeVisible()
     await section.getByRole('button', { name: 'Ẩn mau-1.png khỏi khách' }).click()
     await expect(section.getByRole('button', { name: 'Cho khách xem mau-1.png' })).toBeVisible()
 
