@@ -44,7 +44,11 @@ public sealed record PortalDeliverableDto(
     int? ProgressPercent,     // plan 06b: % of tasks DONE (null = no task); task titles never leave the designer side
     string? ClientDecision,   // "APPROVED" once the client pressed "Duyệt" (still IN_REVIEW until the designer confirms)
     string ReviewState,       // Plan 12 BR-48: ClientReviewStates — the one state the client sees
-    bool HasOpenChangeRequest);
+    bool HasOpenChangeRequest,
+    IReadOnlyList<PortalLinkDto> Links);   // P15 D6: only the links the designer marked visibleToClient, without the flag
+
+/// <summary>P15 D6: a deliverable link shown to the client.</summary>
+public sealed record PortalLinkDto(string Title, string Url);
 
 /// <summary>POST /api/portal/deliverables/{id}/approve.</summary>
 public sealed record PortalDeliverableDecisionDto(Guid Id, string Status, string? ClientDecision, DateTimeOffset? ClientDecisionAt);

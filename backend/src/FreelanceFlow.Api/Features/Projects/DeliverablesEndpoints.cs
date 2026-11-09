@@ -2,6 +2,7 @@ using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Projects;
 using FreelanceFlow.Api.Domain.Revisions;
+using FreelanceFlow.Api.Features.Tasks;
 using FreelanceFlow.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -20,6 +21,33 @@ public static class DeliverablesEndpoints
         adminGroup.MapPost("deliverables/{id:guid}/status", ChangeStatus);
         adminGroup.MapPost("deliverables/{id:guid}/submit-review", SubmitReview);
         adminGroup.MapPost("deliverables/{id:guid}/confirm-approval", ConfirmApproval);
+        adminGroup.MapPut("deliverables/{id:guid}/links", UpdateDeliverableLinks);
+    }
+
+    /// <summary>
+    /// P15 D6: replaces the deliverable's external links. Only links flagged visibleToClient reach the portal; the activity
+    /// log records the count, never a URL (share links may carry tokens).
+    /// </summary>
+    private static async Task<IResult> UpdateDeliverableLinks(
+        Guid id,
+        UpdateDeliverableLinksRequest body,
+        AppDbContext db,
+        ActivityWriter activity)
+    {
+        var deliverable = await db.Deliverables.FindAsync(id);
+        if (deliverable == null) return Results.NotFound();
+
+        var errors = TaskValidation.Links(body.Links);
+        if (errors.Count > 0) return Results.ValidationProblem(errors);
+
+        deliverable.SetLinks(TaskValidation.ToLinks(body.Links ?? []));
+        var links = deliverable.Links();
+        activity.Write("deliverable", deliverable.Id, "deliverable.links_updated",
+            clientId: await ClientIdOfAsync(db, deliverable.ProjectId), projectId: deliverable.ProjectId,
+            data: new { count = links.Count });
+        await db.SaveChangesAsync();
+
+        return Results.Ok(new { links = links.Select(l => new ExternalLinkDto(l.Title, l.Url, l.VisibleToClient)) });
     }
 
     private static async Task<IResult> CreateDeliverable(
@@ -324,3 +352,6 @@ static class DeliveryLinks
 }
 
 record SubmitReviewRequest(string? ClientMessage);
+
+/// <summary>P15: null / [] = remove every link.</summary>
+record UpdateDeliverableLinksRequest(List<ExternalLinkDto>? Links);

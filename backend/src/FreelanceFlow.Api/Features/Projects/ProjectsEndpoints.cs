@@ -4,6 +4,7 @@ using FreelanceFlow.Api.Domain.Projects;
 using FreelanceFlow.Api.Domain.Quotations;
 using FreelanceFlow.Api.Domain.Revisions;
 using FreelanceFlow.Api.Domain.Tasks;
+using FreelanceFlow.Api.Features.Tasks;
 using FreelanceFlow.Api.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
@@ -201,6 +202,8 @@ public static class ProjectsEndpoints
                 d.ClientDecision,
                 d.ClientDecisionAt,
                 QuotedIn = quotedIn.GetValueOrDefault(d.Id) ?? new List<DeliverableQuoteRefDto>(),
+                // P15 D6: every link with its flag (the portal only gets the visibleToClient ones)
+                Links = d.Links().Select(l => new ExternalLinkDto(l.Title, l.Url, l.VisibleToClient)).ToList(),
             };
         });
 

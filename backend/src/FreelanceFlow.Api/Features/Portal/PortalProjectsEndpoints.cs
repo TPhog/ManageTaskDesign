@@ -83,7 +83,7 @@ public static class PortalProjectsEndpoints
         var deliverables = await db.Deliverables.AsNoTracking()
             .Where(d => d.ProjectId == id)
             .OrderBy(d => d.SortOrder).ThenBy(d => d.CreatedAt)
-            .Select(d => new { d.Id, d.Name, d.Quantity, d.Status, d.IncludedRounds, d.DueDate, d.ClientDecision })
+            .Select(d => new { d.Id, d.Name, d.Quantity, d.Status, d.IncludedRounds, d.DueDate, d.ClientDecision, d.LinksJson })
             .ToListAsync();
 
         // used_rounds (docs/04 §4.1): the same single query as the admin side
@@ -105,7 +105,8 @@ public static class PortalProjectsEndpoints
             var state = ClientReviewStates.Of(d.Status, d.ClientDecision, hasOpenChange);
             return new PortalDeliverableDto(d.Id, d.Name, d.Quantity, d.Status, d.IncludedRounds,
                 used, Math.Max(0, d.IncludedRounds - used), d.DueDate,
-                TaskProgress.Percent(tasks?.Total ?? 0, tasks?.Done ?? 0), d.ClientDecision, state, hasOpenChange);
+                TaskProgress.Percent(tasks?.Total ?? 0, tasks?.Done ?? 0), d.ClientDecision, state, hasOpenChange,
+                ExternalLinks.Parse(d.LinksJson).Where(l => l.VisibleToClient).Select(l => new PortalLinkDto(l.Title, l.Url)).ToList());
         }).ToList();
 
         var summary = new PortalDeliverableSummaryDto(
