@@ -1,97 +1,58 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { toast } from 'sonner'
-import { ArrowLeft, CircleCheck, FolderOpen, X } from 'lucide-react'
+import { ArrowLeft, FolderOpen } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/EmptyState'
-import { ImagePicker } from '@/components/ImagePicker'
-import { MAX_PORTAL_IMAGES } from '@/lib/images'
-import { REQUEST_MAX_LENGTH, acceptsRequests, requestErrorMessage, requestSchema, type RequestFormValues } from './requests'
-import { usePortalProject, usePortalProjects, useSendPortalRequest } from './usePortal'
+import { Kicker } from './kit/editorial'
+import { PortalRequestForm, type SentRequestSummary } from './PortalRequestForm'
+import { RequestSentSummary } from './RequestSentSummary'
+import { acceptsRequests } from './requests'
+import { usePortalProjects } from './usePortal'
 
-// Native <select>: the phone's own picker is the most usable control on mobile (docs/08 POR-05)
-const selectClass =
-  'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 md:text-sm'
-
-/** docs/08 §3.2 "/portal/requests/new" — text + up to 5 photos (plan 08). */
+/** docs/08 §3.2 "/portal/requests/new" — text + up to 5 photos (plan 08), one shared form (Plan 12 CF-11/12/13). */
 export default function PortalRequestNewPage() {
   const [params] = useSearchParams()
   const presetProjectId = params.get('projectId') ?? ''
   const { data: projects, isLoading } = usePortalProjects()
-  const send = useSendPortalRequest()
-  const [sent, setSent] = useState(false)
-  const [files, setFiles] = useState<File[]>([])
+  const [sent, setSent] = useState<SentRequestSummary | null>(null)
 
-  const { register, handleSubmit, watch, setValue, reset, formState: { errors } } = useForm<RequestFormValues>({
-    resolver: zodResolver(requestSchema),
-    defaultValues: { projectId: presetProjectId, deliverableId: '', content: '' },
-  })
-  const projectId = watch('projectId')
-  const { data: project } = usePortalProject(projectId || undefined)
-
-  // BR-21/53: only open projects are offered — preselect the only one, drop a preselected closed one
-  useEffect(() => {
-    if (!projects) return
-    const ids = projects.filter(p => acceptsRequests(p.status)).map(p => p.id)
-    if (projectId && !ids.includes(projectId)) setValue('projectId', '')
-    else if (!projectId && ids.length === 1) setValue('projectId', ids[0])
-  }, [projects, projectId, setValue])
-
+  // BR-21/53: only open projects are offered; a preselected closed project is dropped
   const openProjects = (projects ?? []).filter(p => acceptsRequests(p.status))
-  const deliverables = (project?.deliverables ?? []).filter(d => d.status !== 'CANCELLED')
+  const defaultProjectId = openProjects.some(p => p.id === presetProjectId) ? presetProjectId : undefined
   const backTo = presetProjectId ? `/portal/projects/${presetProjectId}` : '/portal/requests'
 
-  function onSubmit(values: RequestFormValues) {
-    send.mutate({ ...values, files }, {
-      onSuccess: () => {
-        reset({ projectId: values.projectId, deliverableId: '', content: '' })
-        setFiles([])
-        setSent(true)
-      },
-      onError: err => toast.error(requestErrorMessage(err)),
-    })
-  }
-
-  if (sent) {
-    return (
-      <div className="rounded-xl border bg-card shadow-card">
-        <EmptyState
-          icon={CircleCheck}
-          title="Đã gửi yêu cầu"
-          description="Cảm ơn bạn! Nhà thiết kế sẽ xem và phản hồi sớm. Bạn theo dõi trạng thái trong mục Yêu cầu của tôi."
-          action={
-            <div className="flex flex-wrap justify-center gap-2">
-              <Button asChild>
-                <Link to="/portal/requests">Xem yêu cầu của tôi</Link>
-              </Button>
-              <Button variant="outline" onClick={() => setSent(false)}>Gửi yêu cầu khác</Button>
-            </div>
-          }
-        />
-      </div>
-    )
-  }
-
   return (
-    <div className="space-y-4">
-      <Link to={backTo} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+    <div className="space-y-6">
+      <Link to={backTo} className="-ml-1 inline-flex min-h-11 items-center gap-1 px-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         Quay lại
       </Link>
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Gửi yêu cầu chỉnh sửa</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Designer sẽ xem yêu cầu và báo lại cho bạn.</p>
-      </div>
+      <header className="-mt-2">
+        <Kicker tone="highlight">Yêu cầu</Kicker>
+        <h1 className="mt-2 font-display text-[2rem] font-medium leading-[1.1] tracking-[-0.02em] text-foreground">Gửi yêu cầu chỉnh sửa</h1>
+        <p className="mt-1.5 font-serif text-base text-muted-foreground">Nhà thiết kế sẽ xem và báo lại cho bạn.</p>
+      </header>
 
-      {isLoading ? (
-        <Skeleton className="h-64 w-full rounded-xl" />
+      {sent ? (
+        <RequestSentSummary
+          summary={sent}
+          deliverableName={sent.request.deliverableName}
+          actions={
+            <>
+              <Button asChild size="touch" className="w-full sm:w-auto">
+                <Link to="/portal/requests">Xem yêu cầu của tôi</Link>
+              </Button>
+              <Button type="button" variant="outline" size="touch" className="w-full sm:w-auto" onClick={() => setSent(null)}>
+                Gửi yêu cầu khác
+              </Button>
+            </>
+          }
+        />
+      ) : isLoading ? (
+        <Skeleton className="h-64 w-full" />
       ) : openProjects.length === 0 ? (
-        <div className="rounded-xl border bg-card shadow-card">
+        <div className="border-t-[3px] border-rule">
           <EmptyState
             icon={FolderOpen}
             title="Chưa có dự án nhận yêu cầu"
@@ -99,87 +60,9 @@ export default function PortalRequestNewPage() {
           />
         </div>
       ) : (
-        <form
-          onSubmit={handleSubmit(onSubmit)}
-          noValidate
-          className="space-y-5 rounded-xl border bg-card p-4 shadow-card sm:p-5"
-        >
-          <div className="space-y-2">
-            <Label htmlFor="request-project">Dự án</Label>
-            <select
-              id="request-project"
-              className={selectClass}
-              aria-invalid={!!errors.projectId}
-              aria-describedby={errors.projectId ? 'request-project-error' : undefined}
-              {...register('projectId', { onChange: () => setValue('deliverableId', '') })}
-            >
-              <option value="">Chọn dự án</option>
-              {openProjects.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </select>
-            {errors.projectId && (
-              <p id="request-project-error" className="text-sm text-destructive">{errors.projectId.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="request-deliverable">Hạng mục (tuỳ chọn)</Label>
-            <select id="request-deliverable" className={selectClass} {...register('deliverableId')}>
-              <option value="">Cả dự án / chưa rõ hạng mục</option>
-              {deliverables.map(d => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="request-content">Nội dung yêu cầu</Label>
-            <Textarea
-              id="request-content"
-              rows={6}
-              maxLength={REQUEST_MAX_LENGTH}
-              placeholder={'Mỗi ý một dòng, ví dụ:\nĐổi màu chữ sang xanh navy\nTăng cỡ logo thêm 10%'}
-              aria-invalid={!!errors.content}
-              aria-describedby={errors.content ? 'request-content-hint request-content-error' : 'request-content-hint'}
-              {...register('content')}
-            />
-            <p id="request-content-hint" className="text-xs text-muted-foreground">
-              Mỗi ý một dòng giúp nhà thiết kế xử lý nhanh hơn. Góp ý cho một hạng mục được tính là 1 lần sửa của hạng mục đó.
-            </p>
-            {errors.content && (
-              <p id="request-content-error" className="text-sm text-destructive">{errors.content.message}</p>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="request-images">Ảnh minh hoạ (tuỳ chọn)</Label>
-            <ImagePicker
-              id="request-images"
-              max={MAX_PORTAL_IMAGES - files.length}
-              disabled={send.isPending || files.length >= MAX_PORTAL_IMAGES}
-              onFiles={picked => setFiles(current => [...current, ...picked].slice(0, MAX_PORTAL_IMAGES))}
-              label="Thêm ảnh"
-              hint={`Chụp màn hình hoặc ảnh mẫu · tối đa ${MAX_PORTAL_IMAGES} ảnh, 20 MB/ảnh`}
-            />
-            {files.length > 0 && (
-              <ul className="flex flex-wrap gap-1.5" aria-label="Ảnh đính kèm">
-                {files.map((f, i) => (
-                  <li key={`${f.name}-${i}`} className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs">
-                    {f.name}
-                    <button type="button" aria-label={`Bỏ ${f.name}`} onClick={() => setFiles(files.filter((_, j) => j !== i))}>
-                      <X className="h-3 w-3" aria-hidden="true" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-
-          <Button type="submit" className="w-full" disabled={send.isPending}>
-            {send.isPending ? 'Đang gửi…' : 'Gửi yêu cầu'}
-          </Button>
-        </form>
+        <div className="border-t-[3px] border-rule pt-5">
+          <PortalRequestForm projects={openProjects} defaultProjectId={defaultProjectId} onSent={setSent} />
+        </div>
       )}
     </div>
   )

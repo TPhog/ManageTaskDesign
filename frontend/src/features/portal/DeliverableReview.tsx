@@ -1,21 +1,14 @@
-import { useState, type FormEvent } from 'react'
-import { toast } from 'sonner'
+import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { qk } from '@/lib/queryKeys'
 import type { ProjectStatus } from '@/lib/types'
 import type { PortalDeliverable } from '@/lib/portalTypes'
-import { REQUEST_MAX_LENGTH, acceptsRequests, requestErrorMessage } from './requests'
-import { useSendPortalRequest } from './usePortal'
+import { acceptsRequests } from './requests'
+import { PortalRequestForm, type SentRequestSummary } from './PortalRequestForm'
+import { RequestSentSummary } from './RequestSentSummary'
 import { progressText, reviewState } from './review'
 import { useApproveDeliverable } from './useDeliverableReview'
 
@@ -87,60 +80,41 @@ interface RequestChangeProps {
   onOpenChange: (open: boolean) => void
 }
 
-/** "Yêu cầu sửa": a client request tied to this deliverable (POST /api/portal/projects/{id}/requests, Plan 06). */
+/** "Yêu cầu sửa": the shared PortalRequestForm fixed to this product, then a sent summary (CF-11/13). */
 function RequestChangeDialog({ projectId, deliverable, open, onOpenChange }: RequestChangeProps) {
-  const send = useSendPortalRequest()
-  const [content, setContent] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const fieldId = `change-${deliverable.id}`
+  const qc = useQueryClient()
+  const [sent, setSent] = useState<SentRequestSummary | null>(null)
 
-  function submit(e: FormEvent) {
-    e.preventDefault()
-    const text = content.trim()
-    if (!text) {
-      setError('Nhập nội dung cần sửa')
-      return
-    }
-    send.mutate(
-      { projectId, deliverableId: deliverable.id, content: text },
-      {
-        onSuccess: () => {
-          toast.success('Đã gửi yêu cầu chỉnh sửa')
-          setContent('')
-          setError(null)
-          onOpenChange(false)
-        },
-        onError: err => setError(requestErrorMessage(err)),
-      },
-    )
+  function change(next: boolean) {
+    if (!next) setSent(null)
+    onOpenChange(next)
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+    <Dialog open={open} onOpenChange={change}>
+      <DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Yêu cầu sửa {deliverable.name}</DialogTitle>
-          <DialogDescription>Mô tả điều bạn muốn chỉnh — designer sẽ xem và phản hồi.</DialogDescription>
+          <DialogTitle>{`Yêu cầu sửa ${deliverable.name}`}</DialogTitle>
+          <DialogDescription>Mô tả điều bạn muốn chỉnh — nhà thiết kế sẽ xem và phản hồi.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-3" noValidate>
-          <div className="space-y-2">
-            <Label htmlFor={fieldId}>Nội dung cần sửa</Label>
-            <Textarea
-              id={fieldId}
-              rows={5}
-              maxLength={REQUEST_MAX_LENGTH}
-              value={content}
-              onChange={e => setContent(e.target.value)}
-              aria-invalid={!!error}
-              aria-describedby={error ? `${fieldId}-error` : undefined}
-            />
-            {error && <p id={`${fieldId}-error`} className="text-sm text-destructive">{error}</p>}
-          </div>
-          <DialogFooter className="gap-2">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Huỷ</Button>
-            <Button type="submit" disabled={send.isPending}>{send.isPending ? 'Đang gửi…' : 'Gửi yêu cầu'}</Button>
-          </DialogFooter>
-        </form>
+        {sent ? (
+          <RequestSentSummary
+            summary={sent}
+            deliverableName={deliverable.name}
+            actions={<Button type="button" size="touch" className="w-full" onClick={() => change(false)}>Xong</Button>}
+          />
+        ) : (
+          <PortalRequestForm
+            projects={[{ id: projectId, name: '' }]}
+            defaultProjectId={projectId}
+            fixedDeliverable={deliverable}
+            onSent={summary => {
+              setSent(summary)
+              void qc.invalidateQueries({ queryKey: qk.portal.project(projectId) })
+            }}
+            onCancel={() => change(false)}
+          />
+        )}
       </DialogContent>
     </Dialog>
   )
