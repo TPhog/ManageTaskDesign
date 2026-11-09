@@ -243,13 +243,20 @@ public static class IntakeInboxEndpoints
         var images = await ImagesOf(db, id).ToListAsync(ct);
         db.IntakeSubmissions.Remove(submission);
         activity.Write("intake_submission", id, "intake.deleted", data: new { imageCount = images.Count });
-        if (images.Count == 0)
+        try
         {
-            await db.SaveChangesAsync(ct);
-            return Results.NoContent();
+            if (images.Count == 0)
+            {
+                await db.SaveChangesAsync(ct);
+                return Results.NoContent();
+            }
+            // one SaveChanges inside (before any object is touched): the row removal, the soft deletes and their activities
+            await ImageDeletion.DeleteAsync(db, storage, activity, clock, loggers.CreateLogger(LogCategory), images, bulk: false, ct);
         }
-        // one SaveChanges inside: the row removal, the soft deletes and their activities commit together
-        await ImageDeletion.DeleteAsync(db, storage, activity, clock, loggers.CreateLogger(LogCategory), images, bulk: false, ct);
+        catch (DbUpdateConcurrencyException)
+        {
+            return Conflict();   // e.g. a convert committed between load and save: nothing was deleted
+        }
         await storageAlerts.EvaluateSafelyAsync(CancellationToken.None);
         return Results.NoContent();
     }

@@ -90,6 +90,28 @@ public class IntakeInboxTests(AppFactory factory) : IntakeTestBase(factory)
     }
 
     [Fact]
+    public async Task Delete_racing_a_convert_is_a_conflict_and_keeps_everything()   // review P13-BE #4
+    {
+        var slug = await EnableIntakeAsync();
+        var id = await SubmitMenuAsync(Anonymous(), slug);
+        Factory.BeforeSave.RunOnNextSave(async () =>
+        {
+            using var other = Factory.Services.CreateScope();   // a convert (any update) commits between load and save
+            await other.ServiceProvider.GetRequiredService<AppDbContext>().Database
+                .ExecuteSqlInterpolatedAsync($"UPDATE intake_submissions SET note = note || '' WHERE id = {id}");
+        });
+
+        var resp = await Client.DeleteAsync($"/api/admin/intake/{id}");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.Conflict);
+        (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("CONCURRENCY_CONFLICT");
+        using var scope = Factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        (await db.IntakeSubmissions.AsNoTracking().AnyAsync(s => s.Id == id)).Should().BeTrue();
+        (await db.Files.AsNoTracking().Where(f => f.OwnerId == id).AllAsync(f => f.DeletedAt == null)).Should().BeTrue();
+    }
+
+    [Fact]
     public async Task Inbox_needs_the_designer() =>
         (await Anonymous().GetAsync("/api/admin/intake")).StatusCode.Should().Be(HttpStatusCode.Unauthorized);
 }

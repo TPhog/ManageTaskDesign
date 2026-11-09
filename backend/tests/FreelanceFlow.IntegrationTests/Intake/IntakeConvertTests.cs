@@ -119,6 +119,13 @@ public class IntakeConvertTests(AppFactory factory) : IntakeTestBase(factory)
         });
         stale.StatusCode.Should().Be(HttpStatusCode.Conflict);
         (await stale.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("CONCURRENCY_CONFLICT");
+        using (var scope = Factory.Services.CreateScope())   // the whole convert rolled back
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            (await db.Clients.AsNoTracking().AnyAsync(c => c.Name == "Lan")).Should().BeFalse();
+            (await db.Projects.AsNoTracking().AnyAsync(p => p.Name == "Menu")).Should().BeFalse();
+            (await db.ActivityLogs.AsNoTracking().AnyAsync(a => a.Action == "intake.converted" && a.EntityId == id)).Should().BeFalse();
+        }
 
         (await ConvertAsync(id, detail)).StatusCode.Should().Be(HttpStatusCode.OK);
         var again = await ConvertAsync(id, await Client.GetFromJsonAsync<JsonElement>($"/api/admin/intake/{id}"));
