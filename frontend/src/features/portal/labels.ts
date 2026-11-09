@@ -1,4 +1,5 @@
-// Client-facing wording (docs/08 §3.3): no internal terms such as "deliverable" or "round".
+// Plan 12 glossary — xem plan-12 'Bảng thuật ngữ'. Client-facing wording (docs/08 §3.3): no internal terms such as
+// "deliverable", "round", "hạng mục", "lần sửa", "brief" or "designer".
 
 export const portalProjectStatus: Record<string, string> = {
   DRAFT: 'Đang chuẩn bị',
@@ -11,9 +12,9 @@ export const portalProjectStatus: Record<string, string> = {
 
 export const portalDeliverableStatus: Record<string, string> = {
   NOT_STARTED: 'Chưa bắt đầu',
-  IN_PROGRESS: 'Đang thực hiện',
+  IN_PROGRESS: 'Đang làm',
   IN_REVIEW: 'Chờ bạn duyệt',
-  APPROVED: 'Bạn đã duyệt',
+  APPROVED: 'Đã duyệt',
   DELIVERED: 'Đã bàn giao',
   CANCELLED: 'Đã huỷ',
 }
@@ -32,9 +33,9 @@ export const designTypeLabel: Record<string, string> = {
 
 // docs/08 §3.2–3.3: client-facing names; EXPIRED stays a badge ("Đã hết hạn"), never a stored status.
 export const portalQuotationStatus: Record<string, string> = {
-  SENT: 'Chờ bạn xem xét',
-  ACCEPTED: 'Đã xác nhận',
-  REJECTED: 'Đã từ chối',
+  SENT: 'Chờ bạn đồng ý',
+  ACCEPTED: 'Đã chốt',
+  REJECTED: 'Không tiếp tục',
   EXPIRED: 'Đã hết hạn',
   SUPERSEDED: 'Phiên bản cũ',
 }
@@ -46,9 +47,9 @@ export const portalPaymentStatus: Record<string, string> = {
 }
 
 export const portalRequestStatus: Record<string, string> = {
-  NEW: 'Mới',
-  TRIAGED: 'Đã tiếp nhận',
-  DECLINED: 'Từ chối',
+  NEW: 'Đã gửi — chờ nhà thiết kế xem',
+  TRIAGED: 'Nhà thiết kế đã nhận, đang xử lý',
+  DECLINED: 'Nhà thiết kế không nhận yêu cầu này',
 }
 
 export const portalQuotationKind: Record<string, string> = {
@@ -56,16 +57,15 @@ export const portalQuotationKind: Record<string, string> = {
   ADDITIONAL: 'Báo giá phát sinh',
 }
 
-// docs/08 §3.3: "Miễn phí / Trong số lần sửa / Tính phí" instead of FREE_FIX / IN_QUOTA / CHARGEABLE
 export const portalBilling: Record<string, string> = {
-  FREE_FIX: 'Miễn phí',
-  IN_QUOTA: 'Trong số lần sửa',
+  FREE_FIX: 'Miễn phí (lỗi của nhà thiết kế)',
+  IN_QUOTA: 'Dùng lượt miễn phí',
   CHARGEABLE: 'Tính phí',
 }
 
 export const portalWorkStatus: Record<string, string> = {
-  TODO: 'Chờ làm',
+  TODO: 'Chưa bắt đầu',
   IN_PROGRESS: 'Đang sửa',
-  DONE: 'Đã xong',
+  DONE: 'Đã sửa xong',
   CANCELLED: 'Đã huỷ',
 }

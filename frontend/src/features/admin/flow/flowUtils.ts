@@ -32,6 +32,8 @@ export function actionHref(kind: FlowActionKind, projectId: string, target: Flow
       return tab('revisions')
     case 'SEND_QUOTATION':
     case 'RECORD_ACCEPTANCE':
+    case 'CONFIRM_CLIENT_ACCEPTANCE':
+    case 'CONFIRM_CLIENT_PAYMENT':
       return target.quotationId ? `/admin/quotations/${target.quotationId}` : tab('quotations')
     case 'TRIAGE_REQUEST':
       return target.requestId ? `/admin/requests/${target.requestId}` : '/admin/requests'

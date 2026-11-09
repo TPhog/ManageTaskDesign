@@ -41,6 +41,8 @@ describe('actionHref', () => {
     expect(actionHref('SEND_QUOTATION', 'p1', { ...none, quotationId: 'q1' })).toBe('/admin/quotations/q1')
     expect(actionHref('RECORD_ACCEPTANCE', 'p1', { ...none, quotationId: 'q1' })).toBe('/admin/quotations/q1')
     expect(actionHref('TRIAGE_REQUEST', 'p1', { ...none, requestId: 'r1' })).toBe('/admin/requests/r1')
+    expect(actionHref('CONFIRM_CLIENT_ACCEPTANCE', 'p1', { ...none, quotationId: 'q1' })).toBe('/admin/quotations/q1')
+    expect(actionHref('CONFIRM_CLIENT_PAYMENT', 'p1', { ...none, quotationId: 'q1' })).toBe('/admin/quotations/q1')
   })
 
   it('has no link for commands run in place', () => {

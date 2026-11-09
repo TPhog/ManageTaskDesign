@@ -17,7 +17,7 @@ describe('PortalRequestList', () => {
     const item = screen.getByRole('listitem')
     expect(item).toHaveTextContent('Đổi màu chữ sang xanh navy')
     expect(item).toHaveTextContent('Logo')
-    expect(item).toHaveTextContent('Mới')
+    expect(item).toHaveTextContent('Đã gửi — chờ nhà thiết kế xem')
     expect(item).not.toHaveTextContent('Nhận diện ABC')
   })
 
@@ -30,7 +30,7 @@ describe('PortalRequestList', () => {
     )
 
     const item = screen.getByRole('listitem')
-    expect(item).toHaveTextContent('Từ chối')
+    expect(item).toHaveTextContent('Nhà thiết kế không nhận yêu cầu này')
     expect(item).toHaveTextContent('Lý do: Ngoài phạm vi hợp đồng')
     expect(item).toHaveTextContent('Nhận diện ABC')
   })

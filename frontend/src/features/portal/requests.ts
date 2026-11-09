@@ -34,14 +34,22 @@ export function toRequestForm(values: Pick<RequestFormValues, 'deliverableId' | 
   return form
 }
 
+/** CF-11: said right before "Gửi" — a request for one product normally uses one free revision. */
+export function quotaLine(d: { includedRounds: number; remainingRounds: number } | null): string {
+  if (!d) return 'Góp ý chung cho cả dự án — nhà thiết kế sẽ báo trước nếu cần tính phí.'
+  if (d.includedRounds === 0) return 'Sản phẩm này không gồm lượt chỉnh sửa miễn phí — nhà thiết kế sẽ báo giá trước khi sửa.'
+  if (d.remainingRounds <= 0) return 'Bạn đã dùng hết lượt chỉnh sửa miễn phí — nhà thiết kế sẽ báo giá trước khi sửa.'
+  return `Yêu cầu này dùng 1 lượt chỉnh sửa miễn phí (còn ${d.remainingRounds}). Lỗi do nhà thiết kế thì không tính.`
+}
+
 /** Vietnamese message for a failed request submission (docs/08 §4). */
 export function requestErrorMessage(err: unknown): string {
   const e = (err ?? {}) as Partial<ApiError>
   if (e.status === 429) {
-    return `Hôm nay bạn đã gửi ${DAILY_REQUEST_LIMIT} yêu cầu — vui lòng gửi tiếp vào ngày mai hoặc nhắn trực tiếp cho designer.`
+    return `Hôm nay bạn đã gửi ${DAILY_REQUEST_LIMIT} yêu cầu — vui lòng gửi tiếp vào ngày mai hoặc nhắn trực tiếp cho nhà thiết kế.`
   }
   if (isStorageFull(err) || e.status === 413 || e.status === 415) return imageErrorMessage(err, 'client')
-  if (e.status === 401) return 'Phiên xem đã hết hạn — vui lòng mở lại link designer đã gửi.'
+  if (e.status === 401) return 'Phiên xem đã hết hạn — vui lòng mở lại link nhà thiết kế đã gửi.'
   if (e.status === 403) return 'Vui lòng tải lại trang rồi gửi lại.'
   if (e.status === 422) return unprocessableMessage(e.detail)
   if (e.status === 404) return 'Không tìm thấy dự án này.'
@@ -56,7 +64,7 @@ function unprocessableMessage(detail?: string): string {
   if (!detail) return 'Dự án này không nhận yêu cầu mới.'
   if (/BR-21|BR-53/.test(detail)) return 'Dự án này đã hoàn thành hoặc đã huỷ nên không nhận yêu cầu mới.'
   if (/BR-54/.test(detail)) {
-    return `Hôm nay bạn đã gửi ${DAILY_REQUEST_LIMIT} yêu cầu — vui lòng gửi tiếp vào ngày mai hoặc nhắn trực tiếp cho designer.`
+    return `Hôm nay bạn đã gửi ${DAILY_REQUEST_LIMIT} yêu cầu — vui lòng gửi tiếp vào ngày mai hoặc nhắn trực tiếp cho nhà thiết kế.`
   }
   return detail.replace(RULE_CODE, '').trim() || 'Dự án này không nhận yêu cầu mới.'
 }

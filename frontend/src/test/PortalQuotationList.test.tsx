@@ -7,7 +7,8 @@ function item(overrides: Partial<PortalQuotationListItem> = {}): PortalQuotation
   return {
     id: 'q1', projectId: 'p1', projectName: 'Nhận diện ABC', number: 'BG-2026-0007', version: 2, kind: 'INITIAL',
     title: 'Báo giá logo', status: 'SENT', effectiveStatus: 'EXPIRED', paymentStatus: 'UNPAID',
-    total: 2_400_000, depositAmount: 1_200_000, issueDate: '2026-11-01', expiryDate: '2026-11-08', ...overrides,
+    total: 2_400_000, depositAmount: 1_200_000, issueDate: '2026-11-01', expiryDate: '2026-11-08',
+    clientAcceptedAt: null, clientPaymentNotice: null, ...overrides,
   }
 }
 

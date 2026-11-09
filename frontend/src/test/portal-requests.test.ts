@@ -56,7 +56,7 @@ describe('requestErrorMessage', () => {
 
 describe('requestErrorMessage', () => {
   it('maps session and CSRF failures', () => {
-    expect(requestErrorMessage({ status: 401 })).toBe('Phiên xem đã hết hạn — vui lòng mở lại link designer đã gửi.')
+    expect(requestErrorMessage({ status: 401 })).toBe('Phiên xem đã hết hạn — vui lòng mở lại link nhà thiết kế đã gửi.')
     expect(requestErrorMessage({ status: 403 })).toBe('Vui lòng tải lại trang rồi gửi lại.')
   })
 

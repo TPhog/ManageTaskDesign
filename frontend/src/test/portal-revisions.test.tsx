@@ -27,8 +27,8 @@ const withRounds: PortalRevisions = {
 }
 
 describe('roundTitle', () => {
-  it('names the round "Lần sửa" with its date (docs/08 §3.3)', () => {
-    expect(roundTitle({ roundNo: 2, receivedAt: '2026-11-08' })).toBe(`Lần sửa 2 · ${formatDate('2026-11-08')}`)
+  it('names the round "Lượt chỉnh sửa" with its date (Plan 12 glossary)', () => {
+    expect(roundTitle({ roundNo: 2, receivedAt: '2026-11-08' })).toBe(`Lượt chỉnh sửa 2 · ${formatDate('2026-11-08')}`)
   })
 })
 
@@ -44,10 +44,10 @@ describe('PortalRevisionsView', () => {
     render(<PortalRevisionsView data={withRounds} />)
 
     expect(screen.getByText('1/3 lần sửa miễn phí')).toBeInTheDocument()
-    expect(screen.getAllByText(/^Lần sửa 1 · /)).toHaveLength(2)
-    expect(screen.getByText('Trong số lần sửa')).toBeInTheDocument()
+    expect(screen.getAllByText(/^Lượt chỉnh sửa 1 · /)).toHaveLength(2)
+    expect(screen.getByText('Dùng lượt miễn phí')).toBeInTheDocument()
     expect(screen.getByText('Tính phí')).toBeInTheDocument()
-    expect(screen.getByText('Miễn phí')).toBeInTheDocument()
+    expect(screen.getByText('Miễn phí (lỗi của nhà thiết kế)')).toBeInTheDocument()
     expect(screen.getByText('Đang sửa')).toBeInTheDocument()
     expect(screen.getByText('Chung cho dự án')).toBeInTheDocument()
     expect(screen.queryByText('IN_QUOTA')).not.toBeInTheDocument()

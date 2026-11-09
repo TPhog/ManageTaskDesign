@@ -1,9 +1,9 @@
 import { formatDate } from '@/lib/format'
 import type { PortalRevisions } from '@/lib/portalTypes'
 
-/** docs/08 §3.3: "Lần sửa" instead of "Round". */
+/** Plan 12 glossary: "Lượt chỉnh sửa" instead of "Round" / "Lần sửa". */
 export function roundTitle(r: { roundNo: number; receivedAt: string }): string {
-  return `Lần sửa ${r.roundNo} · ${formatDate(r.receivedAt)}`
+  return `Lượt chỉnh sửa ${r.roundNo} · ${formatDate(r.receivedAt)}`
 }
 
 export function hasRounds(r: PortalRevisions): boolean {

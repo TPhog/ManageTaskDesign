@@ -20,6 +20,8 @@ export type FlowActionKind =
   | 'CREATE_ADDITIONAL_QUOTATION'
   | 'COMPLETE_PROJECT'
   | 'COPY_PAYMENT_REMINDER'
+  | 'CONFIRM_CLIENT_ACCEPTANCE'
+  | 'CONFIRM_CLIENT_PAYMENT'
 
 export type FlowWarningKind =
   | 'BRIEF_NOT_CONFIRMED'
@@ -30,6 +32,7 @@ export type FlowWarningKind =
   | 'QUOTA_EXCEEDED'
   | 'BALANCE_DUE'
   | 'DELIVERED_WITH_OPEN_REVISIONS'
+  | 'REVIEW_WITH_OPEN_REVISIONS'
 
 export interface FlowTarget {
   deliverableId: string | null

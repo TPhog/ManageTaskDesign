@@ -107,6 +107,15 @@ export interface QuotationNewDeliverable {
   itemDescription: string
 }
 
+/** Plan 12: what the client reported on the portal with "Tôi đã chuyển khoản" (recorded only — BR-01). */
+export interface ClientPaymentNotice {
+  purpose: QrPurpose
+  amount: number
+  at: string
+  note: string | null
+  pending: boolean
+}
+
 export interface QuotationDetail {
   id: string
   projectId: string
@@ -142,6 +151,9 @@ export interface QuotationDetail {
   rejectedReason: string | null
   depositPaidAt: string | null
   paidAt: string | null
+  /** Plan 12: the client pressed "Đồng ý báo giá" on the portal */
+  clientAcceptedAt: string | null
+  clientPaymentNotice: ClientPaymentNotice | null
   /** DRAFT only — every other status renders from snapshot */
   items: QuotationItem[]
   snapshot: QuotationSnapshot | null
