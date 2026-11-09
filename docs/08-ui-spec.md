@@ -9,7 +9,7 @@ Admin tối ưu desktop (≥ 1280px) nhưng dùng được trên tablet; Portal 
 |---|---|
 | `StatusBadge` | Màu theo trạng thái (xem §5) |
 | `MoneyText` | Định dạng VND, căn phải trong bảng |
-| `MoneyInput` | Nhập số, tự chèn dấu chấm, lưu số nguyên |
+| `MoneyInput` | Nhập số, tự chèn dấu chấm ngăn nghìn **ngay khi gõ** (`2.000.000`), lưu số nguyên; dán `2,500,000` hay `2.500.000` đều hiểu là nghìn; phần thập phân (`1,5`) bị bỏ qua vì VND là số nguyên; Backspace trên dấu chấm giữ nguyên vị trí con trỏ |
 | `QuotaMeter` | `2/3 vòng` + thanh tiến độ; vàng khi còn 1, đỏ khi hết |
 | `BillingChip` | FREE_FIX "Sửa lỗi – miễn phí" · IN_QUOTA "Trong quota" · CHARGEABLE "Tính phí" |
 | `FileUploader` | Kéo thả, hiển thị tiến độ, lỗi định dạng/kích thước |
@@ -71,6 +71,29 @@ Sidebar: **Tổng quan** · **Yêu cầu** (badge NEW) · **Khách mới** (badg
 6. Sau khi Gửi: dialog "Đã gửi. Sao chép link portal / tin nhắn mẫu" với template:
    `"Chào anh/chị {tên}, em gửi báo giá {số} ({tổng}). Anh/chị xem và quét QR tại: {link portal}"`
    (link portal chỉ có nếu designer vừa tạo; nếu không, nhắc "khách mở link portal cũ để xem").
+
+### 2.4 Bảng thuật ngữ & quy ước giao diện admin (Plan 14)
+
+Một bộ từ cho cả giao diện (`frontend/src/lib/glossary.ts`; `glossary.test.ts` quét mọi `.tsx`/`.ts` tìm cụm bị cấm):
+
+| Dùng | Không dùng |
+|---|---|
+| **hạng mục** (deliverable) | "deliverable" trong chữ hiển thị, "Thêm deliverable", "Chưa có deliverable" |
+| **công việc** (task) | "task" trong chữ hiển thị mới |
+| **vòng sửa**, **vòng sửa miễn phí** | "round", "Vòng thêm:", "Giá/vòng vượt" |
+| **Giá vòng sửa thêm** | "Giá vòng thêm" |
+| **tin nhắn thanh toán** (nhắn, không phải "nhắc") | "tin nhắc" |
+| Không hiện mã quy tắc cho người dùng | "(BR-…)" trong giao diện |
+
+- **Toast** nằm dưới-phải (cao hơn nút dính đáy: `offset.bottom = 88`, mobile 96), tối đa 3 toast cùng lúc.
+- **Nhãn trạng thái dự án** "Sẵn sàng bắt đầu" (BR-143); ô hạn ở header không để dấu gạch lơ lửng khi thiếu ngày.
+- **Kanban**: không hiện nhãn ưu tiên `Trung bình` (chỉ hiện Khẩn cấp/Cao/Thấp); cột "Bị chặn" nằm trọn trong khung ở 1440 px; mobile có lớp bố cục riêng.
+- **Hộp xác nhận** cho Gửi duyệt / Xác nhận đã duyệt / Bàn giao (BR-139, BR-140); hộp "Bắt đầu dự án" có ô "Hạn chung · {hạng mục}" cho mỗi hạng mục (BR-144); chuyển trạng thái dự án có cảnh báo hiện qua hộp "Cần xác nhận" kèm "Xem công việc" khi còn việc chưa xong.
+- **Tách yêu cầu thành vòng sửa**: yêu cầu có ≥ 2 dòng thì mỗi dòng điền sẵn một "Mô tả mục n" (sửa được); thiếu mô tả báo lỗi ngay tại ô.
+- **Brief**: tab Brief có chế độ xem Markdown (ví dụ `## Mục tiêu` thành tiêu đề); ghi chú task cũng dùng Markdown.
+- **Ctrl+K**: nhóm Khách, Dự án, Báo giá, **Công việc**, **Yêu cầu** (02 §14.1).
+- **Sao chép link portal**: tin nhắn mẫu kèm link, ghi vào clipboard ngay trong cú nhấp chuột kể cả khi phải gọi POST để tạo link (`copyWhenReady`).
+- Admin ở **390 px** không cuộn ngang trên Tổng quan, Công việc, Dịch vụ, chi tiết dự án.
 
 ## 3. Portal (khách)
 

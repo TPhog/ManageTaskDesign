@@ -96,7 +96,7 @@ Các resource có `rowVersion` (xmin, kiểu `uint`) trong response. Lệnh upda
 | POST | `/api/admin/projects` | `{ clientId, name, designType, startDate, dueDate, internalNotes }` → tạo kèm brief v1 DRAFT rỗng |
 | GET | `/api/admin/projects/{id}` | Overview: project + client + deliverables (với `usedRounds`, `remainingRounds`) + tổng tiền + counts |
 | PUT | `/api/admin/projects/{id}` | `{ name, designType, startDate, dueDate, internalNotes, rowVersion }` |
-| POST | `/api/admin/projects/{id}/status` | `{ to, reason?, reasonPublic?, confirmWarnings?: bool, rowVersion }` → `200` hoặc `409 INVALID_TRANSITION`; nếu có cảnh báo và `confirmWarnings=false` → `422 BUSINESS_RULE` kèm `warnings: [...]` |
+| POST | `/api/admin/projects/{id}/status` | `{ to, reason?, reasonPublic?, confirmWarnings?: bool, rowVersion }` → `200` hoặc `409 INVALID_TRANSITION`; nếu có cảnh báo và `confirmWarnings=false` → `422 BUSINESS_RULE` kèm `warnings: [...]`. Với `to = COMPLETED`, `warnings` còn nêu công việc chưa xong và mục sửa chưa xong (BR-142) |
 | GET | `/api/admin/projects/{id}/activity?page=` | |
 
 ### 3.5 Briefs
@@ -115,7 +115,7 @@ Các resource có `rowVersion` (xmin, kiểu `uint`) trong response. Lệnh upda
 |---|---|---|
 | POST | `/api/admin/projects/{id}/deliverables` | `{ name, quantity, serviceId?, includedRounds?, extraRoundPrice?, dueDate }` (thiếu → lấy từ service; không service thì bắt buộc) |
 | PUT | `/api/admin/deliverables/{id}` | `{ name, quantity, includedRounds, extraRoundPrice, dueDate, sortOrder }` — trả `warnings` nếu BR-44 |
-| POST | `/api/admin/deliverables/{id}/status` | `{ to }` |
+| POST | `/api/admin/deliverables/{id}/status` | `{ to, deliveryUrl?, clientMessage? }` - hai trường sau chỉ đọc khi `to = DELIVERED` (BR-140): `deliveryUrl` http/https ≤ 500, `clientMessage` ≤ 500; sai → `400` (`errors.deliveryUrl` / `errors.clientMessage`) |
 
 ### 3.7 Requests
 
@@ -167,8 +167,8 @@ Endpoint hỗ trợ UI xem trước gợi ý trước khi lưu:
 | Method | Path | Ghi chú |
 |---|---|---|
 | GET | `/api/admin/tasks?projectId=&status=&due=overdue|today|week&page=` | |
-| POST | `/api/admin/projects/{id}/tasks` | `{ title, description, priority, startDate, dueDate, deliverableId?, revisionItemId? }` |
-| PUT | `/api/admin/tasks/{id}` | |
+| POST | `/api/admin/projects/{id}/tasks` | `{ title, description, priority, startDate, dueDate, deliverableId?, revisionItemId? }` - `dueDate < startDate` → `400` `errors.dueDate` (BR-141) |
+| PUT | `/api/admin/tasks/{id}` | Cùng ràng buộc ngày như POST |
 | POST | `/api/admin/tasks/{id}/move` | `{ status, sortOrder }` (Kanban) |
 | DELETE | `/api/admin/tasks/{id}` | Xóa cứng (task không phải dữ liệu tài chính) + activity; ảnh của task bị xóa theo (BR-88), trừ ảnh chứng từ báo giá (giữ lại, đếm trong `task.deleted`) |
 | POST/PUT/DELETE | `/api/admin/tasks/{id}/checklist[/{itemId}]` | |
@@ -310,12 +310,12 @@ Tất cả dưới `/api/admin/*`, cookie `Designer`; POST/PUT/PATCH/DELETE cầ
 
 | Method | Path | Ghi chú |
 |---|---|---|
-| GET | `/api/admin/search?q=` | Tìm nhanh header: `{ clients, projects, quotations }`, tối đa 5/nhóm; q 2–100 ký tự, không phân biệt hoa/thường/dấu; SĐT bỏ qua khoảng trắng, `.`, `-` |
-| GET | `/api/admin/projects/{id}/flow` | Các bước luồng dự án (ProjectFlow) và bước hiện tại. Action kinds P12: `CONFIRM_CLIENT_ACCEPTANCE` (báo giá `SENT` đã có `client_accepted_at`; khi đó không còn `RECORD_ACCEPTANCE`), `CONFIRM_CLIENT_PAYMENT` (có `clientPaymentNotice.pending`); hai kind này đứng đầu danh sách. Warning P12: `REVIEW_WITH_OPEN_REVISIONS`. `CONFIRM_APPROVAL` chỉ khi `reviewState = CLIENT_APPROVED` (BR-97) |
+| GET | `/api/admin/search?q=` | Tìm nhanh header: `{ clients, projects, quotations, tasks, requests }`, tối đa 5/nhóm (02 §14.1: `tasks[] { id, projectId, title, projectName, status }`, `requests[] { id, projectId, projectName, clientName, excerpt, status }`); q 2–100 ký tự, không phân biệt hoa/thường/dấu; SĐT bỏ qua khoảng trắng, `.`, `-` |
+| GET | `/api/admin/projects/{id}/flow` | Các bước luồng dự án (ProjectFlow) và bước hiện tại. Action kinds P12: `CONFIRM_CLIENT_ACCEPTANCE` (báo giá `SENT` đã có `client_accepted_at`; khi đó không còn `RECORD_ACCEPTANCE`), `CONFIRM_CLIENT_PAYMENT` (có `clientPaymentNotice.pending`); hai kind này đứng đầu danh sách. Warning P12: `REVIEW_WITH_OPEN_REVISIONS`. `CONFIRM_APPROVAL` chỉ khi `reviewState = CLIENT_APPROVED` (BR-97). Action kinds P14: `MARK_QUOTED`, `RECORD_DEPOSIT`, `VIEW_TASKS`; warning `COMPLETED_WITH_OPEN_ITEMS` (info); không có `CREATE_QUOTATION` khi dự án chưa có hạng mục (BR-143); `COPY_PAYMENT_REMINDER` có nhãn "Sao chép tin nhắn thanh toán" |
 | GET | `/api/admin/flow/actions` | Danh sách việc cần làm tiếp theo trên mọi dự án |
-| GET | `/api/admin/projects/{id}/start-preview` | Cảnh báo trước khi bắt đầu (vd chưa có báo giá gốc được chấp nhận) |
-| POST | `/api/admin/projects/{id}/start` | DRAFT/QUOTED → IN_PROGRESS; cảnh báo không chặn |
-| POST | `/api/admin/deliverables/{id}/submit-review` · `confirm-approval` | Gửi khách duyệt / designer xác nhận duyệt thay khách |
+| GET | `/api/admin/projects/{id}/start-preview` | Cảnh báo trước khi bắt đầu (vd chưa có báo giá gốc được chấp nhận) + từng hạng mục `{ deliverableId, name, serviceName, titles[], suggestedDueDate }` (BR-144) |
+| POST | `/api/admin/projects/{id}/start` | `{ rowVersion, tasks?: [{ deliverableId, titles[], dueDate? }] }` - DRAFT/QUOTED → IN_PROGRESS; cảnh báo không chặn; `dueDate` là hạn chung cho mọi công việc tạo từ hạng mục đó (BR-144) → `{ projectId, status, startedDeliverables, createdTasks, warnings[] }` |
+| POST | `/api/admin/deliverables/{id}/submit-review` · `confirm-approval` | Gửi khách duyệt (`{ clientMessage? ≤ 500 }`, lời nhắn hiện cho khách) / designer xác nhận duyệt thay khách |
 | POST | `/api/admin/projects/{projectId}/progress-updates` | Cập nhật tiến độ hiển thị cho khách |
 | GET/POST | `/api/admin/tasks/{id}/notes` | Ghi chú task |
 | PUT/DELETE | `/api/admin/tasks/{id}/notes/{noteId}` | |

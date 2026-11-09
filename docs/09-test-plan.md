@@ -169,6 +169,27 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
 | AC-INT9 | Một lần bấm tạo khách + dự án DRAFT + brief v1 + hạng mục từ dịch vụ + gắn ảnh; khách có sẵn không bị nhân đôi; lần 2 / bản cũ → 409 | `IntakeConvertTests`, e2e `intake.spec.ts` |
 | AC-INT10 | API từ chối khởi động ngoài Development/Testing khi thiếu `DataProtection:KeysPath`; hai host dùng chung thư mục key đọc được token của nhau | `DataProtectionKeysTests` |
 
+### AC-UX14 — Designer UX vòng 2 (P14; BR-139..145)
+
+| ID | Kịch bản | Kết quả | Test |
+|---|---|---|---|
+| AC-UX14-01 | Bấm "Gửi duyệt" khi còn task mở | Hộp xác nhận liệt kê task mở; "Vẫn gửi duyệt" vẫn thực hiện được | `deliverableActionDialogs.test.tsx`, e2e `designer-ux-round2.spec.ts` |
+| AC-UX14-02 | "Bàn giao" kèm link `https://drive…` + lời nhắn | Timeline portal có lời nhắn và link bấm được (`rel=noopener`) | `DeliveryLinkTests`, e2e `designer-ux-round2.spec.ts` |
+| AC-UX14-03 | "Bàn giao" với `javascript:alert(1)` | Lỗi inline, không gọi API (FE); `400 VALIDATION_FAILED` `errors.deliveryUrl` (API) | `deliverableActionDialogs.test.tsx`, `DeliveryLinkTests`, e2e `designer-ux-round2.spec.ts`, `task-notes.spec.ts` |
+| AC-UX14-04 | Task hạn trước ngày bắt đầu | `400 errors.dueDate`; drawer báo lỗi trên ô hạn | `TaskDatesTests`, `TaskTests`, `taskSchema.test.ts` |
+| AC-UX14-05 | Dự án đã hoàn thành còn task mở | Không gợi ý "chuyển về Đang làm"; có info `COMPLETED_WITH_OPEN_ITEMS` "còn n công việc…" | `ProjectFlowTests`, `ProjectCompletionWarningsTests` |
+| AC-UX14-06 | Báo giá được chấp nhận, dự án còn DRAFT | Badge "Sẵn sàng bắt đầu", nút chính "Bắt đầu dự án" | `flowUtils.test.ts`, e2e `designer-ux-round2.spec.ts` |
+| AC-UX14-07 | Dự án 0 hạng mục | Không có "Tạo báo giá" | `ProjectFlowTests`, e2e `project-flow.spec.ts` |
+| AC-UX14-08 | Chưa nhận cọc | Có nút "Đánh dấu đã nhận cọc" → báo giá `DEPOSIT_PAID` | `ProjectFlowTests`, e2e `designer-ux-round2.spec.ts` |
+| AC-UX14-09 | Tải ảnh trong task | Mặc định "Khách xem được" tắt | `taskImages.test.tsx` |
+| AC-UX14-10 | Bắt đầu dự án với hạn chung | Mọi task mẫu của hạng mục có hạn đó (`startDate` trống) | `ProjectFlowApiTests`, `startProject.test.ts`, e2e `designer-ux-round2.spec.ts` |
+| AC-UX14-11 | Tách yêu cầu 4 dòng | 4 mục sửa điền sẵn | kiểm tay (`RequestSheet`/`RoundEditor`) |
+| AC-UX14-12 | Brief `## Mục tiêu` | Kết xuất heading ở trang Brief admin (Portal hiện văn bản thuần) | `briefTab.test.tsx` |
+| AC-UX14-13 | Ô tiền | Hiện `2.000.000` khi đang gõ; dán `2,500,000` = 2.500.000 | `moneyInput.test.ts`, `moneyInputComponent.test.tsx` |
+| AC-UX14-14 | Viewport 390px | Không tràn ngang ở Tổng quan, Công việc, Dịch vụ, chi tiết dự án | e2e `designer-ux-round2.spec.ts` |
+| AC-UX14-15 | Ctrl+K "phac thao" | Có nhóm Công việc (và Yêu cầu theo nội dung) | `SearchTests`, `searchUtils.test.ts`, e2e `designer-ux-round2.spec.ts` |
+| AC-UX14-16 | Kanban 1440px | Cột "Bị chặn" nằm trọn trong khung; thẻ không hiện nhãn "Trung bình" | `taskMeta.test.tsx`, e2e `designer-ux-round2.spec.ts` |
+
 ## 3. Luồng E2E (Playwright)
 
 1. **Onboarding:** đăng nhập → cấu hình ngân hàng → tạo dịch vụ → tạo khách → tạo link portal.
@@ -184,6 +205,7 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
 8. **Dung lượng ảnh (P10, `storage-optimization.spec.ts`):** upload ảnh trùng → cảnh báo; Cài đặt › Dung lượng › Theo dự án; xóa task → ảnh của task mất; xem trước xóa bản gốc của dự án đã hoàn thành (AC-STO9).
 9. **Portal vòng 2 (P12):** khách đồng ý báo giá + báo đã chuyển cọc, designer thấy hai bước xác nhận và ghi chú của khách (AC-CF1, CF3, CF4; `portal-quotation-request.spec.ts` › "client agrees to a sent quotation …"); một giọng trạng thái duyệt qua Duyệt và Yêu cầu sửa kèm ảnh, thời gian phản hồi, không nút nổi (AC-CF5..8; `portal-round2.spec.ts`). Chữ trên các spec `portal*.spec.ts` theo bảng thuật ngữ Portal (08 §3.4).
 10. **Mẫu yêu cầu & khách mới (P13):** khách mới điền Poster qua `/f/{slug}` (có kịch bản `FORM_EXPIRED` không mất chữ đã gõ) rồi cảm ơn (`public-intake.spec.ts`); designer chuyển hồ sơ thành khách + dự án + brief hoặc từ chối/xoá (`intake.spec.ts`); khách portal gửi Poster theo mẫu và designer thấy bảng câu trả lời (`portal-template-request.spec.ts`); designer tạo/sửa/xoá mẫu và quản lý link (`request-templates.spec.ts`). Spec công khai dùng 1 lượt/IP/ngày trong trần 5 (BR-137) - chạy > 5 lần/ngày trên cùng máy dev sẽ nhận `429`.
+11. **Designer UX vòng 2 (P14, `designer-ux-round2.spec.ts`):** dự án đã báo giá hiện "Sẵn sàng bắt đầu" → bắt đầu với hạn chung → "Xem công việc"/"Đánh dấu đã nhận cọc" → gửi duyệt khi còn việc ("Vẫn gửi duyệt") → xác nhận đã duyệt → bàn giao với link sai rồi link đúng + lời nhắn, khách thấy trên timeline; Kanban 1440 px, không tràn ngang ở 390 px, Ctrl+K tìm công việc không dấu. Các spec `project-flow`, `project-full-flow`, `deliverables` bấm qua hộp xác nhận mới.
 
 ## 4. Test cô lập Portal (bắt buộc, tự động sinh)
 
