@@ -49,7 +49,7 @@ internal static class RequestReads
             return new RequestDto(r.Id, r.ProjectId, x.ProjectName, x.ClientId, x.ClientName,
                 r.DeliverableId, r.DeliverableId is { } did ? names.GetValueOrDefault(did) : null,
                 r.Content, r.Source, r.CreatedBy, r.Status, r.DeclineReason, r.TriagedAt, r.CreatedAt, x.RowVersion,
-                attachments[r.Id].ToList());
+                attachments[r.Id].ToList(), r.TemplateId, r.TemplateName, r.Answers());
         }).ToList();
     }
 

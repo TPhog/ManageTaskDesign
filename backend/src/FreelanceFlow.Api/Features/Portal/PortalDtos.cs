@@ -138,7 +138,8 @@ public sealed record PortalRequestDto(
     string Content,
     string Status,
     string? DeclineReason,
-    IReadOnlyList<PortalRequestAttachmentDto> Attachments);
+    IReadOnlyList<PortalRequestAttachmentDto> Attachments,
+    string? TemplateName);
 
 // ---------- revisions (docs/05 §4, REV-07): never internalNotes, scopeOverrideReason, quotation links, tasks or round notes ----------
 

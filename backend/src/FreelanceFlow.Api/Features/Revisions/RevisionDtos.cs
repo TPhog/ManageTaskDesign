@@ -1,3 +1,4 @@
+using FreelanceFlow.Api.Domain.RequestTemplates;
 using FreelanceFlow.Api.Features.Images;
 
 namespace FreelanceFlow.Api.Features.Revisions;
@@ -61,7 +62,7 @@ public sealed record RequestDto(
     Guid Id, Guid ProjectId, string ProjectName, Guid ClientId, string ClientName,
     Guid? DeliverableId, string? DeliverableName, string Content, string Source, string CreatedBy,
     string Status, string? DeclineReason, DateTimeOffset? TriagedAt, DateTimeOffset CreatedAt, uint RowVersion,
-    IReadOnlyList<RequestAttachmentDto> Attachments);
+    IReadOnlyList<RequestAttachmentDto> Attachments, Guid? TemplateId, string? TemplateName, IReadOnlyList<TemplateAnswer> Answers);
 
 public sealed record RequestDetailDto(RequestDto Request, IReadOnlyList<RoundDto> Rounds);
 

@@ -26,6 +26,7 @@ public class PortalIsolationTests(AppFactory factory) : PortalTestBase(factory)
         ["GET /api/portal/quotations/{id:guid}/versions/{version:int}"] = "/api/portal/quotations/{quotationA}/versions/1",
         ["GET /api/portal/quotations/{id:guid}/qr/{purpose}.png"] = "/api/portal/quotations/{quotationA}/qr/deposit.png",
         ["GET /api/portal/requests"] = "/api/portal/requests?projectId={projectA}",
+        ["GET /api/portal/request-templates"] = "/api/portal/request-templates", // plan 13: studio templates, same for every client
         ["GET /api/portal/projects/{id:guid}/images"] = "/api/portal/projects/{projectA}/images",
         ["GET /api/portal/images/{id:guid}/{variant}"] = "/api/portal/images/{imageA}/thumb", // M3: never "original"
         ["POST /api/portal/projects/{id:guid}/requests"] = null, // Client_B_cannot_send_a_request_to_a_project_of_A

@@ -3,6 +3,7 @@ using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Files;
 using FreelanceFlow.Api.Domain.Requests;
+using FreelanceFlow.Api.Domain.RequestTemplates;
 using FreelanceFlow.Api.Features.Images;
 using FreelanceFlow.Api.Features.Revisions;
 using FreelanceFlow.Api.Features.Storage;
@@ -115,7 +116,27 @@ public static class PortalRequestsEndpoints
         var content = form["content"].ToString();
 
         var errors = new Dictionary<string, string[]>();
-        if (content.Trim().Length is < 1 or > ClientRequest.MaxContent)
+        // Plan 13 (BR-131/132): with a template, "content" is the optional "Ghi chú thêm" and the stored text is rendered
+        RequestTemplate? template = null;
+        IReadOnlyList<TemplateAnswer> answers = [];
+        var rawTemplate = form["templateId"].ToString();
+        if (rawTemplate.Length > 0)
+        {
+            if (Guid.TryParse(rawTemplate, out var templateId))
+                template = await db.RequestTemplates.AsNoTracking().FirstOrDefaultAsync(t => t.Id == templateId && t.Active);
+            if (template is null)
+                errors["templateId"] = ["Mẫu yêu cầu không còn dùng được — vui lòng tải lại trang"];
+            else
+            {
+                var result = TemplateAnswers.Evaluate(template.Fields(), form["answers"].ToString(), form.Files.Count, clock.TodayVn);
+                foreach (var (key, message) in result.Errors)
+                    errors[key == TemplateAnswers.FormErrorKey ? "answers" : $"answers.{key}"] = [message];
+                answers = result.Answers;
+            }
+            if (content.Trim().Length > TemplateLimits.MaxNote)
+                errors["content"] = [$"Ghi chú tối đa {TemplateLimits.MaxNote} ký tự"];
+        }
+        else if (content.Trim().Length is < 1 or > ClientRequest.MaxContent)
             errors["content"] = [$"Nội dung dài 1–{ClientRequest.MaxContent} ký tự"];
         Guid? deliverableId = null;
         var rawDeliverable = form["deliverableId"].ToString();
@@ -128,12 +149,19 @@ public static class PortalRequestsEndpoints
         }
         foreach (var (field, messages) in ImageLimits.ValidateCount(form.Files.Count, ImageLimits.MaxFilesPerPortalRequest, required: false))
             errors[field] = messages;
+        var text = content;
+        if (template is not null && errors.Count == 0)
+        {
+            text = TemplateRenderer.Render(template.Name, answers, content);
+            if (text.Length > ClientRequest.MaxContent)
+                errors["answers"] = [$"Nội dung quá dài (tối đa {ClientRequest.MaxContent} ký tự) — vui lòng rút gọn câu trả lời"];
+        }
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
         ClientRequest request;
         try
         {
-            request = ClientRequest.CreateByClient(id, project.Status, deliverableId, content, sentToday);
+            request = ClientRequest.CreateByClient(id, project.Status, deliverableId, text, sentToday, template?.Id, template?.Name, answers);
         }
         catch (DomainException ex) when (ex.Code == "RATE_LIMITED")
         {
@@ -147,7 +175,7 @@ public static class PortalRequestsEndpoints
         db.ClientRequests.Add(request);
         activity.Write("request", request.Id, "request.created",
             clientId: principal.ClientId, projectId: id, actorType: "CLIENT",
-            data: new { source = request.Source, createdBy = request.CreatedBy, deliverableId = request.DeliverableId });
+            data: new { source = request.Source, createdBy = request.CreatedBy, deliverableId = request.DeliverableId, templateId = request.TemplateId });
         IReadOnlyList<ProjectFile> images = [];
         try
         {
@@ -199,6 +227,7 @@ public static class PortalRequestsEndpoints
                 var deliverable = await db.Deliverables.AsNoTracking().Where(d => d.Id == did).Select(d => d.Name).FirstOrDefaultAsync();
                 if (deliverable is not null) fields.Add(new("Hạng mục", deliverable));
             }
+            if (request.TemplateName is { } templateName) fields.Add(new("Mẫu", templateName));
             if (imageCount > 0) fields.Add(new("Ảnh đính kèm", imageCount.ToString()));
             var oneLine = string.Join(' ', request.Content.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
             var excerpt = oneLine.Length > 200 ? oneLine[..200] + "…" : oneLine;
@@ -247,7 +276,8 @@ public static class PortalRequestsEndpoints
             x.Request.Content,
             x.Request.Status,
             x.Request.DeclineReason,
-            attachments[x.Request.Id].ToList())).ToList();
+            attachments[x.Request.Id].ToList(),
+            x.Request.TemplateName)).ToList();
     }
 }
 

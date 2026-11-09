@@ -11,6 +11,7 @@ using FreelanceFlow.Api.Features.Portal;
 using FreelanceFlow.Api.Features.Projects;
 using FreelanceFlow.Api.Features.Quotations;
 using FreelanceFlow.Api.Features.Requests;
+using FreelanceFlow.Api.Features.RequestTemplates;
 using FreelanceFlow.Api.Features.Revisions;
 using FreelanceFlow.Api.Features.Search;
 using FreelanceFlow.Api.Features.Services;
@@ -264,6 +265,7 @@ app.MapDashboardEndpoints();
 app.MapImagesEndpoints();
 app.MapStorageEndpoints();
 app.MapWatermarkEndpoints();
+app.MapRequestTemplatesEndpoints();
 app.MapDigestSettingsEndpoints();
 app.MapProjectFlowEndpoints();
 app.MapPortalSessionEndpoints();
@@ -272,6 +274,7 @@ app.MapPortalQuotationsEndpoints();
 app.MapPortalRequestsEndpoints();
 app.MapPortalDeliverablesEndpoints();
 app.MapPortalImagesEndpoints();
+app.MapPortalRequestTemplatesEndpoints();
 
 app.MapGet("/health", async (AppDbContext db) =>
 {
