@@ -190,6 +190,19 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
 | AC-UX14-15 | Ctrl+K "phac thao" | Có nhóm Công việc (và Yêu cầu theo nội dung) | `SearchTests`, `searchUtils.test.ts`, e2e `designer-ux-round2.spec.ts` |
 | AC-UX14-16 | Kanban 1440px | Cột "Bị chặn" nằm trọn trong khung; thẻ không hiện nhãn "Trung bình" | `taskMeta.test.tsx`, e2e `designer-ux-round2.spec.ts` |
 
+### AC-SET — Cài đặt theo tab (P17)
+
+| ID | Kịch bản | Kết quả | Test |
+|---|---|---|---|
+| AC-SET1 | Mở `/admin/settings?tab=payment`; `?tab=` thiếu/sai | Hiện form ngân hàng; thiếu/sai mở tab Studio; đổi tab cập nhật URL | `settingsPage.test.tsx`, e2e `settings.spec.ts` |
+| AC-SET2 | Lưu tài khoản ngân hàng | Chỉ trường ngân hàng đổi; tên studio, điều khoản, `logoFileId` giữ nguyên; payload dựng từ bản server mới nhất + `rowVersion` | `settingsPage.test.tsx`, e2e `settings.spec.ts` |
+| AC-SET3 | 409 khi lưu một phần | Thông báo "đã tải lại", phần đó tải lại, lần lưu sau dùng `rowVersion` mới | `settingsPage.test.tsx` |
+| AC-SET4 | Sửa một phần rồi đổi tab / rời trang | Hộp "Bỏ thay đổi chưa lưu?"; không sửa gì thì không hỏi; `beforeunload` chỉ khi có thay đổi | `settingsPage.test.tsx`, e2e `settings.spec.ts` |
+| AC-SET5 | Phím mũi tên trên danh sách tab | Chỉ di chuyển focus (không hộp hỏi); Enter mở tab | `settingsPage.test.tsx`, e2e `settings.spec.ts` |
+| AC-SET6 | Xoá hết điều khoản mặc định rồi lưu | `defaultTerms = ''` được lưu (xoá); phần khác lưu không đụng tới điều khoản | `settingsPage.test.tsx` |
+| AC-SET7 | Checklist thiết lập STUDIO/BANK/WATERMARK | Link dẫn tới `?tab=studio` / `payment` / `images`; hộp Khách mới rỗng dẫn tới `?tab=portal` | `SetupChecklistTests`, `intakePageEmpty.test.tsx`, e2e `dashboard-upgrade.spec.ts` |
+| AC-SET8 | 390 px | Không tràn ngang ở cả 7 tab; tab đang chọn nằm trọn trong khung | e2e `settings.spec.ts` |
+
 ## 3. Luồng E2E (Playwright)
 
 1. **Onboarding:** đăng nhập → cấu hình ngân hàng → tạo dịch vụ → tạo khách → tạo link portal.
