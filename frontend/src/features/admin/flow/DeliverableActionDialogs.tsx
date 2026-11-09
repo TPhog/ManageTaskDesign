@@ -116,10 +116,11 @@ export function ApproveDialog({ deliverable, open, onOpenChange, pending, onConf
 
 interface DeliverProps extends BaseProps {
   serverError?: string
+  onEditField?: () => void
   onConfirm: (v: { deliveryUrl: string | null; clientMessage: string | null }) => void
 }
 
-export function DeliverDialog({ deliverable, open, onOpenChange, pending, serverError, onConfirm }: DeliverProps) {
+export function DeliverDialog({ deliverable, open, onOpenChange, pending, serverError, onConfirm, onEditField = () => {} }: DeliverProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
@@ -129,13 +130,13 @@ export function DeliverDialog({ deliverable, open, onOpenChange, pending, server
             {deliverable.name} · Khách sẽ thấy lời nhắn và link này trên timeline portal.
           </DialogDescription>
         </DialogHeader>
-        {open && <DeliverBody pending={pending} serverError={serverError} onCancel={() => onOpenChange(false)} onConfirm={onConfirm} />}
+        {open && <DeliverBody pending={pending} serverError={serverError} onEdit={onEditField} onCancel={() => onOpenChange(false)} onConfirm={onConfirm} />}
       </DialogContent>
     </Dialog>
   )
 }
 
-function DeliverBody({ pending, serverError, onCancel, onConfirm }: Pick<DeliverProps, 'pending' | 'serverError' | 'onConfirm'> & { onCancel: () => void }) {
+function DeliverBody({ pending, serverError, onCancel, onConfirm, onEdit }: Pick<DeliverProps, 'pending' | 'serverError' | 'onConfirm'> & { onCancel: () => void; onEdit: () => void }) {
   const [url, setUrl] = useState('')
   const [message, setMessage] = useState('')
   const [touched, setTouched] = useState(false)
@@ -159,7 +160,7 @@ function DeliverBody({ pending, serverError, onCancel, onConfirm }: Pick<Deliver
         <Input
           id="deliver-url"
           value={url}
-          onChange={e => setUrl(e.target.value)}
+          onChange={e => { setUrl(e.target.value); onEdit() }}
           placeholder="https://drive.google.com/…"
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? 'deliver-url-error' : undefined}
@@ -168,7 +169,7 @@ function DeliverBody({ pending, serverError, onCancel, onConfirm }: Pick<Deliver
       </div>
       <div className="space-y-1.5">
         <Label htmlFor="deliver-message">Lời nhắn cho khách (tuỳ chọn)</Label>
-        <Textarea id="deliver-message" rows={3} maxLength={MESSAGE_MAX} value={message} onChange={e => setMessage(e.target.value)} />
+        <Textarea id="deliver-message" rows={3} maxLength={MESSAGE_MAX} value={message} onChange={e => { setMessage(e.target.value); onEdit() }} />
       </div>
       <DialogFooter className="gap-2">
         <Button type="button" variant="outline" onClick={onCancel}>Huỷ</Button>

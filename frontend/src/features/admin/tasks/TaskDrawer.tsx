@@ -122,7 +122,7 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
   const deliverables = project?.deliverables ?? []
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { register, handleSubmit, watch, setValue, setError, formState: { errors, isDirty } } = useForm<FormValues>({
+  const { register, handleSubmit, watch, setValue, setError, trigger, formState: { errors, isDirty } } = useForm<FormValues>({
     resolver: zodResolver(taskFormSchema) as any,
     defaultValues: {
       title: task.title,
@@ -195,7 +195,7 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
         </div>
         <div className="space-y-2">
           <Label htmlFor="task-startDate">Ngày bắt đầu</Label>
-          <DateInput id="task-startDate" value={watch('startDate')} onChange={v => setValue('startDate', v, { shouldDirty: true })} />
+          <DateInput id="task-startDate" value={watch('startDate')} onChange={v => { setValue('startDate', v, { shouldDirty: true }); if (watch('dueDate')) void trigger('dueDate') }} />
         </div>
         <div className="space-y-2">
           <Label htmlFor="task-dueDate">Hạn hoàn thành</Label>

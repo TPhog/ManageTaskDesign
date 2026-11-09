@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ApiError } from '@/lib/api'
 import type { ProjectDetail } from '@/lib/types'
-import { useTaskList } from '@/features/admin/tasks/useTasks'
+import { useAllProjectTasks } from '@/features/admin/tasks/useTasks'
 import { ApproveDialog, DeliverDialog, SubmitReviewDialog } from './DeliverableActionDialogs'
 import { flowErrorText, openTaskSummary } from './flowUtils'
 import type { DeliverableActionKind } from './useFlowActionRunner'
@@ -17,8 +17,8 @@ export function useDeliverableDialogs(project: ProjectDetail) {
   const submitReview = useSubmitReview()
   const confirmApproval = useConfirmApproval()
   const deliverableStatus = useDeliverableStatus()
-  // only needed for the submit warning: load once the dialog is first asked for
-  const tasks = useTaskList({ projectId: project.id, pageSize: 100 })
+  // only needed for the submit warning: loaded (all pages) while the submit dialog is open
+  const tasks = useAllProjectTasks(project.id, active?.kind === 'submit')
 
   const deliverable = active ? project.deliverables.find(d => d.id === active.id) : undefined
   const close = () => setActive(null)
@@ -34,7 +34,7 @@ export function useDeliverableDialogs(project: ProjectDetail) {
         deliverable={{ id: deliverable?.id ?? '', name: deliverable?.name ?? '' }}
         open={active?.kind === 'submit' && !!deliverable}
         onOpenChange={o => { if (!o) close() }}
-        openTasks={openTaskSummary(tasks.data?.items ?? [], deliverable?.id ?? '')}
+        openTasks={openTaskSummary(tasks.data ?? [], deliverable?.id ?? '')}
         pending={submitReview.isPending}
         onConfirm={clientMessage =>
           deliverable && submitReview.mutate({ deliverableId: deliverable.id, clientMessage: clientMessage ?? undefined }, { onSuccess: close })}
@@ -52,6 +52,7 @@ export function useDeliverableDialogs(project: ProjectDetail) {
         onOpenChange={o => { if (!o) close() }}
         pending={deliverableStatus.isPending}
         serverError={deliverError}
+        onEditField={() => setDeliverError(undefined)}
         onConfirm={v =>
           deliverable &&
           deliverableStatus.mutate(

@@ -57,6 +57,23 @@ export function useTaskCount(params: TaskListParams) {
   })
 }
 
+/** Every task of a project (follows the API's total across pages), loaded only while `enabled`. */
+export function useAllProjectTasks(projectId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: [...qk.tasks.lists, 'all', projectId],
+    enabled,
+    queryFn: async () => {
+      const items: TaskListItem[] = []
+      for (let page = 1; page <= 50; page++) {
+        const res = await api.get<PagedResult<TaskListItem>>(`/admin/tasks?${toQuery({ projectId, page, pageSize: 100 })}`)
+        items.push(...res.items)
+        if (items.length >= res.total || res.items.length === 0) break
+      }
+      return items
+    },
+  })
+}
+
 export function useTask(id: string | null) {
   return useQuery({
     queryKey: qk.tasks.detail(id ?? ''),

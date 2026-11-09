@@ -33,8 +33,10 @@ test.describe('Project detail (QA D-01, D-08, D-27)', () => {
     const reason = page.getByRole('dialog', { name: 'Mở lại dự án' })
     await expect(reason.getByRole('button', { name: 'Mở lại dự án' })).toBeDisabled()
     await reason.getByLabel('Lý do mở lại').fill('Khách cần thêm một bản in')
+    const sent = page.waitForRequest(r => r.method() !== 'GET' && r.url().includes(`/api/admin/projects/${projectId}`) && (r.postData() ?? '').includes('Khách cần thêm một bản in'))
     await reason.getByRole('button', { name: 'Mở lại dự án' }).click()
-    // reopening a completed project no longer warns: it goes straight through with the reason
+    // reopening a completed project no longer warns: it goes straight through, and the reason travels with it
+    expect((await sent).postDataJSON()).toMatchObject({ to: 'IN_PROGRESS', reason: 'Khách cần thêm một bản in' })
     await expect.poll(() => projectStatus(page, projectId)).toBe('IN_PROGRESS')
   })
 
