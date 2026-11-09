@@ -190,6 +190,40 @@ describe('SettingsPage per-section save (continued)', () => {
     expect(vi.mocked(api.put).mock.calls[0][1]).toMatchObject({ rowVersion: 7 })
     expect(vi.mocked(api.put).mock.calls[1][1]).toMatchObject({ rowVersion: 9, displayName: 'Đổi ở tab khác Y' })
   })
+
+  it('toggling the intake link refreshes the settings, so the next Portal-tab save carries the new rowVersion', async () => {
+    let intake = { enabled: false, slug: null as string | null, url: null as string | null }
+    vi.mocked(api.get).mockImplementation(async (path: string) => {
+      if (path === '/admin/settings') return { ...server }
+      if (path === '/admin/settings/intake') return { ...intake }
+      if (path === '/admin/request-templates') return []
+      throw new Error(`unexpected GET ${path}`)
+    })
+    vi.mocked(api.put).mockImplementation(async (path: string, body: unknown) => {
+      if (path === '/admin/settings/intake') {
+        // the intake toggle writes the settings row → its xmin moves on
+        server = { ...server, rowVersion: server.rowVersion + 1 }
+        intake = { enabled: (body as { enabled: boolean }).enabled, slug: 'abc', url: 'https://x/f/abc' }
+        return { ...intake }
+      }
+      if ((body as Settings).rowVersion !== server.rowVersion)
+        throw Object.assign(new Error('conflict'), { status: 409, code: 'CONCURRENCY_CONFLICT' })
+      server = { ...server, ...(body as Settings), rowVersion: server.rowVersion + 1 }
+      return undefined
+    })
+    renderPage('/admin/settings?tab=portal')
+    await userEvent.click(await screen.findByRole('switch', { name: 'Bật form khách mới' }))
+    await waitFor(() => expect(vi.mocked(api.get).mock.calls.filter(c => c[0] === '/admin/settings')).toHaveLength(2))
+
+    const time = screen.getByLabelText('Thời gian phản hồi dự kiến (hiện cho khách)')
+    await userEvent.clear(time)
+    await userEvent.type(time, 'trong 2 giờ')
+    await userEvent.click(screen.getByRole('button', { name: 'Lưu thời gian phản hồi' }))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Đã lưu thời gian phản hồi'))
+    expect(toast.error).not.toHaveBeenCalledWith(CONFLICT_MESSAGE)
+    const save = vi.mocked(api.put).mock.calls.find(c => c[0] === '/admin/settings')![1]
+    expect(save).toMatchObject({ rowVersion: 8, portalResponseTime: 'trong 2 giờ' })
+  })
 })
 
 describe('SettingsPage unsaved-changes guard', () => {

@@ -49,7 +49,11 @@ export function useUpdateIntakeLink() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (enabled: boolean) => api.put<IntakeLink>('/admin/settings/intake', { enabled }),
-    onSuccess: data => qc.setQueryData(qk.intakeLink, data),
+    onSuccess: data => {
+      qc.setQueryData(qk.intakeLink, data)
+      // the write bumps the settings row's xmin: refresh it or the next settings-section save 409s
+      return qc.invalidateQueries({ queryKey: qk.settings, exact: true })
+    },
   })
 }
 
@@ -57,6 +61,10 @@ export function useRegenerateIntakeLink() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => api.post<IntakeLink>('/admin/settings/intake/regenerate', {}),
-    onSuccess: data => qc.setQueryData(qk.intakeLink, data),
+    onSuccess: data => {
+      qc.setQueryData(qk.intakeLink, data)
+      // the write bumps the settings row's xmin: refresh it or the next settings-section save 409s
+      return qc.invalidateQueries({ queryKey: qk.settings, exact: true })
+    },
   })
 }
