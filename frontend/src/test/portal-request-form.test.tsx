@@ -49,6 +49,38 @@ describe('PortalRequestForm (CF-11/12)', () => {
   })
 })
 
+describe('PortalRequestForm with templates (plan 13)', () => {
+  const template = (fields: unknown[]) => [{ id: 't1', name: 'Poster', description: 'In hoặc online', fields }]
+  beforeEach(() => vi.mocked(api.postForm).mockReset())
+
+  it('focuses the first unanswered choice question instead of sending', async () => {
+    vi.mocked(api.get).mockImplementation(async (url: string) => url === '/portal/request-templates'
+      ? template([{ key: 'format', label: 'Hình thức', type: 'SINGLE_CHOICE', required: true, help: null, options: ['In ấn', 'Đăng online'] }])
+      : { deliverables: [] })
+    wrap(<PortalRequestForm projects={[{ id: 'p1', name: 'Tiệm bánh Mây' }]} withTemplates onSent={vi.fn()} />)
+
+    fireEvent.click(await screen.findByRole('radio', { name: /^Poster/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Gửi yêu cầu' }))
+
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole('group', { name: /Hình thức/ })))
+    expect(screen.getByText('Bắt buộc')).toBeInTheDocument()
+    expect(api.postForm).not.toHaveBeenCalled()
+  })
+
+  it('refuses a template request with nothing answered and no note, like the server', async () => {
+    vi.mocked(api.get).mockImplementation(async (url: string) => url === '/portal/request-templates'
+      ? template([{ key: 'style', label: 'Phong cách', type: 'SHORT_TEXT', required: false, help: null, options: [] }])
+      : { deliverables: [] })
+    wrap(<PortalRequestForm projects={[{ id: 'p1', name: 'Tiệm bánh Mây' }]} withTemplates onSent={vi.fn()} />)
+
+    fireEvent.click(await screen.findByRole('radio', { name: /^Poster/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Gửi yêu cầu' }))
+
+    expect(await screen.findByText('Trả lời ít nhất một câu hỏi hoặc viết ghi chú thêm')).toBeInTheDocument()
+    expect(api.postForm).not.toHaveBeenCalled()
+  })
+})
+
 describe('RequestSentSummary (CF-13)', () => {
   it('recaps the request with the expected response time', () => {
     const summary: SentRequestSummary = {

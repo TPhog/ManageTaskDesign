@@ -160,3 +160,13 @@ export function fieldsError(fields: TemplateField[]): string | null {
 }
 
 export const imagesField = (fields: TemplateField[]) => fields.find(f => f.type === 'IMAGES')
+
+/** Same text as TemplateAnswers.NothingAnswered (400 errors.answers). */
+export const NOTHING_ANSWERED = 'Trả lời ít nhất một câu hỏi hoặc viết ghi chú thêm'
+
+/** Mirrors the server refusal of a template request with no answer, no photo for its images question and no note. */
+export function nothingAnswered(fields: TemplateField[], drafts: AnswerDrafts, imageCount: number, note: string): boolean {
+  if (note.trim()) return false
+  if (imageCount > 0 && imagesField(fields)) return false
+  return Object.keys(toAnswersPayload(fields, drafts)).length === 0
+}

@@ -94,7 +94,7 @@ function Question({ field, idPrefix, drafts, onChange, errors, files, onFilesCha
       )
     case 'SINGLE_CHOICE':
       return (
-        <Choices legend={title} describedBy={describedBy} footer={footer}>
+        <Choices id={id} invalid={!!error} legend={title} describedBy={describedBy} footer={footer}>
           {field.options.map(o => (
             <label key={o} className={choiceRow}>
               <input type="radio" name={id} value={o} checked={draft === o} disabled={disabled} className="h-4 w-4 accent-primary" onChange={() => set(o)} />
@@ -111,7 +111,7 @@ function Question({ field, idPrefix, drafts, onChange, errors, files, onFilesCha
     case 'MULTI_CHOICE': {
       const picked = (draft as string[]) ?? []
       return (
-        <Choices legend={title} describedBy={describedBy} footer={footer}>
+        <Choices id={id} invalid={!!error} legend={title} describedBy={describedBy} footer={footer}>
           {field.options.map(o => (
             <label key={o} className={choiceRow}>
               <input type="checkbox" checked={picked.includes(o)} disabled={disabled} className="h-4 w-4 accent-primary"
@@ -125,7 +125,7 @@ function Question({ field, idPrefix, drafts, onChange, errors, files, onFilesCha
     case 'SIZE': {
       const s = draft as SizeDraft
       return (
-        <Choices legend={title} describedBy={describedBy} footer={footer}>
+        <Choices id={id} invalid={!!error} legend={title} describedBy={describedBy} footer={footer}>
           {field.options.map(o => (
             <label key={o} className={choiceRow}>
               <input type="radio" name={id} checked={s.mode === 'preset' && s.preset === o} disabled={disabled} className="h-4 w-4 accent-primary"
@@ -135,7 +135,7 @@ function Question({ field, idPrefix, drafts, onChange, errors, files, onFilesCha
           ))}
           <label className={choiceRow}>
             <input type="radio" name={id} checked={s.mode === 'custom'} disabled={disabled} className="h-4 w-4 accent-primary"
-              aria-label="Kích thước tuỳ chỉnh" onChange={() => set({ ...s, mode: 'custom', preset: '' })} />
+              onChange={() => set({ ...s, mode: 'custom', preset: '' })} />
             Tuỳ chỉnh (rộng × cao)
           </label>
           {s.mode === 'custom' && (
@@ -179,9 +179,12 @@ function Question({ field, idPrefix, drafts, onChange, errors, files, onFilesCha
   }
 }
 
-function Choices({ legend, describedBy, footer, children }: { legend: ReactNode; describedBy?: string; footer: ReactNode; children: ReactNode }) {
+/** The fieldset carries the question id (tabIndex -1) so a form can focus the first unanswered choice question. */
+function Choices({ id, invalid, legend, describedBy, footer, children }: {
+  id: string; invalid: boolean; legend: ReactNode; describedBy?: string; footer: ReactNode; children: ReactNode
+}) {
   return (
-    <fieldset className="space-y-2" aria-describedby={describedBy}>
+    <fieldset id={id} tabIndex={-1} aria-invalid={invalid || undefined} className="scroll-mt-4 space-y-2 focus:outline-none" aria-describedby={describedBy}>
       <legend className="text-sm font-medium text-foreground">{legend}</legend>
       <div className="grid gap-2 sm:grid-cols-2">{children}</div>
       {footer}

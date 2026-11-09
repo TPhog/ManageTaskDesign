@@ -36,12 +36,24 @@ describe('TemplateFields', () => {
 
   it('offers a custom width × height with a unit', async () => {
     render(<Harness />)
-    await userEvent.click(screen.getByRole('radio', { name: 'Kích thước tuỳ chỉnh' }))
+    await userEvent.click(screen.getByRole('radio', { name: 'Tuỳ chỉnh (rộng × cao)' }))
     await userEvent.type(screen.getByRole('textbox', { name: 'Chiều rộng' }), '60')
     await userEvent.type(screen.getByRole('textbox', { name: 'Chiều cao' }), '160')
     await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Đơn vị' }), 'cm')
 
     expect(screen.getByTestId('drafts').textContent).toContain('"size":{"mode":"custom","preset":"","width":"60","height":"160","unit":"cm"}')
+  })
+
+  it('gives every question a focusable element with the question id, choice groups included', () => {
+    render(<Harness errors={{ size: 'Bắt buộc' }} />)
+    for (const key of ['headline', 'style', 'size']) {
+      const el = document.getElementById(`t-${key}`)
+      expect(el, key).not.toBeNull()
+      el!.focus()
+      expect(document.activeElement).toBe(el)
+    }
+    expect(document.getElementById('t-size')).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByRole('group', { name: /Kích thước/ })).toHaveAccessibleDescription(expect.stringContaining('Bắt buộc'))
   })
 
   it('shows the error under the question and marks the input invalid', () => {

@@ -21,7 +21,8 @@ import { splitWordmark } from '@/features/portal/kit/wordmark'
 import type { ApiError } from '@/lib/api'
 import { isStorageFull } from '@/lib/images'
 import {
-  FORM_ERROR_KEY, TEMPLATE_LIMITS, answerErrorsFromApi, emptyDrafts, toAnswersPayload, validateDrafts, type AnswerDrafts,
+  FORM_ERROR_KEY, NOTHING_ANSWERED, TEMPLATE_LIMITS, answerErrorsFromApi, emptyDrafts, nothingAnswered, toAnswersPayload, validateDrafts,
+  type AnswerDrafts,
 } from '@/lib/requestTemplates'
 import { contactSchema, intakeErrorMessage, isFormExpired, toIntakeForm, type IntakeContact } from './intake'
 import { usePublicIntakeForm, useSubmitIntake } from './usePublicIntake'
@@ -101,13 +102,18 @@ export default function PublicIntakePage() {
     const contactOk = await trigger()
     const answerErrs = template ? validateDrafts(fields, drafts, filesToSend.length, todayVn()) : {}
     const noteErr = !template && note.trim().length === 0 ? 'Mô tả yêu cầu của bạn' : null
+    const firstAnswer = fields.find(f => answerErrs[f.key])?.key
+    // the server refuses a template request with nothing in it: say so before spending one of the hourly sends
+    if (template && !firstAnswer && nothingAnswered(fields, drafts, filesToSend.length, note)) answerErrs[FORM_ERROR_KEY] = NOTHING_ANSWERED
     setAnswerErrors(answerErrs)
     setNoteError(noteErr)
-    const firstAnswer = fields.find(f => answerErrs[f.key])?.key
     const firstContact = CONTACT_FIELDS.find(f => getFieldState(f).invalid)
-    if (firstAnswer || noteErr || !contactOk) {
-      const target = firstAnswer ? `intake-${firstAnswer}` : noteErr ? 'intake-note' : `intake-${firstContact}`
-      document.getElementById(target)?.focus()
+    if (firstAnswer || noteErr || answerErrs[FORM_ERROR_KEY] || !contactOk) {
+      const target = firstAnswer ? `intake-${firstAnswer}` : noteErr || answerErrs[FORM_ERROR_KEY] ? 'intake-note' : `intake-${firstContact}`
+      const el = document.getElementById(target)
+      if (el) el.focus()
+      if (answerErrs[FORM_ERROR_KEY]) toast.error(answerErrs[FORM_ERROR_KEY])
+      else if (!el) toast.error('Còn thông tin chưa điền — vui lòng kiểm tra lại.')
       return
     }
     if (!form) return

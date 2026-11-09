@@ -14,7 +14,8 @@ import type { ApiError } from '@/lib/api'
 import { MAX_PORTAL_IMAGES } from '@/lib/images'
 import type { PortalDeliverable, PortalProjectListItem, PortalRequest } from '@/lib/portalTypes'
 import {
-  FORM_ERROR_KEY, TEMPLATE_LIMITS, answerErrorsFromApi, emptyDrafts, toAnswersPayload, validateDrafts, type AnswerDrafts,
+  FORM_ERROR_KEY, NOTHING_ANSWERED, TEMPLATE_LIMITS, answerErrorsFromApi, emptyDrafts, nothingAnswered, toAnswersPayload, validateDrafts,
+  type AnswerDrafts,
 } from '@/lib/requestTemplates'
 import { REQUEST_MAX_LENGTH, quotaLine, requestErrorMessage, requestSchema, type RequestFormValues } from './requests'
 import { RequestKindPicker } from './RequestKindPicker'
@@ -90,10 +91,11 @@ export function PortalRequestForm({
   function onSubmit(values: RequestFormValues) {
     if (template) {
       const errs = validateDrafts(template.fields, drafts, files.length, todayVn())
-      setAnswerErrors(errs)
       const firstKey = template.fields.find(f => errs[f.key])?.key
-      if (firstKey) {
-        document.getElementById(`request-${firstKey}`)?.focus()
+      if (!firstKey && nothingAnswered(template.fields, drafts, files.length, values.content)) errs[FORM_ERROR_KEY] = NOTHING_ANSWERED
+      setAnswerErrors(errs)
+      if (firstKey || errs[FORM_ERROR_KEY]) {
+        focusOrWarn(firstKey ? `request-${firstKey}` : 'request-content')
         return
       }
     }
@@ -248,4 +250,11 @@ export function PortalRequestForm({
       </fieldset>
     </form>
   )
+}
+
+/** Focus the first question to fix; if it cannot take focus, at least say why nothing was sent. */
+function focusOrWarn(id: string) {
+  const el = document.getElementById(id)
+  if (el) el.focus()
+  else toast.error('Còn câu hỏi chưa trả lời — vui lòng kiểm tra lại.')
 }

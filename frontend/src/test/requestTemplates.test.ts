@@ -1,6 +1,6 @@
 import {
   FORM_ERROR_KEY, answerErrorsFromApi, emptyDrafts, fieldsError, moveItem, newField, newFieldKey, parseOptions,
-  toAnswersPayload, validateDrafts, type AnswerDrafts,
+  nothingAnswered, toAnswersPayload, validateDrafts, type AnswerDrafts,
 } from '@/lib/requestTemplates'
 import type { TemplateField } from '@/lib/requestTemplateTypes'
 
@@ -52,6 +52,17 @@ describe('validateDrafts', () => {
     expect(validateDrafts(fields, ok, 1, '2026-11-13')).toEqual({})
     const zero: AnswerDrafts = { ...ok, size: { mode: 'custom', preset: '', width: '0', height: '10', unit: 'cm' } }
     expect(validateDrafts(fields, zero, 1, '2026-11-13')).toEqual({ size: 'Nhập chiều rộng và chiều cao lớn hơn 0' })
+  })
+})
+
+describe('nothingAnswered', () => {
+  it('is true only with no answer, no photo for the images question and no note', () => {
+    const empty = emptyDrafts(fields)
+    expect(nothingAnswered(fields, empty, 0, '  ')).toBe(true)
+    expect(nothingAnswered(fields, empty, 0, 'Gấp')).toBe(false)
+    expect(nothingAnswered(fields, empty, 1, '')).toBe(false)
+    expect(nothingAnswered(fields.filter(f => f.type !== 'IMAGES'), empty, 1, '')).toBe(true)
+    expect(nothingAnswered(fields, { ...empty, budget: '500.000' }, 0, '')).toBe(false)
   })
 })
 
