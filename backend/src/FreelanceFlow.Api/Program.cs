@@ -283,6 +283,7 @@ app.MapWatermarkEndpoints();
 app.MapRequestTemplatesEndpoints();
 app.MapIntakeLinkEndpoints();
 app.MapPublicIntakeEndpoints();
+app.MapIntakeInboxEndpoints();
 app.MapDigestSettingsEndpoints();
 app.MapProjectFlowEndpoints();
 app.MapPortalSessionEndpoints();
