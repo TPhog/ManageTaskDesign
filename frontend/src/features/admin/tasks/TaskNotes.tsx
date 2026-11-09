@@ -30,7 +30,7 @@ export function TaskNotes({ taskId, onDirtyChange }: { taskId: string; onDirtyCh
   return (
     <section aria-labelledby="task-notes-heading" className="space-y-3">
       <div>
-        <h3 id="task-notes-heading" className="text-sm font-semibold text-foreground">Ghi chú ({notes?.length ?? 0})</h3>
+        <h3 id="task-notes-heading" className="font-display text-base font-bold text-foreground">Ghi chú ({notes?.length ?? 0})</h3>
         <p className="text-xs text-muted-foreground">Chỉ bạn thấy — khách không xem được.</p>
       </div>
       <form onSubmit={submit} className="space-y-2">
@@ -113,7 +113,7 @@ function NoteItem({ note, saving, deleting, onSave, onDelete, onEditingChange }:
               type="button"
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-muted-foreground hover:text-red-700"
+              className="h-8 w-8 text-muted-foreground hover:text-danger"
               aria-label="Xoá ghi chú"
               onClick={() => setConfirming(true)}
             >

@@ -8,36 +8,56 @@ const statusText = { done: ' (đã xong)', current: ' (hiện tại)', upcoming:
 /** Plan 06b §6: 5 derived stages; on mobile a single line "Giai đoạn 3/5 · Thực hiện". */
 export function FlowStepper({ flow }: { flow: FlowState }) {
   return (
-    <nav aria-label="Giai đoạn dự án" className="rounded-xl border bg-card px-4 py-3 shadow-card">
-      <p className="text-sm font-medium text-foreground sm:hidden">{stepperSummary(flow)}</p>
-      <ol className="hidden items-center gap-2 sm:flex">
+    <nav aria-label="Giai đoạn dự án" className="rounded-xl border bg-card px-5 py-4 shadow-card">
+      <div className="sm:hidden">
+        <p className="text-sm font-semibold text-foreground">{stepperSummary(flow)}</p>
+        <div className="mt-2.5 flex gap-1" aria-hidden="true">
+          {flow.steps.map(step => (
+            <span
+              key={step.stage}
+              className={cn(
+                'h-1.5 flex-1 rounded-full',
+                step.status === 'done' && 'bg-primary',
+                step.status === 'current' && 'bg-highlight',
+                step.status === 'upcoming' && 'bg-border',
+              )}
+            />
+          ))}
+        </div>
+      </div>
+      <ol className="hidden sm:flex">
         {flow.steps.map((step, i) => (
           <li
             key={step.stage}
             aria-current={step.status === 'current' ? 'step' : undefined}
-            className="flex flex-1 items-center gap-2"
+            className="relative flex min-w-0 flex-1 flex-col gap-2 pr-3 last:pr-0"
           >
+            {i < flow.steps.length - 1 && (
+              <span
+                className={cn('absolute left-9 right-1 top-[13px] h-0.5 rounded-full', step.status === 'done' ? 'bg-primary' : 'bg-border')}
+                aria-hidden="true"
+              />
+            )}
             <span
               className={cn(
-                'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
-                step.status === 'done' && 'bg-emerald-500 text-white',
-                step.status === 'current' && 'bg-primary text-primary-foreground ring-4 ring-primary/15',
-                step.status === 'upcoming' && 'bg-muted text-muted-foreground',
+                'relative flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                step.status === 'done' && 'bg-primary text-primary-foreground',
+                step.status === 'current' && 'bg-highlight text-highlight-foreground ring-[5px] ring-highlight-soft',
+                step.status === 'upcoming' && 'border-[1.5px] border-border-strong bg-card text-muted-foreground',
               )}
               aria-hidden="true"
             >
-              {step.status === 'done' ? <Check className="h-4 w-4" /> : i + 1}
+              {step.status === 'done' ? <Check className="h-3.5 w-3.5" strokeWidth={2.6} /> : i + 1}
             </span>
             <span
               className={cn(
-                'whitespace-nowrap text-sm',
-                step.status === 'current' ? 'font-semibold text-foreground' : 'text-muted-foreground',
+                'text-sm font-semibold leading-snug',
+                step.status === 'upcoming' ? 'text-muted-foreground' : 'text-foreground',
               )}
             >
               {stageLabel[step.stage]}
               <span className="sr-only">{statusText[step.status]}</span>
             </span>
-            {i < flow.steps.length - 1 && <span className="h-px min-w-4 flex-1 bg-border" aria-hidden="true" />}
           </li>
         ))}
       </ol>

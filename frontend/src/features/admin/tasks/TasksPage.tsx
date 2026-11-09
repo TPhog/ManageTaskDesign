@@ -164,7 +164,7 @@ export default function TasksPage() {
                 onClick={() => setFilter('view', mode === 'calendar' ? 'calendar' : undefined)}
                 className={cn(
                   'inline-flex min-h-10 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8',
-                  calendar === (mode === 'calendar') ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                  calendar === (mode === 'calendar') ? 'bg-card text-foreground shadow-card' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
                 <Icon className="h-4 w-4" aria-hidden="true" />
@@ -203,7 +203,7 @@ export default function TasksPage() {
                     onClick={() => setFilter('due', f.value === 'all' ? undefined : f.value)}
                     className={cn(
                       'inline-flex min-h-10 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8',
-                      current.value === f.value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                      current.value === f.value ? 'bg-card text-foreground shadow-card' : 'text-muted-foreground hover:text-foreground',
                     )}
                   >
                     {f.label}

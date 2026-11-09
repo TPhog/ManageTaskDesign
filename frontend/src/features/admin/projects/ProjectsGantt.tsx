@@ -4,12 +4,12 @@ import { EmptyState } from '@/components/EmptyState'
 import type { ProjectListItem, ProjectStatus } from '@/lib/types'
 
 const statusColor: Record<ProjectStatus, string> = {
-  DRAFT: '#94a3b8',
-  QUOTED: '#8b5cf6',
-  IN_PROGRESS: '#3b82f6',
-  ON_HOLD: '#f59e0b',
-  COMPLETED: '#10b981',
-  CANCELLED: '#ef4444',
+  DRAFT: 'var(--muted-foreground)',
+  QUOTED: 'var(--border-strong)',
+  IN_PROGRESS: 'var(--foreground)',
+  ON_HOLD: 'var(--warning)',
+  COMPLETED: 'var(--success)',
+  CANCELLED: 'var(--danger)',
 }
 
 const statusLabel: Record<ProjectStatus, string> = {
@@ -115,16 +115,16 @@ export function ProjectsGantt({ projects }: Props) {
           {/* header row */}
           {monthTicks.map((t, i) => (
             <g key={i}>
-              <line x1={t.x} y1={PADDING_Y + 20} x2={t.x} y2={svgH} stroke="#e5e7eb" strokeWidth={1} />
-              <text x={t.x + 4} y={PADDING_Y + 14} fontSize={11} fill="#9ca3af">{t.label}</text>
+              <line x1={t.x} y1={PADDING_Y + 20} x2={t.x} y2={svgH} strokeWidth={1} style={{ stroke: 'var(--border)' }} />
+              <text x={t.x + 4} y={PADDING_Y + 14} fontSize={11} style={{ fill: 'var(--muted-foreground)' }}>{t.label}</text>
             </g>
           ))}
 
           {/* today line */}
           {todayX >= LABEL_W && todayX <= svgW && (
             <>
-              <line x1={todayX} y1={PADDING_Y + 20} x2={todayX} y2={svgH} stroke="#ef4444" strokeWidth={1.5} strokeDasharray="4,3" />
-              <text x={todayX + 3} y={PADDING_Y + 14} fontSize={10} fill="#ef4444">Hôm nay</text>
+              <line x1={todayX} y1={PADDING_Y + 20} x2={todayX} y2={svgH} strokeWidth={1.5} strokeDasharray="4,3" style={{ stroke: 'var(--highlight-text)' }} />
+              <text x={todayX + 3} y={PADDING_Y + 14} fontSize={10} fontWeight={600} style={{ fill: 'var(--highlight-text)' }}>Hôm nay</text>
             </>
           )}
 
@@ -143,14 +143,14 @@ export function ProjectsGantt({ projects }: Props) {
               p.status !== 'COMPLETED' &&
               p.status !== 'CANCELLED'
 
-            const fillColor = isOverdue ? '#ef4444' : statusColor[p.status]
+            const fillColor = isOverdue ? 'var(--highlight)' : statusColor[p.status]
 
             return (
               <g key={p.id} onClick={() => navigate(`/admin/projects/${p.id}`)} style={{ cursor: 'pointer' }}>
                 {/* zebra */}
-                <rect x={0} y={y - 2} width={svgW} height={ROW_H} fill={i % 2 === 0 ? 'transparent' : '#f9fafb'} />
+                <rect x={0} y={y - 2} width={svgW} height={ROW_H} style={{ fill: i % 2 === 0 ? 'transparent' : 'var(--surface-sunk)' }} />
                 {/* label */}
-                <text x={4} y={y + ROW_H / 2 + 4} fontSize={12} fill="#374151" className="truncate">
+                <text x={4} y={y + ROW_H / 2 + 4} fontSize={12} style={{ fill: 'var(--foreground)' }} className="truncate">
                   {p.name.length > 22 ? p.name.slice(0, 20) + '…' : p.name}
                 </text>
                 {/* bar */}
@@ -160,7 +160,7 @@ export function ProjectsGantt({ projects }: Props) {
                   width={barW}
                   height={ROW_H - 14}
                   rx={3}
-                  fill={fillColor}
+                  style={{ fill: fillColor }}
                   opacity={p.status === 'CANCELLED' ? 0.4 : 0.85}
                 />
               </g>

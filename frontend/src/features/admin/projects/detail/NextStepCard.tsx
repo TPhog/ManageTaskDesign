@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom'
 import { AlertTriangle, Info } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { cn } from '@/lib/utils'
 import type { ProjectDetail } from '@/lib/types'
 import type { FlowState } from '@/lib/flowTypes'
 import { FlowActionButton } from '@/features/admin/flow/FlowActionControls'
@@ -14,7 +13,8 @@ import { StartProjectDialog } from './StartProjectDialog'
 import { completeTransition, quotedTransition } from './projectStatus'
 import { useProjectStatusChange } from './useProjectStatusChange'
 
-const panelClass = 'rounded-xl border bg-card p-5 shadow-card'
+/** The ink tile of the Studio Bento detail page: tokens inside re-point, so buttons and skeletons adapt */
+const panelClass = 'tone-inverse rounded-xl p-5 shadow-card'
 
 interface Props {
   project: ProjectDetail
@@ -80,21 +80,19 @@ export function NextStepCard({ project, flow, isLoading, isError, isFetching }: 
 
   return (
     <section aria-labelledby="next-step-heading" className={panelClass}>
-      <h2 id="next-step-heading" className="text-sm font-semibold text-foreground">Bước tiếp theo</h2>
+      <h2 id="next-step-heading" className="kicker text-on-inverse-accent">Bước tiếp theo</h2>
 
       {flow.warnings.length > 0 && (
         <ul aria-label="Cảnh báo" className="mt-3 space-y-2">
           {flow.warnings.map((w, i) => (
             <li
               key={`${w.kind}-${i}`}
-              className={cn(
-                'flex items-start gap-2 rounded-lg px-3 py-2 text-sm',
-                w.severity === 'warning' ? 'bg-amber-50 text-amber-800' : 'bg-slate-100 text-slate-700',
-              )}
+              className="flex items-start gap-2 rounded-md border border-border px-3 py-2 text-sm text-foreground"
             >
+              {/* red text fails contrast on ink: the icon carries the tone, light vermilion vs muted */}
               {w.severity === 'warning'
-                ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                : <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />}
+                ? <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-on-inverse-accent" aria-hidden="true" />
+                : <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
               {w.message}
             </li>
           ))}
@@ -110,7 +108,7 @@ export function NextStepCard({ project, flow, isLoading, isError, isFetching }: 
       ) : (
         <>
           <div className="mt-4">
-            <FlowActionButton action={primary} projectId={project.id} busy={busy} onRun={runner.run} />
+            <FlowActionButton action={primary} projectId={project.id} busy={busy} onRun={runner.run} highlightPrimary />
           </div>
           {others.length > 0 && (
             <div className="mt-3 flex flex-wrap items-center gap-2">

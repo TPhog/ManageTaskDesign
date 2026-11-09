@@ -30,7 +30,7 @@ export function ProjectStatusControl({ project }: { project: ProjectDetail }) {
           {transitions.map(t => (
             <DropdownMenuItem
               key={t.to}
-              className={t.destructive ? 'text-red-700 focus:text-red-700' : undefined}
+              className={t.destructive ? 'text-danger focus:text-danger' : undefined}
               onClick={() => change.request(t)}
             >
               {t.label}

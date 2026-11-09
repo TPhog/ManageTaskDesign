@@ -4,7 +4,7 @@ import { QuotaMeter } from '@/components/QuotaMeter'
 test('a deliverable with no free rounds shows a neutral line, not a full red bar', () => {
   const { container } = render(<QuotaMeter used={0} total={0} label="vòng" />)
   expect(screen.getByText('Không có vòng sửa miễn phí')).toBeInTheDocument()
-  expect(container.querySelector('.bg-red-500')).toBeNull()
+  expect(container.querySelector('.bg-danger')).toBeNull()
   expect(screen.queryByText(/0\/0/)).toBeNull()
 })
 

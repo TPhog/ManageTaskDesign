@@ -4,6 +4,7 @@ import { StatusBadge } from '@/components/StatusBadge'
 import { EmptyState } from '@/components/EmptyState'
 import { Button } from '@/components/ui/button'
 import { formatDate } from '@/lib/format'
+import { tableHeadRowClass, tableRowClass } from '@/components/dataTable'
 import type { ProjectListItem } from '@/lib/types'
 
 const designTypeLabel: Record<string, string> = {
@@ -47,10 +48,10 @@ export function ProjectsTable({ projects, filtering, onCreate }: Props) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="whitespace-nowrap border-b bg-muted/50 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <tr className={tableHeadRowClass}>
             <th scope="col" className="px-4 py-3">Tên dự án</th>
             <th scope="col" className="hidden px-4 py-3 md:table-cell">Khách hàng</th>
             <th scope="col" className="hidden px-4 py-3 lg:table-cell">Loại</th>
@@ -60,7 +61,7 @@ export function ProjectsTable({ projects, filtering, onCreate }: Props) {
             <th scope="col" className="hidden px-4 py-3 text-right sm:table-cell">Hạng mục</th>
           </tr>
         </thead>
-        <tbody className="divide-y">
+        <tbody>
           {projects.map(p => {
             const isOverdue =
               p.dueDate &&
@@ -72,14 +73,14 @@ export function ProjectsTable({ projects, filtering, onCreate }: Props) {
               <tr
                 key={p.id}
                 onClick={() => navigate(`/admin/projects/${p.id}`)}
-                className="cursor-pointer transition-colors duration-150 hover:bg-muted/40"
+                className={`cursor-pointer ${tableRowClass}`}
               >
                 <td className="px-4 py-3.5">
                   {/* real link so the row is reachable by keyboard and opens in a new tab */}
                   <Link
                     to={`/admin/projects/${p.id}`}
                     onClick={e => e.stopPropagation()}
-                    className="line-clamp-1 font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                    className="link-hover line-clamp-1 font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
                   >
                     {p.name}
                   </Link>
@@ -96,7 +97,7 @@ export function ProjectsTable({ projects, filtering, onCreate }: Props) {
                   {formatDate(p.startDate)}
                 </td>
                 <td className="px-4 py-3.5">
-                  <span className={`tabular-nums ${isOverdue ? 'font-medium text-red-700' : 'text-muted-foreground'}`}>
+                  <span className={`tabular-nums ${isOverdue ? 'font-semibold text-danger' : 'text-muted-foreground'}`}>
                     {formatDate(p.dueDate)}
                     {isOverdue && <span className="sr-only"> (quá hạn)</span>}
                   </span>

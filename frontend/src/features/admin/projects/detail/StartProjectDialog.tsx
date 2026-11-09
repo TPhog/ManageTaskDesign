@@ -91,7 +91,7 @@ function StartForm({ project, preview, warnings, onClose }: FormProps) {
       {warnings.length > 0 && (
         <ul aria-label="Cảnh báo khi bắt đầu" className="space-y-1.5">
           {warnings.map((w, i) => (
-            <li key={`${w.kind}-${i}`} className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <li key={`${w.kind}-${i}`} className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               {w.message}
             </li>

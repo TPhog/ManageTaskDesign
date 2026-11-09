@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { Link2, ListChecks, Repeat } from 'lucide-react'
 import { StatusBadge } from '@/components/StatusBadge'
+import { tableHeadRowClass, tableRowClass } from '@/components/dataTable'
 import { cn } from '@/lib/utils'
 import type { TaskGroup, TaskListItem } from '@/lib/types'
 import { BlockedLine, DueText, PriorityBadge } from './TaskMeta'
@@ -30,10 +31,10 @@ export function TaskTable({ tasks, onOpen, showProject = false, groups }: Props)
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="relative overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="whitespace-nowrap border-b bg-muted/50 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <tr className={tableHeadRowClass}>
             <th scope="col" className="px-4 py-3">Công việc</th>
             {showProject && <th scope="col" className="hidden px-4 py-3 md:table-cell">Dự án</th>}
             <th scope="col" className="px-4 py-3">Trạng thái</th>
@@ -44,22 +45,22 @@ export function TaskTable({ tasks, onOpen, showProject = false, groups }: Props)
           </tr>
         </thead>
         {runs.map((run, r) => (
-          <tbody key={`${r}-${run.key ?? ''}`} className={cn('divide-y', r > 0 && 'border-t')}>
+          <tbody key={`${r}-${run.key ?? ''}`} className={cn(r > 0 && 'border-t')}>
             {run.key != null && (
               <tr>
-                <th scope="rowgroup" colSpan={columns} className="bg-muted/50 px-4 py-2 text-left text-xs font-semibold text-foreground">
+                <th scope="rowgroup" colSpan={columns} className="border-b bg-surface-sunk px-4 py-2.5 text-left text-sm font-semibold text-foreground">
                   {groupOf(run.key)?.label ?? run.key}
-                  <span className="ml-2 tabular-nums text-muted-foreground">{groupOf(run.key)?.count ?? ''}</span>
+                  <span className="ml-2 rounded-full border border-border-strong bg-card px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground">{groupOf(run.key)?.count ?? ''}</span>
                 </th>
               </tr>
             )}
             {run.rows.map(t => (
-              <tr key={t.id} className="transition-colors duration-150 hover:bg-muted/40">
+              <tr key={t.id} className={tableRowClass}>
                 <td className="px-4 py-3">
                   <button
                     type="button"
                     onClick={() => onOpen(t.id)}
-                    className="rounded-sm text-left font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="link-hover rounded-sm text-left font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     {t.title}
                   </button>
@@ -80,7 +81,7 @@ export function TaskTable({ tasks, onOpen, showProject = false, groups }: Props)
                   <td className="hidden px-4 py-3 md:table-cell">
                     <Link
                       to={`/admin/projects/${t.projectId}?tab=tasks`}
-                      className="rounded-sm text-foreground hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="link-hover rounded-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     >
                       {t.projectName}
                     </Link>

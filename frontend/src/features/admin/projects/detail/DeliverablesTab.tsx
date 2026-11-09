@@ -99,7 +99,7 @@ export function DeliverablesTab({ project }: { project: ProjectDetail }) {
             return (
               <li key={d.id} className="flex flex-col gap-3 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-4">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">{d.name}</p>
+                  <p className="truncate text-sm font-semibold text-foreground">{d.name}</p>
                   <p className="text-xs text-muted-foreground">
                     Số lượng: {d.quantity} · Giá vòng sửa thêm: <MoneyText amount={d.extraRoundPrice} />
                   </p>
@@ -110,7 +110,7 @@ export function DeliverablesTab({ project }: { project: ProjectDetail }) {
                         <Link
                           key={r.quotationId}
                           to={`/admin/quotations/${r.quotationId}`}
-                          className="rounded-full bg-secondary px-2 py-0.5 font-medium text-secondary-foreground hover:underline"
+                          className="link-hover rounded-full border bg-surface-sunk px-2 py-0.5 font-semibold text-foreground"
                         >
                           {quoteRefLabel(r)}
                         </Link>
@@ -125,9 +125,9 @@ export function DeliverablesTab({ project }: { project: ProjectDetail }) {
                         aria-valuemin={0}
                         aria-valuemax={100}
                         aria-valuenow={d.progressPercent}
-                        className="h-1.5 w-28 overflow-hidden rounded-full bg-muted"
+                        className="h-1.5 w-28 overflow-hidden rounded-full bg-border"
                       >
-                        <div className="h-full rounded-full bg-primary transition-[width] duration-300" style={{ width: `${d.progressPercent}%` }} />
+                        <div className="h-full rounded-full bg-foreground transition-[width] duration-300" style={{ width: `${d.progressPercent}%` }} />
                       </div>
                       <span className="text-xs tabular-nums text-muted-foreground">
                         {d.taskDone}/{d.taskTotal} việc · {d.progressPercent}%
@@ -136,7 +136,7 @@ export function DeliverablesTab({ project }: { project: ProjectDetail }) {
                   )}
                   {approvedOnPortal && (
                     <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 px-2 py-0.5 text-xs font-medium text-teal-700 ring-1 ring-inset ring-teal-200">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-success-soft px-2.5 py-0.5 text-xs font-semibold text-success ring-1 ring-inset ring-success/25">
                         <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
                         Khách đã duyệt trên portal
                       </span>
@@ -208,7 +208,7 @@ export function DeliverablesTab({ project }: { project: ProjectDetail }) {
                           {next.map(t => (
                             <DropdownMenuItem
                               key={t.to}
-                              className={t.to === 'CANCELLED' ? 'text-red-700 focus:text-red-700' : undefined}
+                              className={t.to === 'CANCELLED' ? 'text-danger focus:text-danger' : undefined}
                               onClick={() => changeStatus(d, t.to)}
                             >
                               {t.label}

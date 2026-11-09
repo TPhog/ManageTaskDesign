@@ -141,16 +141,16 @@ function BoardColumn({ projectId, status, activeStatus, tasks, today, onOpen, on
       ref={setNodeRef}
       aria-label={`Cột ${label}`}
       className={cn(
-        'flex min-h-[24rem] w-64 min-w-[16rem] shrink-0 flex-col lg:w-auto lg:min-w-0 gap-2 rounded-xl bg-muted/60 p-2.5 transition-shadow duration-150',
+        'flex min-h-[24rem] w-64 min-w-[16rem] shrink-0 flex-col lg:w-auto lg:min-w-0 gap-2.5 rounded-xl bg-surface-hover p-3 transition-shadow duration-150',
         isOver && 'ring-2 ring-primary/40',
       )}
     >
-      <div className="flex items-center justify-between px-1.5 pt-0.5">
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</h3>
-        <span className="rounded-full bg-card px-2 text-xs tabular-nums text-muted-foreground">{tasks.length}</span>
+      <div className="flex items-center gap-2 px-1.5 pb-1 pt-0.5">
+        <h3 className="text-sm font-semibold normal-case tracking-normal text-foreground">{label}</h3>
+        <span className="rounded-full border border-border-strong bg-card px-2 py-0.5 text-xs font-semibold tabular-nums text-muted-foreground">{tasks.length}</span>
       </div>
       <SortableContext id={status} items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-2.5">
           {tasks.map(t => (
             <SortableCard key={t.id} task={t} today={today} onOpen={onOpen} onMoveTo={onMoveTo} />
           ))}
@@ -228,25 +228,25 @@ interface CardBodyProps {
 
 function CardBody({ task, today, onOpen, handle, menu }: CardBodyProps) {
   return (
-    <div data-testid={`task-card-${task.id}`} className="rounded-lg border bg-card p-3 shadow-sm">
+    <div data-testid={`task-card-${task.id}`} className="rounded-lg border bg-card p-3.5 shadow-card transition-colors duration-150 hover:border-foreground">
+      {task.deliverableName && <p className="mb-1.5 truncate text-[11.5px] font-semibold text-muted-foreground">{task.deliverableName}</p>}
       <div className="flex items-start gap-1.5">
         {handle}
         {onOpen ? (
           <button
             type="button"
             onClick={onOpen}
-            className="min-w-0 flex-1 rounded-sm text-left text-sm font-medium leading-snug text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="link-hover min-w-0 flex-1 rounded-sm text-left text-sm font-semibold leading-snug text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {task.title}
           </button>
         ) : (
-          <p className="min-w-0 flex-1 text-sm font-medium leading-snug text-foreground">{task.title}</p>
+          <p className="min-w-0 flex-1 text-sm font-semibold leading-snug text-foreground">{task.title}</p>
         )}
         {menu}
       </div>
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 empty:hidden">
         <PriorityBadge priority={task.priority} />
-        <DueText dueDate={task.dueDate} status={task.status} today={today} />
         {task.checklistTotal > 0 && (
           <span className="inline-flex items-center gap-1 text-xs tabular-nums text-muted-foreground">
             <ListChecks className="h-3.5 w-3.5" aria-hidden="true" />
@@ -278,9 +278,9 @@ function CardBody({ task, today, onOpen, handle, menu }: CardBodyProps) {
             <span className="sr-only"> liên kết</span>
           </span>
         )}
+        <DueText dueDate={task.dueDate} status={task.status} today={today} chip className="ml-auto" />
       </div>
       {task.status === 'BLOCKED' && <BlockedLine task={task} className="mt-2" />}
-      {task.deliverableName && <p className="mt-2 truncate text-xs text-muted-foreground">{task.deliverableName}</p>}
     </div>
   )
 }

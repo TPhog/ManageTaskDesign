@@ -54,7 +54,7 @@ export function RevisionItemRow({ item, projectId, deliverableId, selectable, se
   }
 
   return (
-    <li className="flex flex-col gap-2 rounded-lg bg-muted/40 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3">
+    <li className="flex flex-col gap-2 rounded-lg border bg-surface-sunk px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3">
       <div className="flex min-w-0 flex-1 items-start gap-2.5">
         {selectable ? (
           <input
@@ -75,7 +75,7 @@ export function RevisionItemRow({ item, projectId, deliverableId, selectable, se
             {item.tasks.length > 0 && (
               <>
                 {' · '}
-                <Link to={`/admin/projects/${projectId}?tab=tasks`} className="text-primary underline-offset-2 hover:underline">
+                <Link to={`/admin/projects/${projectId}?tab=tasks`} className="link-inline">
                   {item.tasks.length} công việc
                 </Link>
               </>
@@ -84,7 +84,7 @@ export function RevisionItemRow({ item, projectId, deliverableId, selectable, se
             {item.createdDeliverableId && (
               <>
                 {' · '}
-                <Link to={`/admin/projects/${projectId}?tab=deliverables`} className="text-primary underline-offset-2 hover:underline">
+                <Link to={`/admin/projects/${projectId}?tab=deliverables`} className="link-inline">
                   Đã thành hạng mục: {item.createdDeliverableName ?? 'xem tab Hạng mục'}
                 </Link>
               </>
@@ -97,7 +97,7 @@ export function RevisionItemRow({ item, projectId, deliverableId, selectable, se
         {item.quotation && (
           <Link
             to={`/admin/quotations/${item.quotation.id}`}
-            className="flex items-center gap-1.5 text-xs text-primary underline-offset-2 hover:underline"
+            className="link-hover flex items-center gap-1.5 text-xs font-semibold text-foreground"
           >
             {item.quotation.number ?? 'Báo giá nháp'} v{item.quotation.version}
             <StatusBadge status={item.quotation.effectiveStatus} />
@@ -114,7 +114,7 @@ export function RevisionItemRow({ item, projectId, deliverableId, selectable, se
             {workStatusTransitions[item.workStatus].map(t => (
               <DropdownMenuItem
                 key={t.to}
-                className={t.to === 'CANCELLED' ? 'text-red-700 focus:text-red-700' : undefined}
+                className={t.to === 'CANCELLED' ? 'text-danger focus:text-danger' : undefined}
                 onClick={() => (needsScopeOverride(item, t.to) ? setGuardTo(t.to) : change(t.to))}
               >
                 {t.label}

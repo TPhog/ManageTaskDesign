@@ -128,7 +128,7 @@ export function CreateProjectDialog({ open, onClose, defaultClientId = '', defau
             {!clients.loading && clients.total === 0 && !clientSearch && (
               <p className="text-sm text-muted-foreground">
                 Chưa có khách đang hoạt động.{' '}
-                <Link to="/admin/clients" onClick={close} className="font-medium text-primary hover:underline">
+                <Link to="/admin/clients" onClick={close} className="link-inline">
                   Thêm khách trước
                 </Link>
               </p>

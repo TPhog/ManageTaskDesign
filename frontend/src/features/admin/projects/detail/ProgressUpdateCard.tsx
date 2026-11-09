@@ -93,7 +93,7 @@ export function ProgressUpdateCard({ projectId }: { projectId: string }) {
         {files.length > 0 && (
           <ul className="flex flex-wrap gap-1.5" aria-label="Ảnh sẽ gửi">
             {files.map((f, i) => (
-              <li key={`${f.name}-${i}`} className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs">
+              <li key={`${f.name}-${i}`} className="inline-flex items-center gap-1 rounded-full border bg-surface-sunk px-2 py-0.5 text-xs">
                 {f.name}
                 <button type="button" aria-label={`Bỏ ${f.name}`} onClick={() => setFiles(files.filter((_, j) => j !== i))}>
                   <X className="h-3 w-3" aria-hidden="true" />

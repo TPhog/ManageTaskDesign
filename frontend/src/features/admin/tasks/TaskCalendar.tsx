@@ -183,7 +183,7 @@ export function TaskCalendar({ projectId, onOpen, readOnly = false, unit: unitPr
               onClick={() => setUnit(u)}
               className={cn(
                 'inline-flex min-h-10 items-center rounded-md px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8',
-                unit === u ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                unit === u ? 'bg-card text-foreground shadow-card' : 'text-muted-foreground hover:text-foreground',
               )}
             >
               {u === 'month' ? 'Tháng' : 'Tuần'}
@@ -354,13 +354,13 @@ function ChipBody({ task, showProject, showRange }: { task: CalendarTask; showPr
     <span
       title={`${task.title} — ${task.projectName}`}
       className={cn(
-        'block min-w-0 rounded-sm border border-l-[3px] bg-card px-1.5 py-1 text-xs leading-tight text-foreground shadow-sm',
+        'block min-w-0 rounded-sm border border-l-[3px] bg-card px-1.5 py-1 text-xs leading-tight text-foreground shadow-card transition-colors duration-150 hover:border-foreground',
         priorityEdge[task.priority],
         task.isOverdue && 'bg-danger-soft',
         done && 'opacity-60',
       )}
     >
-      <span className={cn('block truncate font-medium', done && 'line-through')}>{task.title}</span>
+      <span className={cn('block truncate font-semibold', done && 'line-through')}>{task.title}</span>
       {(showProject || range) && (
         <span className="block truncate text-[0.6875rem] text-muted-foreground">
           {[range, showProject ? task.projectName : null].filter(Boolean).join(' · ')}

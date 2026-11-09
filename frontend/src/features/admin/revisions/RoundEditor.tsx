@@ -77,7 +77,7 @@ export function RoundEditor({ index, value, deliverables, onChange, onRemove }: 
           const m = i + 1
           const suggestion = suggestions?.[i]
           return (
-            <li key={i} className="space-y-2 rounded-md bg-muted/40 p-3">
+            <li key={i} className="space-y-2 rounded-md border bg-surface-sunk p-3">
               <div className="flex items-start gap-2">
                 <Input
                   aria-label={`Mô tả mục ${m}`}

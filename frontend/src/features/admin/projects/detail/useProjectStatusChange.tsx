@@ -130,7 +130,7 @@ export function useProjectStatusChange(project: ProjectDetail): { request: (t: P
           </DialogHeader>
           <ul className="space-y-2">
             {pending?.warnings.map(w => (
-              <li key={w} className="flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+              <li key={w} className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning-soft p-3 text-sm text-warning">
                 <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                 {w}
               </li>

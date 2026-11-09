@@ -110,7 +110,7 @@ export function AdditionalQuotationDialog({ projectId, revisionItemIds, open, on
                 return (
                   <li
                     key={lineKey(p)}
-                    className={`space-y-3 rounded-lg border p-3 ${p.unitPrice === 0 ? 'border-amber-300 bg-amber-50/40' : ''}`}
+                    className={`space-y-3 rounded-lg border p-3 ${p.unitPrice === 0 ? 'border-warning/30 bg-warning-soft/40' : ''}`}
                   >
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-baseline gap-2">
@@ -152,7 +152,7 @@ export function AdditionalQuotationDialog({ projectId, revisionItemIds, open, on
                           onChange={n => update(i, { ...p, unitPrice: n })}
                         />
                         {error && <p className="text-xs text-destructive">{error}</p>}
-                        {p.unitPrice === 0 && <p className="text-xs text-amber-800">Dòng này đang 0 ₫</p>}
+                        {p.unitPrice === 0 && <p className="text-xs font-medium text-warning">Dòng này đang 0 ₫</p>}
                         {line.kind === 'ROUND' && line.suggestedUnitPrice > 0 && (
                           <p className="text-xs text-muted-foreground">Gợi ý: <MoneyText amount={line.suggestedUnitPrice} />/vòng</p>
                         )}
@@ -166,7 +166,7 @@ export function AdditionalQuotationDialog({ projectId, revisionItemIds, open, on
               Tạm tính (chưa giảm giá/VAT): <span className="font-medium"><MoneyText amount={rows.reduce((s, p) => s + p.unitPrice, 0)} /></span>
             </p>
             {zeroNames.length > 0 && (
-              <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <div className="flex items-start gap-2 rounded-lg border border-warning/30 bg-warning-soft p-3 text-sm text-warning">
                 <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
                 <p>Còn {zeroNames.length} dòng 0 ₫: {zeroNames.join(', ')}. Vẫn tạo được — nhập giá sau trong bản nháp.</p>
               </div>

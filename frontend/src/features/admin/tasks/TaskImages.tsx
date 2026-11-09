@@ -11,7 +11,7 @@ import { MAX_ADMIN_IMAGES, duplicateNotice, imageErrorMessage, isStorageFull } f
 import type { LightboxImage } from '@/lib/imageTypes'
 import { useDeleteImage, useSetImageVisibility, useTaskImages, useUploadTaskImages } from '@/features/admin/images/useImages'
 
-const overlayButton = 'rounded bg-black/50 p-1 text-white hover:bg-black/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white'
+const overlayButton = 'rounded bg-surface-inverse/60 p-1 text-on-inverse hover:bg-surface-inverse/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-on-inverse'
 
 /** Spec §7: task images in the drawer — upload (drag & drop, several at once), grid, lightbox, share/hide, delete. */
 export function TaskImages({ taskId }: { taskId: string }) {
@@ -42,7 +42,7 @@ export function TaskImages({ taskId }: { taskId: string }) {
   return (
     <section aria-labelledby="task-images-heading" className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h3 id="task-images-heading" className="text-sm font-semibold text-foreground">
+        <h3 id="task-images-heading" className="font-display text-base font-bold text-foreground">
           Hình ảnh{images.length > 0 && <span className="font-normal text-muted-foreground"> ({images.length})</span>}
         </h3>
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -70,7 +70,7 @@ export function TaskImages({ taskId }: { taskId: string }) {
           renderOverlay={(img, i) => {
             const image = images[i]
             return (
-              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-black/60 to-transparent p-1.5">
+              <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-1 bg-gradient-to-t from-surface-inverse/60 to-transparent p-1.5">
                 <button
                   type="button"
                   className={overlayButton}

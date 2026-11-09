@@ -34,8 +34,8 @@ const panelClass = 'rounded-xl border bg-card p-5 shadow-card'
 function InfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-sm font-medium text-foreground">{value}</dd>
+      <dt className="kicker text-muted-foreground">{label}</dt>
+      <dd className="mt-1.5 text-sm font-semibold text-foreground">{value}</dd>
     </div>
   )
 }
@@ -87,35 +87,35 @@ export default function ProjectDetailPage() {
   return (
     <div className="space-y-6">
       {/* breadcrumb */}
-      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-muted-foreground">
-        <Link to="/admin/projects" className="rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+        <Link to="/admin/projects" className="shrink-0 whitespace-nowrap rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           Dự án
         </Link>
-        <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
-        <span className="truncate font-medium text-foreground" aria-current="page">{project.name}</span>
+        <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <span className="min-w-0 truncate font-medium text-foreground" aria-current="page">{project.name}</span>
       </nav>
 
       {/* header */}
-      <div className={panelClass}>
+      <div className="-mt-2">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground">{project.name}</h1>
+              <h1 className="min-w-0 break-words font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.025em] text-foreground sm:text-display-lg">{project.name}</h1>
               <StatusBadge status={badge.status} label={badge.label} />
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-              <span>{project.client.name}</span>
-              <span aria-hidden="true">·</span>
-              <span>{designType}</span>
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              <span className="rounded-full border bg-surface-sunk px-2.5 py-1 text-xs font-semibold text-muted-foreground">{project.client.name}</span>
+              <span aria-hidden="true" className="hidden">·</span>
+              <span className="rounded-full border bg-surface-sunk px-2.5 py-1 text-xs font-semibold text-muted-foreground">{designType}</span>
               {range && (
                 <>
-                  <span aria-hidden="true">·</span>
-                  <span className="tabular-nums">{range}</span>
+                  <span aria-hidden="true" className="hidden">·</span>
+                  <span className="rounded-full border bg-surface-sunk px-2.5 py-1 text-xs font-semibold text-muted-foreground tabular-nums">{range}</span>
                 </>
               )}
             </div>
             {project.statusReason && (project.status === 'ON_HOLD' || project.status === 'CANCELLED' || project.status === 'IN_PROGRESS') && (
-              <p className="mt-2 text-sm text-amber-800">Lý do: {project.statusReason}</p>
+              <p className="mt-2 text-sm font-medium text-warning">Lý do: {project.statusReason}</p>
             )}
           </div>
           <ProjectStatusControl project={project} />
@@ -160,8 +160,8 @@ export default function ProjectDetailPage() {
             </dl>
             {project.internalNotes && (
               <div>
-                <p className="mb-1.5 text-xs font-medium text-muted-foreground">Ghi chú nội bộ</p>
-                <p className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm text-foreground">
+                <p className="kicker mb-2 text-muted-foreground">Ghi chú nội bộ</p>
+                <p className="whitespace-pre-wrap rounded-lg border bg-surface-sunk p-3 text-sm text-foreground">
                   {project.internalNotes}
                 </p>
               </div>

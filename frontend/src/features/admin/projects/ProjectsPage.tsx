@@ -86,7 +86,7 @@ export default function ProjectsPage() {
       aria-pressed={view === mode}
       className={cn(
         'inline-flex h-9 w-9 items-center justify-center rounded-md transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        view === mode ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+        view === mode ? 'bg-card text-foreground shadow-card' : 'text-muted-foreground hover:text-foreground',
       )}
     >
       <Icon className="h-4 w-4" aria-hidden="true" />

@@ -32,7 +32,7 @@ export function TaskChecklist({ task, onDirtyChange }: { task: TaskDetail; onDir
   return (
     <section aria-labelledby="task-checklist-heading" className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 id="task-checklist-heading" className="text-sm font-semibold text-foreground">Checklist</h3>
+        <h3 id="task-checklist-heading" className="font-display text-base font-bold text-foreground">Checklist</h3>
         <span className="text-xs tabular-nums text-muted-foreground">{done}/{total}</span>
       </div>
       {total > 0 && (
@@ -98,7 +98,7 @@ function ChecklistRow({ item, open, saving, onToggleOpen, onToggleDone, onSaveDe
   useReportDirty(draft !== item.description, onDirtyChange)
 
   return (
-    <li className="rounded-md px-2 py-1.5 hover:bg-muted/60">
+    <li className="rounded-md px-2 py-1.5 transition-colors duration-150 hover:bg-surface-sunk">
       <div className="flex items-center gap-2">
         <Button
           type="button"
@@ -128,7 +128,7 @@ function ChecklistRow({ item, open, saving, onToggleOpen, onToggleDone, onSaveDe
           type="button"
           variant="ghost"
           size="icon"
-          className="h-8 w-8 text-muted-foreground hover:text-red-700"
+          className="h-8 w-8 text-muted-foreground hover:text-danger"
           aria-label={`Xoá mục ${item.text}`}
           onClick={onRemove}
         >

@@ -4,10 +4,10 @@ import type { TaskListItem, TaskPriority, TaskStatus } from '@/lib/types'
 import { dueInfo, taskPriorityLabel, type DueTone } from './taskUtils'
 
 const priorityStyle: Record<TaskPriority, [string, LucideIcon]> = {
-  URGENT: ['text-red-700', ChevronsUp],
-  HIGH: ['text-orange-700', ArrowUp],
-  MEDIUM: ['text-slate-600', Equal],
-  LOW: ['text-sky-700', ArrowDown],
+  URGENT: ['text-danger', ChevronsUp],
+  HIGH: ['text-warning', ArrowUp],
+  MEDIUM: ['text-muted-foreground', Equal],
+  LOW: ['text-muted-foreground', ArrowDown],
 }
 
 /** Medium is the default: only worth a badge when it differs (alwaysShow keeps it in the table column). */
@@ -15,7 +15,7 @@ export function PriorityBadge({ priority, alwaysShow = false }: { priority: Task
   if (priority === 'MEDIUM' && !alwaysShow) return null
   const [cls, Icon] = priorityStyle[priority]
   return (
-    <span className={cn('inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium', cls)}>
+    <span className={cn('inline-flex items-center gap-1 whitespace-nowrap text-xs font-semibold', cls)}>
       <Icon className="h-3.5 w-3.5" aria-hidden="true" />
       {taskPriorityLabel[priority]}
     </span>
@@ -23,16 +23,42 @@ export function PriorityBadge({ priority, alwaysShow = false }: { priority: Task
 }
 
 const toneClass: Record<DueTone, string> = {
-  overdue: 'font-medium text-red-700',
-  today: 'font-medium text-amber-700',
-  soon: 'text-amber-700',
+  overdue: 'font-semibold text-danger',
+  today: 'font-semibold text-warning',
+  soon: 'text-warning',
   normal: 'text-muted-foreground',
   none: 'text-muted-foreground',
 }
 
-export function DueText({ dueDate, status, today }: { dueDate: string | null; status: TaskStatus; today: string }) {
+/** `chip`: the Kanban card's pill (danger-soft when late, warning-soft today/tomorrow, sunk otherwise) */
+const chipClass: Record<DueTone, string> = {
+  overdue: 'bg-danger-soft text-danger',
+  today: 'bg-warning-soft text-warning',
+  soon: 'bg-warning-soft text-warning',
+  normal: 'bg-surface-sunk text-foreground',
+  none: '',
+}
+
+export function DueText({ dueDate, status, today, chip = false, className }: {
+  dueDate: string | null
+  status: TaskStatus
+  today: string
+  chip?: boolean
+  className?: string
+}) {
   const { label, tone } = dueInfo(dueDate, status, today)
-  return <span className={cn('whitespace-nowrap text-xs tabular-nums', toneClass[tone])}>{label}</span>
+  if (chip && tone === 'none') return null
+  return (
+    <span
+      className={cn(
+        'whitespace-nowrap text-xs tabular-nums',
+        chip ? cn('rounded-full px-2 py-0.5 font-semibold', chipClass[tone]) : toneClass[tone],
+        className,
+      )}
+    >
+      {label}
+    </span>
+  )
 }
 
 /** P15: "Bị chặn: <reason> · chờ "<blocker>" · đã xong" under a BLOCKED card / row title. */

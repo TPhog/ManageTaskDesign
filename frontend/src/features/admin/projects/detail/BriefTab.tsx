@@ -29,7 +29,7 @@ function IntakeImages({ projectId }: { projectId: string }) {
   const images: LightboxImage[] = data.map(i => ({ id: i.id, src: i.originalUrl, thumbSrc: i.thumbUrl, alt: 'Ảnh khách gửi' }))
   return (
     <section aria-label="Ảnh khách gửi kèm yêu cầu ban đầu" className="space-y-2 rounded-xl border bg-card p-5 shadow-card">
-      <h3 className="text-sm font-semibold text-foreground">Ảnh khách gửi kèm yêu cầu ban đầu</h3>
+      <h3 className="font-display text-title font-bold text-foreground">Ảnh khách gửi kèm yêu cầu ban đầu</h3>
       <ImageGrid images={images} onOpen={setOpen} />
       <ImageLightbox images={images} index={open} onIndexChange={setOpen} />
     </section>
@@ -99,7 +99,7 @@ export function BriefTab({ projectId, brief }: Props) {
     <div className="space-y-4 rounded-xl border bg-card p-5 shadow-card">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <span className="font-medium text-foreground">Phiên bản {brief.version}</span>
+          <span className="font-semibold text-foreground">Phiên bản {brief.version}</span>
           <StatusBadge status={brief.status} />
           {brief.confirmedAt && <span>· Xác nhận {formatDate(brief.confirmedAt)}</span>}
         </div>
@@ -113,7 +113,7 @@ export function BriefTab({ projectId, brief }: Props) {
 
       {confirmed ? (
         <>
-          <div className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 rounded-lg border bg-surface-sunk px-3 py-2 text-xs text-muted-foreground">
             <Lock className="h-3.5 w-3.5" aria-hidden="true" />
             Brief đã xác nhận nên không sửa được. Tạo phiên bản mới để thay đổi.
           </div>

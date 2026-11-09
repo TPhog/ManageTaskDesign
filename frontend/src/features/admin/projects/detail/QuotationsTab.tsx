@@ -7,6 +7,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { MoneyText } from '@/components/MoneyText'
 import { StatusBadge } from '@/components/StatusBadge'
 import { formatDate } from '@/lib/format'
+import { tableHeadRowClass, tableRowClass } from '@/components/dataTable'
 import type { ProjectDetail } from '@/lib/types'
 import { CreateQuotationDialog } from '../../quotations/CreateQuotationDialog'
 import { groupChains, kindLabel } from '../../quotations/quotationUtils'
@@ -44,10 +45,10 @@ export function QuotationsTab({ project }: { project: ProjectDetail }) {
           action={createButton}
         />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="relative overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="border-b bg-muted/40 text-left text-xs font-medium text-muted-foreground">
-              <tr>
+            <thead>
+              <tr className={tableHeadRowClass}>
                 <th className="px-4 py-2.5">Số báo giá</th>
                 <th className="px-4 py-2.5">Tiêu đề</th>
                 <th className="px-4 py-2.5">Loại</th>
@@ -57,11 +58,11 @@ export function QuotationsTab({ project }: { project: ProjectDetail }) {
                 <th className="px-4 py-2.5">Hết hạn</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody>
               {chains.map(({ key, latest, versions }) => (
-                <tr key={key} className="hover:bg-muted/30">
+                <tr key={key} className={tableRowClass}>
                   <td className="whitespace-nowrap px-4 py-3 font-medium">
-                    <Link to={`/admin/quotations/${latest.id}`} className="text-primary hover:underline">
+                    <Link to={`/admin/quotations/${latest.id}`} className="link-hover font-semibold text-foreground">
                       {latest.number ? `${latest.number} · v${latest.version}` : 'Bản nháp'}
                     </Link>
                     {versions.length > 1 && (

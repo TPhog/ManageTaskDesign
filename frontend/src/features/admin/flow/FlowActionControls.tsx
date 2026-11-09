@@ -17,11 +17,13 @@ interface ActionProps {
   dialogsAsLinks?: boolean
   /** Small buttons everywhere (dashboard rows) */
   compact?: boolean
+  /** The primary step as the vermilion CTA (the ink "Bước tiếp theo" card) */
+  highlightPrimary?: boolean
 }
 
 /** One flow action, rendered the same way on the project page (NextStepCard) and on the dashboard. */
-export function FlowActionButton({ action, projectId, busy, onRun, dialogsAsLinks = false, compact = false }: ActionProps) {
-  const variant = action.primary ? 'default' : 'outline'
+export function FlowActionButton({ action, projectId, busy, onRun, dialogsAsLinks = false, compact = false, highlightPrimary = false }: ActionProps) {
+  const variant = action.primary ? (highlightPrimary ? 'highlight' : 'default') : 'outline'
   const size = action.primary && !compact ? 'default' : 'sm'
   const href = actionHref(action.kind, projectId, action.target)
     ?? (dialogsAsLinks && isDialogAction(action.kind) ? stepHref(projectId, action.kind) : null)
@@ -63,8 +65,8 @@ export function FlowWarningChip({ warning }: { warning: FlowWarning }) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs',
-        warning.severity === 'warning' ? 'bg-amber-50 text-amber-800' : 'bg-slate-100 text-slate-700',
+        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium',
+        warning.severity === 'warning' ? 'bg-warning-soft text-warning' : 'bg-surface-hover text-foreground',
       )}
     >
       <Icon className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />

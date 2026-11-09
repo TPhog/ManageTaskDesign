@@ -24,7 +24,7 @@ export function MarkdownField({ id, label, value, onChange, maxLength, placehold
       onClick={() => setEditing(edit)}
       className={cn(
         'rounded px-2.5 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        editing === edit ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+        editing === edit ? 'bg-card text-foreground shadow-card' : 'text-muted-foreground hover:text-foreground',
       )}
     >
       {text}

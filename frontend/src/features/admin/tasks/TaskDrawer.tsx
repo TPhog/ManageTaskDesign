@@ -89,7 +89,7 @@ export function TaskDrawer({ taskId, onClose }: Props) {
           <SheetTitle>Chi tiết công việc</SheetTitle>
           <SheetDescription>
             {task ? (
-              <Link to={`/admin/projects/${task.projectId}?tab=tasks`} className="hover:text-foreground hover:underline">
+              <Link to={`/admin/projects/${task.projectId}?tab=tasks`} className="link-hover font-medium hover:text-foreground">
                 {task.projectName}
               </Link>
             ) : (
@@ -333,7 +333,7 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
             type="button"
             variant="ghost"
             size="sm"
-            className="text-red-700 hover:bg-red-50 hover:text-red-700"
+            className="text-danger hover:bg-danger-soft hover:text-danger"
             onClick={() => setConfirmDelete(true)}
           >
             <Trash2 aria-hidden="true" />

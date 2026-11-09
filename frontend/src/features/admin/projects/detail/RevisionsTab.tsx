@@ -57,11 +57,11 @@ export function RevisionsTab({ project }: { project: ProjectDetail }) {
             <span className="font-semibold text-foreground">Vòng {round.roundNo}</span>
             <span className="text-xs text-muted-foreground">nhận {formatDate(round.receivedAt)}</span>
             {round.sourceRequestId && (
-              <Link to={`/admin/requests/${round.sourceRequestId}`} className="text-xs text-primary underline-offset-2 hover:underline">
+              <Link to={`/admin/requests/${round.sourceRequestId}`} className="link-inline text-xs">
                 Từ yêu cầu
               </Link>
             )}
-            {round.counted && <span className="text-xs text-emerald-700">Tính 1 vòng quota</span>}
+            {round.counted && <span className="text-xs font-medium text-success">Tính 1 vòng quota</span>}
           </div>
           <ul className="mt-2 space-y-2">
             {round.items.map(item => (
@@ -111,7 +111,7 @@ export function RevisionsTab({ project }: { project: ProjectDetail }) {
         <section key={d.id} aria-label={d.name} className={panelClass}>
           <header className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <h3 className="truncate text-sm font-semibold text-foreground">{d.name}</h3>
+              <h3 className="truncate font-display text-title font-bold text-foreground">{d.name}</h3>
               <StatusBadge status={d.status} />
             </div>
             <div className="flex items-center gap-4">
@@ -130,7 +130,7 @@ export function RevisionsTab({ project }: { project: ProjectDetail }) {
       {data.projectRounds.length > 0 && (
         <section aria-label="Cấp dự án" className={panelClass}>
           <header className="border-b p-4">
-            <h3 className="text-sm font-semibold text-foreground">Cấp dự án</h3>
+            <h3 className="font-display text-title font-bold text-foreground">Cấp dự án</h3>
             <p className="text-xs text-muted-foreground">Cấp dự án — không dùng vòng sửa miễn phí</p>
           </header>
           {roundList(data.projectRounds)}
