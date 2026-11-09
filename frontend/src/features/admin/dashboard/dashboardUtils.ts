@@ -30,6 +30,7 @@ export const dashboardLinks = {
 
 /** Projects shown before "Hiện thêm". */
 export const DASHBOARD_FLOW_LIMIT = 5
+export const DASHBOARD_FLOW_LIMIT_MOBILE = 3
 
 /**
  * "Việc cần làm": projects with something to do now (an action, or a warning-level chip such as money due),

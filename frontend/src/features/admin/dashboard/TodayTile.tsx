@@ -10,7 +10,7 @@ import { dashboardLinks } from './dashboardUtils'
  * Phone: the overdue tile spans the row, the rest go two by two.
  */
 export function TodayTile({ summary, wide }: { summary: Dashboard['actionRequired']; wide: boolean }) {
-  const big = cn('min-h-36 sm:col-span-2 sm:min-h-44', wide && 'xl:col-span-1')
+  const big = cn('min-h-24 sm:col-span-2 sm:min-h-44', wide && 'xl:col-span-1')
   const small = cn('sm:col-span-3', wide && 'xl:col-span-1 xl:min-h-44')
   return (
     <Tile aria-label="Hôm nay của bạn" className="flex h-full flex-col gap-4">

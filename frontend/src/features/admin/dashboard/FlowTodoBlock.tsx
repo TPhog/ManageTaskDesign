@@ -8,7 +8,8 @@ import { FlowActionButton, FlowWarningChip } from '@/features/admin/flow/FlowAct
 import { flowActionKey, stageLabel } from '@/features/admin/flow/flowUtils'
 import { useFlowActions } from '@/features/admin/flow/useFlow'
 import { useFlowActionRunner } from '@/features/admin/flow/useFlowActionRunner'
-import { DASHBOARD_FLOW_LIMIT, projectsNeedingAction } from './dashboardUtils'
+import { DASHBOARD_FLOW_LIMIT, DASHBOARD_FLOW_LIMIT_MOBILE, projectsNeedingAction } from './dashboardUtils'
+import { useIsMobile } from './useIsMobile'
 
 /**
  * Spec 06b §6 dashboard "Việc cần làm": next steps of every open project from GET /api/admin/flow/actions, run with the
@@ -17,9 +18,10 @@ import { DASHBOARD_FLOW_LIMIT, projectsNeedingAction } from './dashboardUtils'
  */
 export function FlowTodoBlock() {
   const [showAll, setShowAll] = useState(false)
+  const mobile = useIsMobile()
   const { data, isLoading, isError, refetch } = useFlowActions()
   const runner = useFlowActionRunner()
-  const { items, hidden } = projectsNeedingAction(data ?? [], showAll ? Infinity : DASHBOARD_FLOW_LIMIT)
+  const { items, hidden } = projectsNeedingAction(data ?? [], showAll ? Infinity : mobile ? DASHBOARD_FLOW_LIMIT_MOBILE : DASHBOARD_FLOW_LIMIT)
 
   return (
     <Tile aria-label="Việc cần làm" className="space-y-4">

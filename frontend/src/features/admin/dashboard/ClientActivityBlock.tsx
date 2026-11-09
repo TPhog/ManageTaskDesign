@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import type { ClientActivity, ClientActivityKind } from '@/lib/dashboardTypes'
 import { formatDatetime } from '@/lib/format'
 import { Section } from './DashboardSection'
+import { useIsMobile } from './useIsMobile'
 import { useClientActivity } from './useDashboardBlocks'
 
 const KIND_ICON = {
@@ -48,6 +49,7 @@ export function ClientActivityView({ activity }: { activity: ClientActivity }) {
 
 export function ClientActivityBlock({ className }: { className?: string }) {
   const { data, isLoading, error, refetch } = useClientActivity(8)
+  const mobile = useIsMobile()
   return (
     <Section title="Hoạt động của khách" icon={MessageSquare} className={className}>
       {isLoading ? (
@@ -61,7 +63,7 @@ export function ClientActivityBlock({ className }: { className?: string }) {
           <Button variant="link" className="px-0" onClick={() => refetch()}>Thử lại</Button>
         </div>
       ) : (
-        <ClientActivityView activity={data} />
+        <ClientActivityView activity={mobile ? { ...data, items: data.items.slice(0, 5) } : data} />
       )}
     </Section>
   )

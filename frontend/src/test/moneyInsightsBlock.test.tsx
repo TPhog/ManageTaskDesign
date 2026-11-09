@@ -68,7 +68,7 @@ describe('MoneyInsightsView', () => {
     renderView(insights())
     await userEvent.click(screen.getByRole('button', { name: /Copy nhắc thanh toán/ }))
     expect(writeText).toHaveBeenCalledWith(receivableReminder(receivable))
-    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Đã sao chép tin nhắc thanh toán'))
+    await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Đã sao chép tin nhắn nhắc thanh toán'))
   })
 
   it('links to all outstanding quotations when rows are hidden and explains an empty list', () => {

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { CalendarDays, Flag, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -7,6 +8,7 @@ import type { DashboardSchedule, ScheduleDay, ScheduleDeadline, ScheduleTask } f
 import { cn } from '@/lib/utils'
 import { TaskDrawer } from '@/features/admin/tasks/TaskDrawer'
 import { taskPriorityLabel } from '@/features/admin/tasks/taskUtils'
+import { useIsMobile } from './useIsMobile'
 import { dayHeading, dayMonth, scheduleIsEmpty, weekdayShort } from './dashboardUtils'
 import { Section } from './DashboardSection'
 import { useCompleteScheduleTask, useDashboardSchedule } from './useDashboardBlocks'
@@ -89,6 +91,8 @@ const listClass = 'divide-y divide-border xl:max-h-96 xl:space-y-1.5 xl:divide-y
 /** …and fades out at the bottom edge when it holds more than fits, so the cut reads as "scroll for more" */
 const fadeClass = 'xl:[mask-image:linear-gradient(to_bottom,black_calc(100%-2rem),transparent)]'
 const LONG_LIST = 4
+/** Mobile (<768px): overdue and today show at most this many tasks, the rest links to the task list. */
+const MOBILE_TASKS = 3
 const columnClass = 'xl:flex xl:min-h-44 xl:min-w-0 xl:flex-col xl:gap-1.5 xl:space-y-0 xl:rounded-lg xl:border xl:p-2.5'
 
 function DaySection({ day, today, idle, onComplete, onOpenTask }: {
@@ -100,6 +104,14 @@ function DaySection({ day, today, idle, onComplete, onOpenTask }: {
 }) {
   const heading = dayHeading(day.date, today)
   const isToday = day.date === today
+  const mobile = useIsMobile()
+  const [open, setOpen] = useState(false)
+  /** Mobile: only today is expanded; the other days are one tappable row */
+  const collapsible = mobile && !isToday && !idle
+  const collapsed = collapsible && !open
+  const capped = mobile && isToday
+  const tasks = capped ? day.tasks.slice(0, MOBILE_TASKS) : day.tasks
+  const moreTasks = day.hiddenTasks + (day.tasks.length - tasks.length)
   return (
     <section
       aria-label={heading}
@@ -110,7 +122,21 @@ function DaySection({ day, today, idle, onComplete, onOpenTask }: {
         idle && 'hidden',
       )}
     >
-      <h3 className="kicker text-muted-foreground xl:flex xl:min-h-6 xl:items-center xl:justify-between xl:gap-1 xl:px-0.5 xl:pb-1 xl:tracking-[0.06em]">
+      {collapsible && (
+        <h3 className="kicker text-muted-foreground">
+          <button
+            type="button"
+            aria-expanded={open}
+            onClick={() => setOpen(o => !o)}
+            className="flex min-h-11 w-full items-center gap-2 rounded-md text-left text-sm font-medium normal-case tracking-normal text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <span className="font-semibold">{weekdayShort(day.date)} · {dayMonth(day.date)}</span>
+            <span className="text-muted-foreground">· {day.tasks.length + day.hiddenTasks + day.deadlines.length} việc</span>
+            <ChevronDown className={cn('ml-auto h-4 w-4 shrink-0 transition-transform', open && 'rotate-180')} aria-hidden="true" />
+          </button>
+        </h3>
+      )}
+      <h3 className={cn('kicker text-muted-foreground xl:flex xl:min-h-6 xl:items-center xl:justify-between xl:gap-1 xl:px-0.5 xl:pb-1 xl:tracking-[0.06em]', collapsible && 'hidden xl:flex')}>
         <span className="xl:sr-only">{heading}</span>
         <span className="ml-2 text-xs font-normal normal-case tracking-normal xl:sr-only">{day.tasks.length + day.hiddenTasks} việc</span>
         <span aria-hidden="true" className="hidden whitespace-nowrap xl:inline">
@@ -125,14 +151,14 @@ function DaySection({ day, today, idle, onComplete, onOpenTask }: {
       {idle ? (
         <p className="m-auto hidden w-full rounded-md border border-dashed border-border-strong px-2 py-3 text-center text-xs text-muted-foreground xl:block">Trống</p>
       ) : (
-        <ul className={cn(listClass, day.tasks.length + day.deadlines.length > LONG_LIST && fadeClass)}>
-          {day.tasks.map(t => <TaskRow key={t.id} task={t} kicker="Việc" onComplete={onComplete} onOpenTask={onOpenTask} />)}
+        <ul className={cn(listClass, collapsed && 'hidden', day.tasks.length + day.deadlines.length > LONG_LIST && fadeClass)}>
+          {tasks.map(t => <TaskRow key={t.id} task={t} kicker="Việc" onComplete={onComplete} onOpenTask={onOpenTask} />)}
           {day.deadlines.map(d => <DeadlineRow key={`${d.kind}-${d.id}`} deadline={d} />)}
         </ul>
       )}
-      {day.hiddenTasks > 0 && (
-        <Link to="/admin/tasks?due=week" className="inline-block py-2 text-sm link-inline xl:px-0.5 xl:py-1 xl:text-xs">
-          và {day.hiddenTasks} việc khác
+      {moreTasks > 0 && !collapsed && (
+        <Link to={isToday ? '/admin/tasks?due=today' : '/admin/tasks?due=week'} className="inline-block py-2 text-sm link-inline xl:px-0.5 xl:py-1 xl:text-xs">
+          và {moreTasks} việc khác
         </Link>
       )}
     </section>
@@ -146,6 +172,8 @@ export function ScheduleView({ schedule, onComplete, onOpenTask }: {
   onOpenTask: (taskId: string) => void
 }) {
   const { overdue, days, today, undatedOpenTasks } = schedule
+  const mobile = useIsMobile()
+  const overdueItems = mobile ? overdue.items.slice(0, MOBILE_TASKS) : overdue.items
   const isIdle = (d: ScheduleDay) => d.tasks.length === 0 && d.deadlines.length === 0 && d.hiddenTasks === 0
   const idle = days.filter(isIdle)
   const showOverdue = overdue.total > 0
@@ -157,12 +185,12 @@ export function ScheduleView({ schedule, onComplete, onOpenTask }: {
         <TriangleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         Quá hạn ({overdue.total})
       </h3>
-      <ul className={cn(listClass, 'divide-danger/20', overdue.items.length > LONG_LIST && fadeClass)}>
-        {overdue.items.map(t => <TaskRow key={t.id} task={t} kicker={`Hạn ${dayMonth(t.dueDate)}`} onComplete={onComplete} onOpenTask={onOpenTask} />)}
+      <ul className={cn(listClass, 'divide-danger/20', overdueItems.length > LONG_LIST && fadeClass)}>
+        {overdueItems.map(t => <TaskRow key={t.id} task={t} kicker={`Hạn ${dayMonth(t.dueDate)}`} onComplete={onComplete} onOpenTask={onOpenTask} />)}
       </ul>
-      {overdue.total > overdue.items.length && (
+      {overdue.total > overdueItems.length && (
         <p className="py-1 text-sm text-muted-foreground xl:px-0.5 xl:text-xs">
-          và {overdue.total - overdue.items.length} việc khác —{' '}
+          và {overdue.total - overdueItems.length} việc khác —{' '}
           <Link to="/admin/tasks?due=overdue" className="link-inline">Xem tất cả</Link>
         </p>
       )}

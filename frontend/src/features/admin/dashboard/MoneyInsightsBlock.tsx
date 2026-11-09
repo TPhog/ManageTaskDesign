@@ -11,24 +11,26 @@ import type { MoneyInsights, MoneyPeriod, ReceivableItem } from '@/lib/dashboard
 import { formatDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { agingLabel, dashboardLinks, AGING_BUCKET_LABEL, deltaLabel, lastDayOf, PERIOD_LABEL, receivableReminder } from './dashboardUtils'
+import { useIsMobile } from './useIsMobile'
 import { useMoneyInsights } from './useDashboardBlocks'
 
 const PERIODS: MoneyPeriod[] = ['month', 'quarter', 'year']
 /** Visible rows of the receivables ledger and of the per-client totals. */
 const RECEIVABLE_ROWS = 8
 const CLIENT_ROWS = 8
+const MOBILE_ROWS = 5
 const REGION = 'Tiền đã thu và công nợ'
 
 async function copyReminder(item: ReceivableItem) {
   try {
     await navigator.clipboard.writeText(receivableReminder(item))
-    toast.success('Đã sao chép tin nhắc thanh toán')
+    toast.success('Đã sao chép tin nhắn nhắc thanh toán')
   } catch {
     toast.error('Không sao chép được — hãy mở báo giá để lấy tin nhắn')
   }
 }
 
-const valueClass = 'mt-1.5 block break-words font-display text-display-md font-bold tabular-nums'
+const valueClass = 'mt-1.5 block break-words font-display text-title font-bold sm:text-display-md tabular-nums'
 
 function Stat({ label, value, note, testId, noteTestId, children }: {
   label: string
@@ -70,22 +72,22 @@ function ReceivableRow({ item }: { item: ReceivableItem }) {
   return (
     <tr
       data-testid={`dsh-receivable-${item.quotationId}`}
-      className={cn('grid grid-cols-2 gap-x-3 gap-y-1 py-3 sm:grid-cols-4 xl:table-row xl:py-0', tableRowClass)}
+      className={cn('grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 gap-y-0.5 py-2.5 sm:grid-cols-4 xl:table-row xl:py-0', tableRowClass)}
     >
       <td className="min-w-0 xl:table-cell xl:py-3 xl:pr-3">
-        <span className="block text-xs text-muted-foreground xl:hidden">Khách</span>
+        <span className="sr-only text-xs text-muted-foreground sm:not-sr-only sm:block xl:hidden">Khách</span>
         <span className="block truncate text-sm font-semibold text-foreground xl:max-w-52">{item.clientName}</span>
       </td>
       <td className="min-w-0 xl:table-cell xl:py-3 xl:pr-3">
-        <span className="block text-xs text-muted-foreground xl:hidden">Dự án</span>
+        <span className="sr-only text-xs text-muted-foreground sm:not-sr-only sm:block xl:hidden">Dự án</span>
         <Link to={`/admin/projects/${item.projectId}`} className="block truncate text-sm link-hover xl:max-w-64">{item.projectName}</Link>
       </td>
-      <td className="xl:table-cell xl:whitespace-nowrap xl:py-3 xl:pr-3 xl:text-right">
-        <span className="block text-xs text-muted-foreground xl:hidden">Còn nợ</span>
+      <td className="max-sm:col-start-2 max-sm:row-start-1 max-sm:text-right xl:table-cell xl:whitespace-nowrap xl:py-3 xl:pr-3 xl:text-right">
+        <span className="sr-only text-xs text-muted-foreground sm:not-sr-only sm:block xl:hidden">Còn nợ</span>
         <span className="block text-sm font-semibold"><MoneyText amount={item.outstanding} /></span>
       </td>
-      <td className="xl:table-cell xl:py-3 xl:pr-3">
-        <span className="block text-xs text-muted-foreground xl:hidden">Tuổi nợ</span>
+      <td className="max-sm:col-start-2 max-sm:row-start-2 max-sm:text-right xl:table-cell xl:py-3 xl:pr-3">
+        <span className="sr-only text-xs text-muted-foreground sm:not-sr-only sm:block xl:hidden">Tuổi nợ</span>
         <span className="flex flex-wrap items-center gap-1.5 text-sm tabular-nums">
           {agingLabel(item.agingDays)}
           <span className={cn('whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-semibold', agingChip[item.agingBucket])}>
@@ -93,13 +95,13 @@ function ReceivableRow({ item }: { item: ReceivableItem }) {
           </span>
         </span>
       </td>
-      <td className="col-span-2 pt-1 sm:col-span-4 xl:table-cell xl:py-3">
-        <div className="flex flex-wrap gap-2 xl:justify-end">
-          <Button type="button" variant="outline" size="sm" className="min-h-11 xl:min-h-0" onClick={() => void copyReminder(item)}>
+      <td className="col-span-2 sm:col-span-4 xl:table-cell xl:py-3">
+        <div className="flex gap-2 xl:justify-end">
+          <Button type="button" variant="outline" size="sm" className="min-h-11 flex-1 max-sm:px-2 max-sm:text-xs sm:flex-none xl:min-h-0" onClick={() => void copyReminder(item)}>
             <Copy className="h-4 w-4" aria-hidden="true" />
             Copy nhắc thanh toán
           </Button>
-          <Button asChild variant="outline" size="sm" className="min-h-11 xl:min-h-0">
+          <Button asChild variant="outline" size="sm" className="min-h-11 flex-1 max-sm:px-2 max-sm:text-xs sm:flex-none xl:min-h-0">
             <Link to={`/admin/quotations/${item.quotationId}`}>
               <QrCode className="h-4 w-4" aria-hidden="true" />
               Mở báo giá &amp; QR
@@ -123,8 +125,10 @@ export function MoneyInsightsView({ insights, period, onPeriodChange, loading = 
   loading?: boolean
 }) {
   const { collected, accepted, receivables } = insights
+  const mobile = useIsMobile()
+  const receivableRows = mobile ? MOBILE_ROWS : RECEIVABLE_ROWS
   const receivableCount = receivables.items.length + receivables.hiddenItems
-  const clientsShown = receivables.byClient.slice(0, CLIENT_ROWS)
+  const clientsShown = receivables.byClient.slice(0, mobile ? 3 : CLIENT_ROWS)
   const clientsHidden = receivables.byClient.length - clientsShown.length
   const periods = (
     <div role="group" aria-label="Kỳ báo cáo" className="inline-flex rounded-md bg-muted p-[3px]">
@@ -158,7 +162,7 @@ export function MoneyInsightsView({ insights, period, onPeriodChange, loading = 
             </span>
           </div>
 
-          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          <div className="grid grid-cols-2 gap-2.5">
             <Stat
               label="Đã thu"
               testId="dsh-collected"
@@ -226,11 +230,11 @@ export function MoneyInsightsView({ insights, period, onPeriodChange, loading = 
                   </tr>
                 </thead>
                 <tbody className="block xl:table-row-group">
-                  {receivables.items.slice(0, RECEIVABLE_ROWS).map(i => <ReceivableRow key={i.quotationId} item={i} />)}
+                  {receivables.items.slice(0, receivableRows).map(i => <ReceivableRow key={i.quotationId} item={i} />)}
                 </tbody>
               </table>
             </div>
-            {receivableCount > RECEIVABLE_ROWS && (
+            {receivableCount > receivableRows && (
               <Link to={dashboardLinks.outstanding} className="inline-block text-sm link-inline">
                 Xem tất cả {receivableCount} khoản
               </Link>

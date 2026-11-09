@@ -1,6 +1,6 @@
 import { FORBIDDEN_UI_TERMS, GLOSSARY } from '@/lib/glossary'
 
-const files = import.meta.glob('/src/**/*.tsx', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
+const files = import.meta.glob('/src/**/*.{ts,tsx}', { query: '?raw', import: 'default', eager: true }) as Record<string, string>
 
 /** Imports, line comments and doc-comment lines are code, not UI text. */
 const isCode = (line: string) => /^\s*(import\b|\/\/|\*|\/\*)/.test(line)
@@ -13,8 +13,9 @@ function contains(line: string, term: string): boolean {
   return term === '} deliverable' ? /\} deliverable(?![\w=])/.test(line) : line.includes(term)
 }
 
-/** Known leftovers in files owned by another plan; delete the entry when that plan fixes the string. */
-const PENDING = new Set(['/src/features/admin/dashboard/MoneyInsightsBlock.tsx|tin nhắc']) // P16 task 5 redesigns the dashboard: toast 'Đã sao chép tin nhắc thanh toán'
+/** Known exceptions, keyed by file|term. */
+/** Allowed: the portal regex that strips internal rule codes mentions "(BR-" on purpose. */
+const PENDING = new Set<string>(['/src/features/portal/requests.ts|(BR-'])
 
 describe('glossary', () => {
   it('names the agreed terms', () => {
@@ -25,7 +26,7 @@ describe('glossary', () => {
   it('no component renders a forbidden term', () => {
     const hits: string[] = []
     for (const [path, source] of Object.entries(files)) {
-      if (path.endsWith('.test.tsx')) continue
+      if (/.test.tsx?$/.test(path) || path === '/src/lib/glossary.ts') continue
       source.split('\n').forEach((line, i) => {
         if (isCode(line)) return
         for (const term of FORBIDDEN_UI_TERMS) {

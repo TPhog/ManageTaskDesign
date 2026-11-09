@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { stageLabel } from '@/features/admin/flow/flowUtils'
 import { deadlineLabel, RISK_LABEL, SEVERE_RISKS } from './dashboardUtils'
 import { Section } from './DashboardSection'
+import { useIsMobile } from './useIsMobile'
 import { useProjectHealth } from './useDashboardBlocks'
 
 /** md: the list reads as a table (CSS only — it stays a `ul` for screen readers and e2e). Columns follow the DOM order. */
@@ -51,7 +52,7 @@ function QuotaDots({ used, total }: { used: number; total: number }) {
 function HealthRow({ item }: { item: ProjectHealthItem }) {
   const late = item.daysToDeadline !== null && item.daysToDeadline < 0
   return (
-    <li className={cn('space-y-2 py-3 md:items-center md:space-y-0 md:rounded-sm md:px-2 md:transition-colors md:hover:bg-surface-sunk', columns)}>
+    <li className={cn('space-y-1 py-2.5 md:items-center md:space-y-0 md:rounded-sm md:px-2 md:transition-colors md:hover:bg-surface-sunk', columns)}>
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 md:contents">
         <div className="min-w-0">
           <Link
@@ -70,7 +71,7 @@ function HealthRow({ item }: { item: ProjectHealthItem }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 md:contents">
+      <div className="hidden grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 sm:grid md:contents">
         {item.progressPercent === null ? (
           <span className="text-xs text-muted-foreground">Chưa có việc</span>
         ) : (
@@ -132,9 +133,11 @@ export function ProjectHealthView({ health }: { health: ProjectHealth }) {
 
 /** Rows shown on the dashboard; the rest is summed into "và N dự án khác". */
 const HEALTH_ROWS = 8
+const HEALTH_ROWS_MOBILE = 5
 
 export function ProjectHealthBlock() {
   const { data, isLoading, error, refetch } = useProjectHealth()
+  const rows = useIsMobile() ? HEALTH_ROWS_MOBILE : HEALTH_ROWS
   return (
     <Section
       title="Sức khỏe dự án"
@@ -153,7 +156,7 @@ export function ProjectHealthBlock() {
         </div>
       ) : (
         <ProjectHealthView
-          health={{ ...data, items: data.items.slice(0, HEALTH_ROWS), hidden: data.hidden + Math.max(0, data.items.length - HEALTH_ROWS) }}
+          health={{ ...data, items: data.items.slice(0, rows), hidden: data.hidden + Math.max(0, data.items.length - rows) }}
         />
       )}
     </Section>

@@ -24,7 +24,7 @@ function AcceptedChart({ data }: { data: MonthTotal[] }) {
   return (
     <figure data-testid="dsh-chart" className="space-y-2">
       <figcaption className="sr-only">Giá trị đã chốt 6 tháng gần nhất</figcaption>
-      <div className="flex h-40 items-end gap-2.5 border-b-[1.5px] border-foreground pt-6" aria-hidden="true">
+      <div className="flex h-28 items-end gap-2.5 sm:h-40 border-b-[1.5px] border-foreground pt-6" aria-hidden="true">
         {data.map((d, i) => (
           <div key={d.month} className="group relative flex h-full min-w-0 flex-1 flex-col justify-end">
             <span className={cn(
