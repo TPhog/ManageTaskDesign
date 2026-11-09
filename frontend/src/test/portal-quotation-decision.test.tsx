@@ -17,6 +17,9 @@ describe('QuotationDecision (CF-03)', () => {
     renderIt()
 
     fireEvent.click(screen.getByRole('button', { name: 'Đồng ý báo giá' }))
+    // portal touch targets: both confirm buttons are ≥ 44px (size="touch" = h-13)
+    expect(screen.getByRole('button', { name: 'Đồng ý' })).toHaveClass('h-13')
+    expect(screen.getByRole('button', { name: 'Huỷ' })).toHaveClass('h-13')
     fireEvent.click(screen.getByRole('button', { name: 'Đồng ý' }))
 
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/portal/quotations/q1/accept', {}))

@@ -77,6 +77,8 @@ export function DeliverableReview({ projectId, projectStatus, deliverable: d }: 
       )}
 
       <ConfirmDialog
+
+        size="touch"
         open={approveOpen}
         onOpenChange={setApproveOpen}
         title={`Duyệt ${d.name}?`}
@@ -101,14 +103,16 @@ interface RequestChangeProps {
 function RequestChangeDialog({ projectId, deliverable, open, onOpenChange }: RequestChangeProps) {
   const qc = useQueryClient()
   const [sent, setSent] = useState<SentRequestSummary | null>(null)
+  const [wasOpen, setWasOpen] = useState(open)
 
-  function change(next: boolean) {
-    if (!next) setSent(null)
-    onOpenChange(next)
+  // Reset when the dialog opens again, not when it closes: clearing `sent` on close flashed the form during the fade-out.
+  if (open !== wasOpen) {
+    setWasOpen(open)
+    if (open) setSent(null)
   }
 
   return (
-    <Dialog open={open} onOpenChange={change}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{`Yêu cầu sửa ${deliverable.name}`}</DialogTitle>
@@ -120,7 +124,7 @@ function RequestChangeDialog({ projectId, deliverable, open, onOpenChange }: Req
           <RequestSentSummary
             summary={sent}
             deliverableName={deliverable.name}
-            actions={<Button type="button" size="touch" className="w-full" onClick={() => change(false)}>Xong</Button>}
+            actions={<Button type="button" size="touch" className="w-full" onClick={() => onOpenChange(false)}>Xong</Button>}
           />
         ) : (
           <PortalRequestForm
@@ -131,7 +135,7 @@ function RequestChangeDialog({ projectId, deliverable, open, onOpenChange }: Req
               setSent(summary)
               void qc.invalidateQueries({ queryKey: qk.portal.project(projectId) })
             }}
-            onCancel={() => change(false)}
+            onCancel={() => onOpenChange(false)}
           />
         )}
       </DialogContent>

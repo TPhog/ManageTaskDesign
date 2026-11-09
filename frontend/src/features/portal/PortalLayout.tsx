@@ -116,6 +116,7 @@ export default function PortalLayout() {
       </main>
       {/* CF-16: the link is the only way back in, so leaving asks first */}
       <ConfirmDialog
+        size="touch"
         open={confirmLogout}
         onOpenChange={setConfirmLogout}
         title="Thoát khỏi trang theo dõi?"

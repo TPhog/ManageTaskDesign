@@ -24,6 +24,7 @@ export function QuotationDecision({ quotation: q }: { quotation: PortalQuotation
           Đồng ý báo giá
         </Button>
         <ConfirmDialog
+          size="touch"
           open={confirming}
           onOpenChange={setConfirming}
           title={`Đồng ý báo giá ${q.snapshot.number}?`}
