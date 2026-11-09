@@ -34,11 +34,52 @@ test.describe('Client portal — quotations and requests', () => {
       .toHaveAttribute('href', `/api/portal/quotations/${id}/qr/full.png`)
     await expect(portal.locator('body')).not.toContainText('E2E-INTERNAL-NOTE')
     await expect(portal.getByRole('button', { name: 'Đồng ý báo giá' })).toBeVisible()   // ADR-012
+    await expect(portal.getByRole('button', { name: /từ chối/i })).toHaveCount(0)   // ADR-004: the client never rejects on the portal
 
     await portal.getByRole('navigation', { name: 'Điều hướng portal' }).getByRole('link', { name: 'Báo giá' }).click()
     await expect(portal).toHaveURL(/\/portal\/quotations$/)
     await expect(portal.getByRole('link', { name: new RegExp(number) })).toBeVisible()
     await context.close()
+  })
+
+  test('client agrees to a sent quotation and reports the transfer; the designer sees both to confirm', async ({ page, browser }) => {
+    await page.goto('/admin')
+    await configureBank(page)
+    const stamp = Date.now()
+    const clientId = await createClient(page, `Portal Agree E2E ${stamp}`)
+    const projectId = await createProjectForClient(page, clientId, `Dự án đồng ý ${stamp}`)
+    const serviceId = await createService(page, `E2E Portal Agree ${stamp}`, 2_000_000)
+    await apiPost(page.request, page, `/api/admin/projects/${projectId}/deliverables`, { name: 'Logo', quantity: 1, serviceId })
+    const { id, number } = await sendQuotation(page, projectId, 'E2E-INTERNAL-NOTE')
+    const link = await issuePortalLink(page, clientId)
+
+    const { context, page: portal } = await openAsClient(browser, link)
+    await expect(portal).toHaveURL(/\/portal$/)
+    await portal.goto(`/portal/quotations/${id}`)
+
+    await portal.getByRole('button', { name: 'Đồng ý báo giá' }).click()
+    await portal.getByRole('dialog').getByRole('button', { name: 'Đồng ý', exact: true }).click()
+    await expect(portal.getByText(/Bạn đã đồng ý lúc .* — đang chờ nhà thiết kế xác nhận/)).toBeVisible()
+    await expect(portal.getByRole('button', { name: 'Đồng ý báo giá' })).toHaveCount(0)
+
+    await portal.getByRole('button', { name: 'Tôi đã chuyển khoản' }).click()
+    await portal.getByLabel('Ghi chú cho nhà thiết kế (tuỳ chọn)').fill(`TK của chồng ${stamp}`)
+    await portal.getByRole('button', { name: 'Báo đã chuyển' }).click()
+    await expect(portal.getByText(/Bạn đã báo chuyển 1\.000\.000/)).toBeVisible()
+    await expect(portal.getByRole('button', { name: 'Tôi đã chuyển khoản' })).toHaveCount(0)
+    await context.close()
+
+    // Recorded only (BR-01): the quotation is still SENT/UNPAID until the designer confirms
+    const detail = await (await page.request.get(`/api/admin/quotations/${id}`)).json()
+    expect(detail.status).toBe('SENT')
+    expect(detail.paymentStatus).toBe('UNPAID')
+    expect(detail.clientAcceptedAt).not.toBeNull()
+    expect(detail.clientPaymentNotice).toMatchObject({ purpose: 'deposit', amount: 1_000_000, pending: true })
+
+    await page.goto(`/admin/quotations/${id}`)
+    await expect(page.getByText(number).first()).toBeVisible()
+    await expect(page.getByText(/Khách đã bấm “Đồng ý báo giá” trên portal/)).toBeVisible()
+    await expect(page.getByText(/Khách báo đã chuyển 1\.000\.000\s*₫ \(tiền cọc\)/)).toContainText(`TK của chồng ${stamp}`)
   })
 
   test('client sends a change request that the designer sees in the inbox', async ({ page, browser }) => {
