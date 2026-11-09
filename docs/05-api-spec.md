@@ -295,7 +295,7 @@ Các endpoint dashboard bổ sung (P11) đều là `GET` thuần đọc, cookie 
 
 `deltaPercent` là `null` khi kỳ trước bằng 0. `receivables.items` tối đa 20, `byClient` tối đa 10; `receivables.total` bằng `money.outstanding` của `GET /api/admin/dashboard`.
 
-`GET /api/admin/dashboard/client-activity` chỉ gồm `REQUEST_CREATED`, `DELIVERABLE_APPROVED` (do khách thực hiện) và `QUOTATION_ACCEPTED`; `href` do server dựng:
+`GET /api/admin/dashboard/client-activity` chỉ gồm `REQUEST_CREATED`, `DELIVERABLE_APPROVED`, `QUOTATION_CLIENT_ACCEPTED` (`quotation.client_accepted`), `CLIENT_PAYMENT_NOTICE` (`quotation.client_payment_notice`), `INTAKE_SUBMITTED` (`intake.submitted`, `href` `/admin/intake`, không tên khách) — đều do khách thực hiện — và `QUOTATION_ACCEPTED`; `text` viết cho designer (không dùng `client_message` "Bạn …" của hai lời khai báo giá); `href` do server dựng:
 
 ```json
 { "items": [ { "id": 981, "occurredAt": "2026-11-09T02:10:00+00:00", "kind": "REQUEST_CREATED", "text": "…", "clientName": "…", "projectName": "…", "href": "/admin/requests/…" } ] }
@@ -320,7 +320,7 @@ Tất cả dưới `/api/admin/*`, cookie `Designer`; POST/PUT/PATCH/DELETE cầ
 |---|---|---|
 | GET | `/api/admin/search?q=` | Tìm nhanh header: `{ clients, projects, quotations, tasks, requests }`, tối đa 5/nhóm (02 §14.1: `tasks[] { id, projectId, title, projectName, status }`, `requests[] { id, projectId, projectName, clientName, excerpt, status }`); q 2–100 ký tự, không phân biệt hoa/thường/dấu; SĐT bỏ qua khoảng trắng, `.`, `-` |
 | GET | `/api/admin/projects/{id}/flow` | Các bước luồng dự án (ProjectFlow) và bước hiện tại. Action kinds P12: `CONFIRM_CLIENT_ACCEPTANCE` (báo giá `SENT` đã có `client_accepted_at`; khi đó không còn `RECORD_ACCEPTANCE`), `CONFIRM_CLIENT_PAYMENT` (có `clientPaymentNotice.pending`); hai kind này đứng đầu danh sách. Warning P12: `REVIEW_WITH_OPEN_REVISIONS`. `CONFIRM_APPROVAL` chỉ khi `reviewState = CLIENT_APPROVED` (BR-97). Action kinds P14: `MARK_QUOTED`, `RECORD_DEPOSIT`, `VIEW_TASKS`; warning `COMPLETED_WITH_OPEN_ITEMS` (info); không có `CREATE_QUOTATION` khi dự án chưa có hạng mục (BR-143); `COPY_PAYMENT_REMINDER` có nhãn "Sao chép tin nhắn thanh toán" |
-| GET | `/api/admin/flow/actions` | Danh sách việc cần làm tiếp theo trên mọi dự án |
+| GET | `/api/admin/flow/actions` | Danh sách việc cần làm tiếp theo trên mọi dự án chưa lưu trữ, trừ CANCELLED; dự án COMPLETED chỉ có mặt khi còn action (khách đã đồng ý/báo chuyển khoản chờ xác nhận, hoặc còn nợ → `COPY_PAYMENT_REMINDER`) |
 | GET | `/api/admin/projects/{id}/start-preview` | Cảnh báo trước khi bắt đầu (vd chưa có báo giá gốc được chấp nhận) + từng hạng mục `{ deliverableId, name, serviceName, titles[], suggestedDueDate }` (BR-144) |
 | POST | `/api/admin/projects/{id}/start` | `{ rowVersion, tasks?: [{ deliverableId, titles[], dueDate? }] }` - DRAFT/QUOTED → IN_PROGRESS; cảnh báo không chặn; `dueDate` là hạn chung cho mọi công việc tạo từ hạng mục đó (BR-144) → `{ projectId, status, startedDeliverables, createdTasks, warnings[] }` |
 | POST | `/api/admin/deliverables/{id}/submit-review` · `confirm-approval` | Gửi khách duyệt (`{ clientMessage? ≤ 500 }`, lời nhắn hiện cho khách) / designer xác nhận duyệt thay khách |

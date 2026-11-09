@@ -18,6 +18,7 @@ public class DashboardClientActivityTests(AppFactory factory) : IntegrationTestB
     private static readonly Guid DeliverableId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000002");
     private static readonly Guid QuotationId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000003");
     private static readonly Guid ProjectId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000004");
+    private static readonly Guid IntakeId = Guid.Parse("aaaaaaaa-0000-0000-0000-000000000005");
     private static readonly DateTimeOffset T0 = new(2030, 5, 15, 3, 0, 0, TimeSpan.Zero);
 
     [Fact]
@@ -28,9 +29,22 @@ public class DashboardClientActivityTests(AppFactory factory) : IntegrationTestB
     public async Task Lists_client_actions_and_accepted_quotations_newest_first_with_server_built_links()
     {
         var items = (await GetAsync()).GetProperty("items").EnumerateArray().ToList();
-        items.Select(i => i.GetProperty("kind").GetString())
-            .Should().Equal("QUOTATION_ACCEPTED", "DELIVERABLE_APPROVED", "REQUEST_CREATED");
+        items.Select(i => i.GetProperty("kind").GetString()).Should().Equal(
+            "INTAKE_SUBMITTED", "CLIENT_PAYMENT_NOTICE", "QUOTATION_CLIENT_ACCEPTED",
+            "QUOTATION_ACCEPTED", "DELIVERABLE_APPROVED", "REQUEST_CREATED");
 
+        // R2 I2: the P12/P13 client statements, worded for the designer (the stored client_message is for the client)
+        items[0].GetProperty("text").GetString().Should().Be("Khách mới gửi yêu cầu qua form");
+        items[0].GetProperty("href").GetString().Should().Be("/admin/intake");
+        items[0].GetProperty("clientName").ValueKind.Should().Be(JsonValueKind.Null);
+        items[0].GetProperty("projectName").ValueKind.Should().Be(JsonValueKind.Null);
+        items[1].GetProperty("text").GetString().Should()
+            .Be("Khách báo đã chuyển 500 ₫ (phần còn lại) cho báo giá BG-2030-0001 (v1) — kiểm tra & xác nhận");
+        items[1].GetProperty("href").GetString().Should().Be($"/admin/quotations/{QuotationId}");
+        items[2].GetProperty("text").GetString().Should().Be("Khách đồng ý báo giá BG-2030-0001 (v1) — chờ bạn xác nhận");
+        items[2].GetProperty("href").GetString().Should().Be($"/admin/quotations/{QuotationId}");
+
+        items = items.Skip(3).ToList();
         items[0].GetProperty("text").GetString().Should().Be("Báo giá BG-2030-0001 (v1) đã được chấp nhận");
         items[0].GetProperty("href").GetString().Should().Be($"/admin/quotations/{QuotationId}");
         items[1].GetProperty("text").GetString().Should().Be("Khách đã duyệt Logo");
@@ -46,7 +60,7 @@ public class DashboardClientActivityTests(AppFactory factory) : IntegrationTestB
     {
         (await GetAsync(2)).GetProperty("items").GetArrayLength().Should().Be(2);
         (await GetAsync(0)).GetProperty("items").GetArrayLength().Should().Be(1);
-        (await GetAsync(999)).GetProperty("items").GetArrayLength().Should().Be(3);
+        (await GetAsync(999)).GetProperty("items").GetArrayLength().Should().Be(6);
     }
 
     private async Task<JsonElement> GetAsync(int? limit = null)
@@ -71,10 +85,12 @@ public class DashboardClientActivityTests(AppFactory factory) : IntegrationTestB
             Number = Quotation.FormatNumber("BG", 2030, 1), Status = QuotationStatuses.Accepted, ValidityDays = 7,
             Subtotal = 1_000, Total = 1_000, AcceptedAt = D(5, 15), PaymentStatus = PaymentStatuses.Unpaid,
         };
-        ActivityLog Log(string actor, string entityType, Guid entityId, string action, int minutes, string? message = null) => new()
+        ActivityLog Log(string actor, string entityType, Guid entityId, string action, int minutes, string? message = null,
+            string data = "{}", bool anonymous = false) => new()
         {
-            OccurredAt = T0.AddMinutes(minutes), ActorType = actor, ClientId = client.Id, ProjectId = project.Id,
-            EntityType = entityType, EntityId = entityId, Action = action, ClientMessage = message,
+            OccurredAt = T0.AddMinutes(minutes), ActorType = actor,
+            ClientId = anonymous ? null : client.Id, ProjectId = anonymous ? null : project.Id,
+            EntityType = entityType, EntityId = entityId, Action = action, ClientMessage = message, Data = data,
         };
 
         db.Clients.Add(client);
@@ -87,7 +103,15 @@ public class DashboardClientActivityTests(AppFactory factory) : IntegrationTestB
             Log("DESIGNER", "request", Guid.NewGuid(), "request.created", 2),                // designer-made: excluded
             Log("CLIENT", "file", Guid.NewGuid(), "image.uploaded", 3),                      // not a feed action
             Log("DESIGNER", "quotation", QuotationId, "quotation.accepted", 4,
-                "Báo giá BG-2030-0001 (v1) đã được chấp nhận"));   // the exact shape QuotationWorkflowEndpoints writes
+                "Báo giá BG-2030-0001 (v1) đã được chấp nhận"),   // the exact shape QuotationWorkflowEndpoints writes
+            // the exact shapes PortalQuotationsEndpoints / PublicIntakeEndpoints write
+            Log("CLIENT", "quotation", QuotationId, "quotation.client_accepted", 5,
+                "Bạn đã đồng ý báo giá BG-2030-0001 — chờ nhà thiết kế xác nhận", """{"number":"BG-2030-0001","version":1}"""),
+            Log("CLIENT", "quotation", QuotationId, "quotation.client_payment_notice", 6,
+                "Bạn báo đã chuyển 500 ₫ (phần còn lại) cho báo giá BG-2030-0001 — chờ nhà thiết kế kiểm tra",
+                """{"number":"BG-2030-0001","version":1,"purpose":"remaining","amount":500,"hasNote":false}"""),
+            Log("CLIENT", "intake_submission", IntakeId, "intake.submitted", 7, data: """{"templateId":null,"imageCount":0}""",
+                anonymous: true));
         await db.SaveChangesAsync();
     }
 }

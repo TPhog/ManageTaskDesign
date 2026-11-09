@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { CheckCircle2, FileCheck2, Inbox, MessageSquare, TriangleAlert } from 'lucide-react'
+import { Banknote, CheckCircle2, FileCheck2, Handshake, Inbox, MessageSquare, TriangleAlert, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ClientActivity, ClientActivityKind } from '@/lib/dashboardTypes'
@@ -12,6 +12,9 @@ const KIND_ICON = {
   REQUEST_CREATED: Inbox,
   DELIVERABLE_APPROVED: CheckCircle2,
   QUOTATION_ACCEPTED: FileCheck2,
+  QUOTATION_CLIENT_ACCEPTED: Handshake,
+  CLIENT_PAYMENT_NOTICE: Banknote,
+  INTAKE_SUBMITTED: UserPlus,
 } satisfies Record<ClientActivityKind, typeof Inbox>
 
 /** Presentational: what clients did lately; every row links to the server-built `href`. */

@@ -33,25 +33,33 @@ public static class ProjectFlowEndpoints
         return facts.TryGetValue(id, out var f) ? Results.Ok(ProjectFlow.Evaluate(f, today)) : Results.NotFound();
     }
 
-    /// <summary>Dashboard "Việc cần làm" (plan 07): open, non-archived projects.</summary>
+    /// <summary>
+    /// Dashboard "Việc cần làm" (plan 07): open, non-archived projects, plus COMPLETED ones that still have an action
+    /// (R2 I2: a client statement to confirm — BR-76/77 — or a balance due). The SQL pre-filter only narrows the
+    /// COMPLETED candidates; ProjectFlow.Evaluate decides.
+    /// </summary>
     private static async Task<IResult> ListActions(AppDbContext db, IClock clock)
     {
         var today = clock.TodayVn;
         var projects = await (
                 from p in db.Projects.AsNoTracking()
                 join c in db.Clients on p.ClientId equals c.Id
-                where p.ArchivedAt == null && p.Status != "COMPLETED" && p.Status != "CANCELLED"
+                where p.ArchivedAt == null && p.Status != "CANCELLED"
+                      && (p.Status != "COMPLETED" || db.Quotations.Any(q => q.ProjectId == p.Id
+                          && ((q.Status == QuotationStatuses.Accepted && q.PaymentStatus != PaymentStatuses.Paid)
+                              || (q.Status == QuotationStatuses.Sent
+                                  && (q.ClientAcceptedAt != null || q.ClientPaymentNoticeAt != null)))))
                 orderby p.DueDate == null, p.DueDate, p.CreatedAt descending
-                select new { p.Id, p.Name, ClientName = c.Name })
+                select new { p.Id, p.Name, p.Status, ClientName = c.Name })
             .ToListAsync();
 
         var facts = await ProjectFlowReads.LoadFactsAsync(db, projects.Select(p => p.Id).ToList(), today);
 
-        return Results.Ok(projects.Select(p =>
-        {
-            var state = ProjectFlow.Evaluate(facts[p.Id], today);
-            return new FlowProjectActionsDto(p.Id, p.Name, p.ClientName, state.Stage, state.Actions, state.Warnings);
-        }).ToList());
+        return Results.Ok(projects
+            .Select(p => (p, State: ProjectFlow.Evaluate(facts[p.Id], today)))
+            .Where(x => x.p.Status != "COMPLETED" || x.State.Actions.Count > 0)
+            .Select(x => new FlowProjectActionsDto(x.p.Id, x.p.Name, x.p.ClientName, x.State.Stage, x.State.Actions, x.State.Warnings))
+            .ToList());
     }
 
     private static async Task<IResult> StartPreview(Guid id, AppDbContext db)

@@ -159,7 +159,9 @@ export interface MoneyInsights {
   receivables: { total: number; items: ReceivableItem[]; byClient: ReceivableClient[]; hiddenItems: number }
 }
 
-export type ClientActivityKind = 'REQUEST_CREATED' | 'DELIVERABLE_APPROVED' | 'QUOTATION_ACCEPTED'
+export type ClientActivityKind =
+  | 'REQUEST_CREATED' | 'DELIVERABLE_APPROVED' | 'QUOTATION_ACCEPTED'
+  | 'QUOTATION_CLIENT_ACCEPTED' | 'CLIENT_PAYMENT_NOTICE' | 'INTAKE_SUBMITTED'
 
 export interface ClientActivityItem {
   id: number

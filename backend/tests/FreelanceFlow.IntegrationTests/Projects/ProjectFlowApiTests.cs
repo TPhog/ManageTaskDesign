@@ -561,4 +561,55 @@ public class ProjectFlowApiTests(AppFactory factory) : PortalTestBase(factory)
         action.GetProperty("kind").GetString().Should().Be("COPY_PAYMENT_REMINDER");
         action.GetProperty("target").GetProperty("quotationId").GetGuid().Should().Be(quotationId);
     }
+
+    /// <summary>Brief + accepted INITIAL quotation (2.000.000 ₫ UNPAID), the deliverable delivered and the project COMPLETED.</summary>
+    private async Task<(Guid ProjectId, Guid QuotationId)> CompletedWithMoneyDueAsync(Guid projectId)
+    {
+        var logo = await CreateDeliverableAsync(projectId, "Logo");
+        var quotationId = await QuotedAsync(projectId);
+        (await StartAsync(projectId, Array.Empty<object>())).EnsureSuccessStatusCode();
+        await MoveDeliverableAsync(logo, "IN_REVIEW", "APPROVED", "DELIVERED");
+        await ChangeProjectStatusAsync(projectId, new { to = "COMPLETED", confirmWarnings = true });
+        return (projectId, quotationId);
+    }
+
+    [Fact]
+    public async Task Flow_actions_list_a_completed_project_while_money_is_still_due()   // R2 I2
+    {
+        await LoginAsync();
+        var (projectId, quotationId) = await CompletedWithMoneyDueAsync(await NewProjectAsync("Done"));
+
+        var list = (await Client.GetFromJsonAsync<JsonElement>("/api/admin/flow/actions")).EnumerateArray().ToList();
+
+        var row = list.Single(p => p.GetProperty("projectId").GetGuid() == projectId);
+        row.GetProperty("stage").GetString().Should().Be("CLOSE");
+        var action = row.GetProperty("actions").EnumerateArray().Single();
+        action.GetProperty("kind").GetString().Should().Be("COPY_PAYMENT_REMINDER");
+        action.GetProperty("target").GetProperty("quotationId").GetGuid().Should().Be(quotationId);
+
+        var rowVersion = (await Client.GetFromJsonAsync<JsonElement>($"/api/admin/quotations/{quotationId}"))
+            .GetProperty("rowVersion").GetUInt32();
+        var paid = await Client.PostAsJsonAsync($"/api/admin/quotations/{quotationId}/payment-status",
+            new { to = "PAID", date = "2026-11-10", rowVersion });
+        paid.StatusCode.Should().Be(HttpStatusCode.OK, await paid.Content.ReadAsStringAsync());
+
+        (await Client.GetFromJsonAsync<JsonElement>("/api/admin/flow/actions")).EnumerateArray()
+            .Should().NotContain(p => p.GetProperty("projectId").GetGuid() == projectId);
+    }
+
+    [Fact]
+    public async Task Flow_actions_list_a_completed_project_whose_client_reported_a_payment()   // R2 I2, BR-77
+    {
+        await LoginAsync();
+        var (clientId, token) = await CreateClientWithPortalLinkAsync();
+        var (projectId, quotationId) = await CompletedWithMoneyDueAsync(await CreateProjectAsync(clientId, $"Done {Guid.NewGuid():N}"));
+        var portal = await OpenPortalSessionAsync(token);
+        (await portal.PostAsJsonAsync($"/api/portal/quotations/{quotationId}/payment-notice", new { purpose = "full", note = (string?)null }))
+            .StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var list = (await Client.GetFromJsonAsync<JsonElement>("/api/admin/flow/actions")).EnumerateArray().ToList();
+
+        var row = list.Single(p => p.GetProperty("projectId").GetGuid() == projectId);
+        Kinds(row.GetProperty("actions")).Should().Contain("CONFIRM_CLIENT_PAYMENT");
+    }
 }

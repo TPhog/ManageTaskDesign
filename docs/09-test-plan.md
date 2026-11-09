@@ -123,11 +123,12 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
 | AC-DSH-03 | Sức khỏe dự án: rủi ro, điểm, thứ tự, dự án COMPLETED còn nợ có mặt, đã thu đủ thì không; chấm điểm mọi dự án trong phạm vi rồi mới cắt 12 dòng (`hidden`) | `DashboardProjectHealthTests`, `ProjectHealthTests` |
 | AC-DSH-04 | Đã thu theo kỳ = cọc theo `DepositPaidAt` + phần còn lại theo `PaidAt`; so sánh cùng số ngày kỳ trước; `period` sai → 400 | `DashboardMoneyInsightsTests`, `DashboardPeriodsTests` |
 | AC-DSH-05 | `receivables.total` = `money.outstanding`; tuổi nợ và bucket đúng; copy nhắc thanh toán đúng nội dung | `DashboardMoneyInsightsTests`, `moneyInsightsBlock.test.tsx` |
-| AC-DSH-06 | Feed hoạt động chỉ gồm sự kiện do khách + báo giá được chấp nhận; link do server dựng; số truy vấn cố định | `DashboardClientActivityTests` |
+| AC-DSH-06 | Feed hoạt động chỉ gồm sự kiện do khách (gồm khách đồng ý báo giá, khách báo đã chuyển khoản, khách mới gửi form) + báo giá được chấp nhận; chữ viết cho designer; link do server dựng; số truy vấn cố định | `DashboardClientActivityTests` |
 | AC-DSH-07 | Checklist: 6 mục, hoàn thành theo dữ liệu thật (STUDIO cần tên khác tên mẫu và có SĐT/email; SERVICE cần dịch vụ có giá được tạo/sửa sau seed), tắt idempotent, ẩn khi xong | `DashboardSetupTests`, `setupChecklist.test.tsx` |
 | AC-DSH-08 | Digest gửi tối đa 1 lần/ngày VN (kể cả chạy đồng thời), đúng giờ cấu hình, tắt thì im lặng, không có gì để báo thì không gửi; lỗi trước commit thì ngày được thử lại | `DailyDigestTests`, `DailyDigestMessageTests` |
 | AC-DSH-09 | Cấu hình digest lưu/validate 0–23, cảnh báo khi chưa có webhook | `DigestSettingsTests`, `digestSection.test.tsx` |
 | AC-DSH-10 | Không tràn ngang ở 390px; bảng/thanh có bản đọc được bằng chữ | e2e `dashboard-upgrade.spec.ts` + kiểm tay |
+| AC-DSH-11 | "Việc cần làm" vẫn liệt kê dự án COMPLETED khi khách báo đã chuyển khoản / đồng ý báo giá chờ xác nhận hoặc còn nợ; thu đủ thì biến mất | `ProjectFlowApiTests.Flow_actions_list_a_completed_project_*` |
 
 ### AC-CF — Portal vòng 2 (P12; BR-76, BR-77, BR-97)
 
