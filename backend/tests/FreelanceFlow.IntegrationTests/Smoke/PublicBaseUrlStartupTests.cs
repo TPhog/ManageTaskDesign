@@ -16,6 +16,8 @@ public class PublicBaseUrlStartupTests
             b.UseEnvironment("Production");
             b.UseSetting("ConnectionStrings:DefaultConnection", "Host=localhost;Database=unused");
             b.UseSetting("App:PublicBaseUrl", value);
+            // an existing writable folder, so the DataProtection:KeysPath guard (it runs first) passes
+            b.UseSetting("DataProtection:KeysPath", Path.GetTempPath());
         });
 
         var act = () => factory.CreateClient();
