@@ -533,6 +533,6 @@ public static class TasksEndpoints
             errors["deliverableId"] = ["Hạng mục không thuộc dự án này"];
     }
 
-    private static Task<Guid> ClientIdOfAsync(AppDbContext db, Guid projectId) =>
+    internal static Task<Guid> ClientIdOfAsync(AppDbContext db, Guid projectId) =>
         db.Projects.Where(p => p.Id == projectId).Select(p => p.ClientId).FirstAsync();
 }

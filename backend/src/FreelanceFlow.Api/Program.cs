@@ -292,6 +292,7 @@ app.MapProjectsEndpoints();
 app.MapBriefsEndpoints();
 app.MapDeliverablesEndpoints();
 app.MapTasksEndpoints();
+app.MapTaskCalendarEndpoints();
 app.MapSearchEndpoints();
 app.MapQuotationsEndpoints();
 app.MapQuotationWorkflowEndpoints();
