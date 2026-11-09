@@ -204,6 +204,45 @@ public class PortalRequestsTests(AppFactory factory) : PortalTestBase(factory)
     }
 
     [Fact]
+    public async Task Full_storage_accepts_a_template_request_text_only_even_with_a_required_images_question()
+    {
+        await LoginAsync();
+        var created = await Client.PostAsJsonAsync("/api/admin/request-templates", new
+        {
+            name = "Cần ảnh", description = "", designType = "OTHER", serviceId = (Guid?)null, active = true,
+            fields = new object[]
+            {
+                new { key = "idea", label = "Ý tưởng", type = "SHORT_TEXT", required = true, help = (string?)null, options = Array.Empty<string>() },
+                new { key = "refs", label = "Ảnh mẫu", type = "IMAGES", required = true, help = (string?)null, options = Array.Empty<string>() },
+            },
+        });
+        created.StatusCode.Should().Be(HttpStatusCode.Created, await created.Content.ReadAsStringAsync());
+        var templateId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+        var (clientId, token) = await CreateClientWithPortalLinkAsync();
+        var projectId = await CreateProjectAsync(clientId, "Dự án đầy");
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            db.Files.Add(FreelanceFlow.Api.Domain.Files.ProjectFile.CreateImage(projectId, FreelanceFlow.Api.Domain.Files.ImageOwnerTypes.Task,
+                Guid.NewGuid(), null, "DESIGNER", false, "filler.webp", 1, 1, 10_000, 1, 1, new byte[32], DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync();
+        }
+        await using var host = Factory.WithWebHostBuilder(b => b.ConfigureTestServices(s =>
+            s.PostConfigure<FreelanceFlow.Api.Infrastructure.Storage.StorageOptions>(o => o.QuotaBytes = 1)));
+        var portal = await OpenPortalSessionAsync(token, host.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            { AllowAutoRedirect = false, HandleCookies = false }));
+
+        var form = new MultipartFormDataContent
+        {
+            { new StringContent(templateId.ToString()), "templateId" },
+            { new StringContent("""{"idea":"Logo quán"}"""), "answers" },
+        };
+        var resp = await portal.PostAsync($"/api/portal/projects/{projectId}/requests", form);
+
+        resp.StatusCode.Should().Be(HttpStatusCode.Created, await resp.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Client_sees_own_requests_newest_first_with_status_and_decline_reason()   // REQ-06, AC-R4
     {
         var (portal, clientId, projectId) = await ArrangeAsync();

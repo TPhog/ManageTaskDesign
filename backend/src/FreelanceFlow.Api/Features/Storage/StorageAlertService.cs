@@ -27,6 +27,9 @@ public sealed class StorageAlertService(
             StorageThresholds.UploadsBlocked(used, Quota), StorageThresholds.All);
     }
 
+    public async Task<bool> UploadsBlockedAsync(CancellationToken ct = default) =>
+        StorageThresholds.UploadsBlocked(await UsedBytesAsync(ct), Quota);
+
     public async Task EnsureUploadsAllowedAsync(CancellationToken ct = default)
     {
         if (StorageThresholds.UploadsBlocked(await UsedBytesAsync(ct), Quota))

@@ -15,7 +15,9 @@ public static class TemplateAnswers
     /// <summary>A template request must carry at least one answer (photos count) or a note — never just "Mẫu: …".</summary>
     public const string NothingAnswered = "Trả lời ít nhất một câu hỏi hoặc viết ghi chú thêm";
 
-    public static TemplateAnswerResult Evaluate(IReadOnlyList<TemplateField> fields, string? answersJson, int imageCount, DateOnly todayVn)
+    /// <param name="photosAccepted">False when storage refuses photos for this submission: a required images question is then optional.</param>
+    public static TemplateAnswerResult Evaluate(IReadOnlyList<TemplateField> fields, string? answersJson, int imageCount, DateOnly todayVn,
+        bool photosAccepted = true)
     {
         JsonElement root = default;
         if (!string.IsNullOrWhiteSpace(answersJson))
@@ -48,7 +50,7 @@ public static class TemplateAnswers
             if (error is not null) errors[field.Key] = error;
             else if (display is null)
             {
-                if (field.Required) errors[field.Key] = field.Type == TemplateFieldTypes.Images ? "Đính kèm ít nhất 1 ảnh" : "Bắt buộc";
+                if (field.Required && (photosAccepted || field.Type != TemplateFieldTypes.Images)) errors[field.Key] = field.Type == TemplateFieldTypes.Images ? "Đính kèm ít nhất 1 ảnh" : "Bắt buộc";
             }
             else answers.Add(new TemplateAnswer(field.Key, field.Label, field.Type, display));
         }

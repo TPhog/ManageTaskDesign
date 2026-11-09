@@ -224,6 +224,50 @@ public class PublicIntakeAbuseTests(AppFactory factory) : IntakeTestBase(factory
     }
 
     [Fact]
+    public async Task From_80_percent_storage_a_required_images_question_is_optional_on_the_text_only_form()
+    {
+        var slug = await EnableIntakeAsync();
+        var created = await Client.PostAsJsonAsync("/api/admin/request-templates", new
+        {
+            name = "Cần ảnh", description = "", designType = "OTHER", serviceId = (Guid?)null, active = true,
+            fields = new object[]
+            {
+                new { key = "idea", label = "Ý tưởng", type = "SHORT_TEXT", required = true, help = (string?)null, options = Array.Empty<string>() },
+                new { key = "refs", label = "Ảnh mẫu", type = "IMAGES", required = true, help = (string?)null, options = Array.Empty<string>() },
+            },
+        });
+        created.StatusCode.Should().Be(HttpStatusCode.Created, await created.Content.ReadAsStringAsync());
+        long existing;
+        using (var scope = Factory.Services.CreateScope())
+            existing = await scope.ServiceProvider.GetRequiredService<FreelanceFlow.Api.Features.Storage.StorageAlertService>().UsedBytesAsync();
+        const long filler = 1000;
+        var quota = (existing + filler) * 100 / 85;   // → 85 % used: above the intake limit, below the designer's 90 %
+        await using var host = Factory.WithWebHostBuilder(b => b.ConfigureTestServices(s =>
+            s.PostConfigure<StorageOptions>(o => o.QuotaBytes = quota)));
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var fillerSub = FreelanceFlow.Api.Domain.Intake.IntakeSubmission.Create("Filler", "0909000000", null, null, null, [], "filler");
+            db.IntakeSubmissions.Add(fillerSub);
+            db.Files.Add(ProjectFile.CreateImage(null, ImageOwnerTypes.IntakeSubmission, fillerSub.Id, null, "CLIENT", false, "f.webp",
+                1, 1, filler / 3, filler / 3, filler - 2 * (filler / 3), [1], DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync();
+        }
+        var anon = Anonymous(host);
+        var form = await GetFormAsync(anon, slug);
+        form.GetProperty("maxImages").GetInt32().Should().Be(0);
+        var token = form.GetProperty("formToken").GetString()!;
+
+        var missingText = await anon.PostAsync($"/api/public/intake/{slug}", IntakeForm(token, TemplateId(form, "Cần ảnh"), new { }));
+        missingText.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await missingText.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors").EnumerateObject().Select(e => e.Name)
+            .Should().Equal("answers.idea");
+
+        var ok = await anon.PostAsync($"/api/public/intake/{slug}", IntakeForm(token, TemplateId(form, "Cần ảnh"), new { idea = "Logo quán" }));
+        ok.StatusCode.Should().Be(HttpStatusCode.NoContent, await ok.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Oversized_body_is_413()
     {
         var slug = await EnableIntakeAsync();

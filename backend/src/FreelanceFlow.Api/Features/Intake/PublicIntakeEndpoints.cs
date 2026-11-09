@@ -100,10 +100,11 @@ public static class PublicIntakeEndpoints
                 statusCode: StatusCodes.Status429TooManyRequests);
         // photos stop at 80 % for anonymous senders (the designer's own block stays at 90 %); text is always accepted
         var mayCarryPhotos = http.HasFormContentType && http.ContentLength is not (<= ImageForms.TextOnlyBodyBytes);
-        if (mayCarryPhotos && await storageAlerts.IntakePhotosBlockedAsync(ct)) return PhotosRefused();
+        var photosBlocked = await storageAlerts.IntakePhotosBlockedAsync(ct);
+        if (mayCarryPhotos && photosBlocked) return PhotosRefused();
         var (form, readError) = await ImageForms.ReadAsync(http, MaxBodyBytes(appSettings.Value), ct);
         if (readError is not null) return readError;
-        if (form!.Files.Count > 0 && await storageAlerts.IntakePhotosBlockedAsync(ct)) return PhotosRefused();
+        if (form!.Files.Count > 0 && photosBlocked) return PhotosRefused();
 
         // BR-138: bots get the same empty 204 as people, and nothing is stored
         if (form!["website"].ToString().Length > 0)
@@ -137,7 +138,8 @@ public static class PublicIntakeEndpoints
                 errors["templateId"] = ["Mẫu yêu cầu không còn dùng được — vui lòng tải lại trang"];
             else
             {
-                var result = TemplateAnswers.Evaluate(template.Fields(), form["answers"].ToString(), form.Files.Count, clock.TodayVn);
+                var result = TemplateAnswers.Evaluate(template.Fields(), form["answers"].ToString(), form.Files.Count, clock.TodayVn,
+                    photosAccepted: !photosBlocked);
                 foreach (var (key, message) in result.Errors)
                     errors[key == TemplateAnswers.FormErrorKey ? "answers" : $"answers.{key}"] = [message];
                 answers = result.Answers;

@@ -97,6 +97,8 @@ public static class PortalRequestsEndpoints
         var blocked = await ImageForms.EnsureUploadsAllowedAsync(storageAlerts, http, imagesOptional: true, http.HttpContext.RequestAborted);
         if (blocked is not null) return blocked;
 
+        var uploadsBlocked = await storageAlerts.UploadsBlockedAsync(http.HttpContext.RequestAborted);
+
         IFormCollection form;
         try
         {
@@ -128,7 +130,8 @@ public static class PortalRequestsEndpoints
                 errors["templateId"] = ["Mẫu yêu cầu không còn dùng được — vui lòng tải lại trang"];
             else
             {
-                var result = TemplateAnswers.Evaluate(template.Fields(), form["answers"].ToString(), form.Files.Count, clock.TodayVn);
+                var result = TemplateAnswers.Evaluate(template.Fields(), form["answers"].ToString(), form.Files.Count, clock.TodayVn,
+                    photosAccepted: !uploadsBlocked);
                 foreach (var (key, message) in result.Errors)
                     errors[key == TemplateAnswers.FormErrorKey ? "answers" : $"answers.{key}"] = [message];
                 answers = result.Answers;

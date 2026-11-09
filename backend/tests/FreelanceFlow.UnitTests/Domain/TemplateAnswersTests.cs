@@ -75,6 +75,22 @@ public class TemplateAnswersTests
         TemplateAnswers.Evaluate(fields, null, 1, Today).IsValid.Should().BeTrue();
     }
 
+    [Fact]
+    public void Required_image_field_is_optional_when_photos_are_not_accepted_but_text_is_still_checked()
+    {
+        var fields = TemplateFieldRules.Normalize(
+        [
+            new TemplateField("refs", "Ảnh", TemplateFieldTypes.Images, true, null, []),
+            new TemplateField("idea", "Ý tưởng", TemplateFieldTypes.ShortText, true, null, []),
+        ]);
+
+        var result = TemplateAnswers.Evaluate(fields, "{}", 0, Today, photosAccepted: false);
+
+        result.Errors.Keys.Should().Equal("idea");
+        TemplateAnswers.Evaluate(fields, """{"idea":"Logo"}""", 0, Today, photosAccepted: false).IsValid.Should().BeTrue();
+        TemplateAnswers.Evaluate(fields, """{"idea":"Logo"}""", 0, Today).Errors.Keys.Should().Equal("refs");
+    }
+
     [Theory]
     [InlineData("[1,2]")]
     [InlineData("{not json")]
