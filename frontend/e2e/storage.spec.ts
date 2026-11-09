@@ -30,8 +30,18 @@ test.describe('Settings › Dung lượng and watermark', () => {
     await expect(page).toHaveURL(/completedOnly=1&olderThanMonths=6&sort=oldest/)
   })
 
+  test('Quản lý dung lượng and the back link stay on the Ảnh & Dung lượng tab', async ({ page }) => {
+    await page.goto('/admin/settings?tab=images')
+    await page.getByRole('link', { name: 'Quản lý dung lượng' }).click()
+    await expect(page.getByRole('heading', { name: 'Dung lượng', level: 1 })).toBeVisible()
+    await page.getByRole('main').getByRole('link', { name: 'Cài đặt', exact: true }).click()
+    await expect(page).toHaveURL(/\/admin\/settings\?tab=images$/)
+    await expect(page.getByRole('region', { name: 'Watermark ảnh' })).toBeVisible()
+  })
+
   test('designer changes the watermark from the settings page', async ({ page }) => {
     await page.goto('/admin/settings')
+    await page.getByRole('tab', { name: 'Ảnh & Dung lượng' }).click()
     const section = page.getByRole('region', { name: 'Watermark ảnh' })
     await section.getByLabel('Nội dung').fill('Studio E2E · Bản xem trước')
     await section.getByRole('button', { name: 'Lưu watermark' }).click()

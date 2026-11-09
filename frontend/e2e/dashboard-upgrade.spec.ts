@@ -89,8 +89,17 @@ test.describe('Dashboard upgrade (P11)', () => {
     await expect(page.getByRole('region', { name: 'Bắt đầu thiết lập' })).toHaveCount(0)
   })
 
+  test('setup checklist links open the matching settings tab', async ({ page }) => {
+    const setup = await (await page.request.get('/api/admin/dashboard/setup')).json() as { items: { key: string; href: string }[] }
+    const href = (key: string) => setup.items.find(i => i.key === key)?.href
+    expect([href('STUDIO'), href('BANK'), href('WATERMARK')])
+      .toEqual(['/admin/settings?tab=studio', '/admin/settings?tab=payment', '/admin/settings?tab=images'])
+    await page.goto(href('BANK')!)
+    await expect(page.getByLabel('Số tài khoản')).toBeVisible()
+  })
+
   test('digest settings save and survive reload', async ({ page }) => {
-    await page.goto('/admin/settings')
+    await page.goto('/admin/settings?tab=notifications')
     const section = page.getByRole('region', { name: 'Nhắc việc hằng ngày' })
     const hour = section.getByLabel('Giờ gửi (giờ Việt Nam)')
     await hour.selectOption('7')

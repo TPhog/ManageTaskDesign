@@ -4,6 +4,13 @@ import { expectToast } from './helpers'
 test.describe('Request templates (Settings)', () => {
   test('lists the presets and the new-client form section', async ({ page }) => {
     await page.goto('/admin/settings')
+    await page.getByRole('tab', { name: 'Khách hàng & Portal' }).click()
+    await expect(page.getByRole('heading', { name: 'Form nhận yêu cầu khách mới' })).toBeVisible()
+    await page.getByRole('link', { name: /Quản lý mẫu yêu cầu/ }).click()
+    await expect(page.getByRole('heading', { name: 'Mẫu yêu cầu', level: 1 })).toBeVisible()
+    // the back link returns to the tab the list was opened from
+    await page.getByRole('main').getByRole('link', { name: 'Cài đặt', exact: true }).click()
+    await expect(page).toHaveURL(/\/admin\/settings\?tab=portal$/)
     await expect(page.getByRole('heading', { name: 'Form nhận yêu cầu khách mới' })).toBeVisible()
     await page.getByRole('link', { name: /Quản lý mẫu yêu cầu/ }).click()
     await expect(page.getByRole('heading', { name: 'Mẫu yêu cầu', level: 1 })).toBeVisible()
