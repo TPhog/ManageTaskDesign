@@ -12,7 +12,8 @@ public static class ExternalLinks
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     /// <summary>
-    /// Trims, accepts absolute http/https URLs without user info only, fills an empty title with the host and forces
+    /// Trims, accepts absolute http/https URLs without user info or inner whitespace only (same rule as the delivery link)
+    /// and stores the canonical <see cref="Uri.AbsoluteUri"/>; fills an empty title with the host and forces
     /// VisibleToClient=false when <paramref name="allowClientVisible"/> is false (task links never reach the portal).
     /// </summary>
     public static IReadOnlyList<ExternalLink> Normalize(IEnumerable<ExternalLink>? links, bool allowClientVisible)
@@ -26,9 +27,11 @@ public static class ExternalLinks
         {
             var url = link.Url?.Trim() ?? "";
             if (url.Length > MaxUrl
+                || url.Any(char.IsWhiteSpace)
                 || !Uri.TryCreate(url, UriKind.Absolute, out var uri)
                 || uri.Scheme is not ("http" or "https")
-                || !string.IsNullOrEmpty(uri.UserInfo))
+                || !string.IsNullOrEmpty(uri.UserInfo)
+                || uri.AbsoluteUri.Length > MaxUrl)
                 throw new DomainException("VALIDATION_FAILED", "Liên kết phải là địa chỉ http hoặc https hợp lệ");
 
             var title = link.Title?.Trim() ?? "";
@@ -36,7 +39,7 @@ public static class ExternalLinks
             if (title.Length > MaxTitle)
                 throw new DomainException("VALIDATION_FAILED", $"Tên liên kết tối đa {MaxTitle} ký tự");
 
-            result.Add(new ExternalLink(title, url, allowClientVisible && link.VisibleToClient));
+            result.Add(new ExternalLink(title, uri.AbsoluteUri, allowClientVisible && link.VisibleToClient));
         }
         return result;
     }

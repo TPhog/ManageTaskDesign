@@ -34,6 +34,30 @@ public class TaskLarkUpgradesTests
         Assert.Equal("VALIDATION_FAILED", ex.Code);
     }
 
+    [Theory]
+    [InlineData("data:text/html,<b>x</b>")]
+    [InlineData("https://x.com/a b")]
+    [InlineData("https://x.com/a\tb")]
+    public void Links_reject_data_urls_and_inner_whitespace(string url)
+    {
+        var ex = Assert.Throws<DomainException>(() => ExternalLinks.Normalize([new ExternalLink("x", url)], false));
+        Assert.Equal("VALIDATION_FAILED", ex.Code);
+    }
+
+    [Fact]
+    public void Links_reject_urls_longer_than_2000_chars()
+    {
+        var url = "https://x.com/" + new string('a', 2000);
+        Assert.Throws<DomainException>(() => ExternalLinks.Normalize([new ExternalLink("x", url)], false));
+    }
+
+    [Fact]
+    public void Links_store_the_canonical_absolute_uri()
+    {
+        var links = ExternalLinks.Normalize([new ExternalLink("x", "  HTTPS://Figma.com  ")], false);
+        Assert.Equal("https://figma.com/", links[0].Url);
+    }
+
     [Fact]
     public void Links_reject_more_than_ten()
     {
@@ -72,12 +96,31 @@ public class TaskLarkUpgradesTests
     [InlineData("2026-02-28", 31, "2026-03-31")]
     [InlineData("2026-11-20", 15, "2026-12-15")] // day already passed this month
     [InlineData("2026-11-10", 15, "2026-11-15")]
+    [InlineData("2026-01-30", 29, "2026-02-28")] // 29/30 clamp in a common year
+    [InlineData("2026-01-30", 30, "2026-02-28")]
+    [InlineData("2028-01-30", 29, "2028-02-29")] // leap year keeps the 29th
+    [InlineData("2028-01-31", 31, "2028-02-29")]
+    [InlineData("2028-02-29", 29, "2028-03-29")] // no drift after a clamp
+    [InlineData("2026-12-20", 5, "2027-01-05")]  // December -> January rollover
+    [InlineData("2026-12-31", 31, "2027-01-31")]
     public void Monthly_uses_day_of_month_and_clamps(string baseIso, int monthDay, string expected) =>
         Assert.Equal(D(expected), RecurrenceRule.Create("MONTHLY", 0, monthDay, null).NextAfter(D(baseIso)));
 
     [Fact]
     public void Until_stops_the_chain() =>
         Assert.Null(RecurrenceRule.Create("DAILY", 0, null, D("2026-11-08")).NextAfter(D("2026-11-08")));
+
+    [Fact]
+    public void Weekly_until_stops_when_the_next_selected_day_is_past_it()
+    {
+        var mon = RecurrenceRule.Create("WEEKLY", RecurrenceRule.WeekdayBit(DayOfWeek.Monday), null, D("2026-11-15"));
+        Assert.Null(mon.NextAfter(D("2026-11-09"))); // next Monday 11-16 > until
+        Assert.Equal(D("2026-11-09"), mon.NextAfter(D("2026-11-06")));
+    }
+
+    [Fact]
+    public void Daily_rolls_over_the_year() =>
+        Assert.Equal(D("2027-01-01"), RecurrenceRule.Create("DAILY", 0, null, null).NextAfter(D("2026-12-31")));
 
     [Theory]
     [InlineData("WEEKLY", 0, null)]
@@ -152,6 +195,20 @@ public class TaskLarkUpgradesTests
         Assert.True(task.RecurrenceSpawned);
     }
 
+    [Fact]
+    public void Spawn_can_drop_the_deliverable_of_a_closed_deliverable()
+    {
+        var deliverableId = Guid.NewGuid();
+        var task = ProjectTask.Create(Guid.NewGuid(), "x", "", "TODO", "LOW", null, D("2026-11-08"), deliverableId, 1, Clock);
+        task.SetRecurrence(RecurrenceRule.Create("DAILY", 0, null, null));
+        task.Move("DONE", 1, Clock);
+
+        var next = task.TrySpawnNext(Clock, 2, keepDeliverable: false)!;
+
+        Assert.Null(next.DeliverableId);
+        Assert.Equal(task.ProjectId, next.ProjectId);
+    }
+
     // ---- Blocked ----
     [Fact]
     public void Blocked_reason_only_while_blocked_and_cleared_when_leaving()
@@ -194,6 +251,15 @@ public class TaskLarkUpgradesTests
         task.Reschedule(D("2026-11-05"));
         Assert.Equal(D("2026-11-05"), task.StartDate);
         Assert.Equal(D("2026-11-05"), task.DueDate);
+    }
+
+    [Fact]
+    public void Reschedule_refuses_a_done_task()
+    {
+        var task = NewTask("DONE", due: D("2026-11-10"));
+        var ex = Assert.Throws<DomainException>(() => task.Reschedule(D("2026-11-20")));
+        Assert.Equal("INVALID_TRANSITION", ex.Code);
+        Assert.Equal(D("2026-11-10"), task.DueDate);
     }
 
     // ---- TaskGrouping ----

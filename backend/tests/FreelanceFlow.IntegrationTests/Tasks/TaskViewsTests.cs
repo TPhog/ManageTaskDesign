@@ -1,5 +1,8 @@
 using System.Net;
 using System.Text.Json;
+using FreelanceFlow.Api.Data;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FreelanceFlow.IntegrationTests.Tasks;
 
@@ -53,6 +56,43 @@ public class TaskViewsTests(AppFactory factory) : TaskTestBase(factory)
         var last = (await Client.GetFromJsonAsync<JsonElement>("/api/admin/task-views")).GetProperty("last");
         last.GetProperty("mode").GetString().Should().Be("list");
         last.GetProperty("groupBy").GetString().Should().Be("status");
+    }
+
+    [Fact]
+    public async Task Concurrent_saves_of_the_same_name_give_one_201_and_409s_never_500()
+    {
+        await LoginAsync();
+        for (var round = 0; round < 3; round++)
+        {
+            var name = "Race " + Guid.NewGuid().ToString("N")[..6];
+            var responses = await Task.WhenAll(Enumerable.Range(0, 3).Select(i =>
+                Client.PostAsJsonAsync("/api/admin/task-views", new { name = i == 0 ? name : name.ToUpperInvariant(), config = Config() })));
+
+            responses.Count(r => r.StatusCode == HttpStatusCode.Created).Should().Be(1);
+            responses.Count(r => r.StatusCode == HttpStatusCode.Conflict).Should().Be(2);
+            var created = responses.Single(r => r.StatusCode == HttpStatusCode.Created);
+            var id = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+            (await Client.DeleteAsync($"/api/admin/task-views/{id}")).EnsureSuccessStatusCode();
+        }
+    }
+
+    [Fact]
+    public async Task Concurrent_last_view_saves_both_succeed()
+    {
+        await LoginAsync();
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.TaskViewStates.ExecuteDeleteAsync();   // the very first save, from two tabs at once
+        }
+
+        var responses = await Task.WhenAll(
+            Client.PutAsJsonAsync("/api/admin/task-views/last", new { config = Config("calendar", "none") }),
+            Client.PutAsJsonAsync("/api/admin/task-views/last", new { config = Config("list", "priority") }));
+
+        responses.Select(r => r.StatusCode).Should().OnlyContain(s => s == HttpStatusCode.NoContent);
+        var last = (await Client.GetFromJsonAsync<JsonElement>("/api/admin/task-views")).GetProperty("last");
+        last.GetProperty("mode").GetString().Should().BeOneOf("calendar", "list");
     }
 
     [Fact]

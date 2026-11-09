@@ -12,7 +12,8 @@ public record CalendarTaskDto(Guid Id, Guid ProjectId, string ProjectName, strin
 /// <summary>Kind: DELIVERABLE | PROJECT — read-only deadline markers on the calendar.</summary>
 public record CalendarMarkerDto(string Kind, Guid Id, Guid ProjectId, string ProjectName, string Title, DateOnly Date, string Status);
 
-public record CalendarResponse(IReadOnlyList<CalendarTaskDto> Tasks, IReadOnlyList<CalendarMarkerDto> Markers);
+/// <summary>Truncated: more than <see cref="TaskCalendarEndpoints.MaxTasks"/> tasks matched; only the first ones are returned.</summary>
+public record CalendarResponse(IReadOnlyList<CalendarTaskDto> Tasks, IReadOnlyList<CalendarMarkerDto> Markers, bool Truncated);
 
 public record RescheduleTaskRequest(DateOnly? DueDate);
 
@@ -48,12 +49,15 @@ public static class TaskCalendarEndpoints
 
         var today = clock.TodayVn;
 
+        // One project rule for tasks and markers, like the task list (BR-82): an explicit projectId shows that project
+        // whatever its status; otherwise CANCELLED projects are left out.
+        var projects = projectId is { } pid
+            ? db.Projects.AsNoTracking().Where(p => p.Id == pid)
+            : db.Projects.AsNoTracking().Where(p => p.Status != "CANCELLED");
+
         var query = from t in db.Tasks.AsNoTracking()
-                    join p in db.Projects on t.ProjectId equals p.Id
+                    join p in projects on t.ProjectId equals p.Id
                     select new { Task = t, Project = p };
-        query = projectId is { } pid
-            ? query.Where(x => x.Task.ProjectId == pid)
-            : query.Where(x => x.Project.Status != "CANCELLED"); // BR-82
 
         // Due inside the range, a start→due span overlapping it, or (no due) a start inside it
         var tasks = await query
@@ -64,7 +68,7 @@ public static class TaskCalendarEndpoints
             .OrderBy(x => x.Task.DueDate)
             .ThenBy(x => x.Task.SortOrder)
             .ThenBy(x => x.Task.CreatedAt)
-            .Take(MaxTasks)
+            .Take(MaxTasks + 1)
             .Select(x => new CalendarTaskDto(
                 x.Task.Id,
                 x.Task.ProjectId,
@@ -77,21 +81,21 @@ public static class TaskCalendarEndpoints
                 // BR-81 — same rule as ProjectTask.IsOverdue, written out so EF translates it
                 x.Task.DueDate != null && x.Task.DueDate < today && x.Task.Status != "DONE"))
             .ToListAsync();
+        var truncated = tasks.Count > MaxTasks;
+        if (truncated) tasks.RemoveAt(MaxTasks);
 
         var deliverableMarkers = await (
                 from d in db.Deliverables.AsNoTracking()
-                join p in db.Projects on d.ProjectId equals p.Id
+                join p in projects on d.ProjectId equals p.Id
                 where d.DueDate != null && d.DueDate >= start && d.DueDate <= end
                       && d.Status != "CANCELLED" && d.Status != "DELIVERED"
-                      && p.Status != "CANCELLED"
-                      && (projectId == null || p.Id == projectId)
                 select new CalendarMarkerDto("DELIVERABLE", d.Id, p.Id, p.Name, d.Name, d.DueDate!.Value, d.Status))
             .ToListAsync();
 
-        var projectMarkers = await db.Projects.AsNoTracking()
+        // a project's own deadline is only a marker while the project is still running
+        var projectMarkers = await projects
             .Where(p => p.DueDate != null && p.DueDate >= start && p.DueDate <= end
-                        && p.Status != "CANCELLED" && p.Status != "COMPLETED"
-                        && (projectId == null || p.Id == projectId))
+                        && p.Status != "CANCELLED" && p.Status != "COMPLETED")
             .Select(p => new CalendarMarkerDto("PROJECT", p.Id, p.Id, p.Name, p.Name, p.DueDate!.Value, p.Status))
             .ToListAsync();
 
@@ -99,10 +103,13 @@ public static class TaskCalendarEndpoints
             .OrderBy(m => m.Date).ThenBy(m => m.Kind).ThenBy(m => m.Title)
             .ToList();
 
-        return Results.Ok(new CalendarResponse(tasks, markers));
+        return Results.Ok(new CalendarResponse(tasks, markers, truncated));
     }
 
-    /// <summary>Calendar drag: moves the due date (a start date keeps its gap) and logs task.rescheduled.</summary>
+    /// <summary>
+    /// Calendar drag: moves the due date (a start date keeps its gap) and logs task.rescheduled. Same date = no-op, no log.
+    /// A DONE task or a task of a CANCELLED project → 409 INVALID_TRANSITION.
+    /// </summary>
     private static async Task<IResult> Reschedule(
         Guid id,
         RescheduleTaskRequest body,
@@ -115,8 +122,16 @@ public static class TaskCalendarEndpoints
         if (body.DueDate is not { } newDue)
             return Results.ValidationProblem(new Dictionary<string, string[]> { ["dueDate"] = ["Vui lòng chọn hạn hoàn thành"] });
 
+        if (task.DueDate == newDue) return Results.Ok(await TasksEndpoints.LoadDetailAsync(db, id, clock.TodayVn));
+        if (await db.Projects.AnyAsync(p => p.Id == task.ProjectId && p.Status == "CANCELLED"))
+            return Results.Conflict(new { code = "INVALID_TRANSITION", detail = "Dự án đã huỷ — không đổi hạn được" });
+
         var fromDue = task.DueDate;
-        task.Reschedule(newDue);
+        try { task.Reschedule(newDue); }
+        catch (DomainException ex) when (ex.Code == "INVALID_TRANSITION")
+        {
+            return Results.Conflict(new { code = ex.Code, detail = ex.Detail });
+        }
         activity.Write("task", task.Id, "task.rescheduled",
             clientId: await TasksEndpoints.ClientIdOfAsync(db, task.ProjectId), projectId: task.ProjectId,
             data: new { from = fromDue, to = newDue, title = task.Title });

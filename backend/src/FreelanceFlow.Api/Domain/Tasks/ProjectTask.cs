@@ -198,9 +198,10 @@ public class ProjectTask : IAuditable
     /// P15 D4 (BR-01: a consequence of the designer's DONE command). Once per task: base = max(due, today VN); the new
     /// TODO task is due on the rule's next date after base and keeps the start→due gap. Copies title, description,
     /// priority, deliverable, links, rule and the checklist (unchecked); never notes, images, revision item or blocked data.
-    /// Returns null (and ends the chain) when the next date is past Until.
+    /// Returns null (and ends the chain) when the next date is past Until. <paramref name="keepDeliverable"/> false (the
+    /// deliverable is DELIVERED/CANCELLED) makes the next occurrence project-level, so a closed deliverable gets no new work.
     /// </summary>
-    public ProjectTask? TrySpawnNext(IClock clock, double sortOrder)
+    public ProjectTask? TrySpawnNext(IClock clock, double sortOrder, bool keepDeliverable = true)
     {
         if (Status != "DONE" || RecurrenceSpawned || RecurrenceKind == null) return null;
 
@@ -213,7 +214,8 @@ public class ProjectTask : IAuditable
         DateOnly? start = StartDate != null && DueDate != null
             ? due.AddDays(-(DueDate.Value.DayNumber - StartDate.Value.DayNumber))
             : null;
-        var spawned = Create(ProjectId, Title, Description, "TODO", Priority, start, due, DeliverableId, sortOrder, clock);
+        var spawned = Create(ProjectId, Title, Description, "TODO", Priority, start, due,
+            keepDeliverable ? DeliverableId : null, sortOrder, clock);
         spawned.SetRecurrence(Recurrence());
         spawned.LinksJson = LinksJson;
         spawned.RecurrenceSourceId = Id;
@@ -222,9 +224,14 @@ public class ProjectTask : IAuditable
         return spawned;
     }
 
-    /// <summary>Calendar drag: moves the due date; a start date moves with it (same gap), or is clamped when there was no due.</summary>
+    /// <summary>
+    /// Calendar drag: moves the due date; a start date moves with it (same gap), or is clamped when there was no due.
+    /// A DONE task keeps its dates (INVALID_TRANSITION): its deadline is history.
+    /// </summary>
     public void Reschedule(DateOnly newDue)
     {
+        if (Status == "DONE")
+            throw new DomainException("INVALID_TRANSITION", "Công việc đã xong — không đổi hạn được");
         if (DueDate is { } due && StartDate is { } start)
             StartDate = start.AddDays(newDue.DayNumber - due.DayNumber);
         else if (StartDate is { } onlyStart && newDue < onlyStart)

@@ -2,6 +2,7 @@ using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Tasks;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace FreelanceFlow.Api.Features.Tasks;
 
@@ -11,6 +12,8 @@ namespace FreelanceFlow.Api.Features.Tasks;
 /// </summary>
 public static class TaskViewsEndpoints
 {
+    private const string NameIndex = "ux_task_views_name";
+
     public static void MapTaskViewsEndpoints(this IEndpointRouteBuilder app)
     {
         var admin = app.MapGroup("/api/admin").RequireAuthorization();
@@ -53,7 +56,7 @@ public static class TaskViewsEndpoints
             SortOrder = (await db.TaskViews.MaxAsync(v => (int?)v.SortOrder) ?? -1) + 1,
         };
         db.TaskViews.Add(view);
-        await db.SaveChangesAsync();
+        if (!await TrySaveAsync(db)) return DuplicateName();
 
         return Results.Created($"/api/admin/task-views/{view.Id}", new TaskViewDto(view.Id, view.Name, config, view.SortOrder));
     }
@@ -69,7 +72,7 @@ public static class TaskViewsEndpoints
 
         view.Name = name;
         view.ConfigJson = config.ToJson();
-        await db.SaveChangesAsync();
+        if (!await TrySaveAsync(db)) return DuplicateName();
 
         return Results.Ok(new TaskViewDto(view.Id, view.Name, config, view.SortOrder));
     }
@@ -84,22 +87,20 @@ public static class TaskViewsEndpoints
         return Results.NoContent();
     }
 
-    // Upsert of the single task_view_state row
+    // Upsert of the single task_view_state row in one statement: two tabs saving the first state at once both succeed
     private static async Task<IResult> SaveLastView(SaveLastViewRequest body, AppDbContext db, IClock clock)
     {
         TaskViewConfig config;
         try { config = TaskViewConfig.Validate(body.Config); }
         catch (DomainException ex) { return ConfigProblem(ex); }
 
-        var state = await db.TaskViewStates.FindAsync(TaskViewState.SingletonId);
-        if (state == null)
-        {
-            state = new TaskViewState();
-            db.TaskViewStates.Add(state);
-        }
-        state.ConfigJson = config.ToJson();
-        state.UpdatedAt = clock.UtcNow;
-        await db.SaveChangesAsync();
+        var json = config.ToJson();
+        var now = clock.UtcNow;
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO task_view_state (id, config, updated_at)
+            VALUES ({TaskViewState.SingletonId}, {json}::jsonb, {now})
+            ON CONFLICT (id) DO UPDATE SET config = EXCLUDED.config, updated_at = EXCLUDED.updated_at
+            """);
 
         return Results.NoContent();
     }
@@ -117,10 +118,29 @@ public static class TaskViewsEndpoints
         return (name, config, errors);
     }
 
+    // Fast path for the common case; ux_task_views_name (lower(name)) stays the guarantee — see TrySaveAsync
     private static Task<bool> NameTakenAsync(AppDbContext db, string name, Guid? excludeId)
     {
-        var lower = name.ToLower();
+        var lower = name.ToLowerInvariant();
         return db.TaskViews.AnyAsync(v => v.Name.ToLower() == lower && v.Id != excludeId);
+    }
+
+    /// <summary>false when ux_task_views_name refused the name (a concurrent save of the same name won the race).</summary>
+    private static async Task<bool> TrySaveAsync(AppDbContext db)
+    {
+        try
+        {
+            await db.SaveChangesAsync();
+            return true;
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException
+                                          {
+                                              SqlState: PostgresErrorCodes.UniqueViolation,
+                                              ConstraintName: NameIndex,
+                                          })
+        {
+            return false;
+        }
     }
 
     private static IResult DuplicateName() =>

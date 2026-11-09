@@ -7,8 +7,6 @@ namespace FreelanceFlow.Api.Features.Tasks;
 /// <summary>P15 D7: the optional blocking task must be another task of the same project and must not close a cycle.</summary>
 internal static class TaskBlocking
 {
-    private const int MaxChain = 20;
-
     public static async Task CheckAsync(AppDbContext db, ProjectTask task, Guid? byTaskId, Dictionary<string, string[]> errors)
     {
         if (byTaskId is not { } blockerId) return;
@@ -28,9 +26,11 @@ internal static class TaskBlocking
             return;
         }
 
-        // Walk the blocker's own chain: reaching this task means a <- … <- a
+        // Walk the blocker's whole chain: reaching this task means a <- … <- a. The visited set ends the walk on any
+        // older loop that does not involve this task, so it always terminates.
+        var visited = new HashSet<Guid> { blockerId };
         var next = blocker.BlockedByTaskId;
-        for (var step = 0; next is { } current && step < MaxChain; step++)
+        while (next is { } current && visited.Add(current))
         {
             if (current == task.Id)
             {

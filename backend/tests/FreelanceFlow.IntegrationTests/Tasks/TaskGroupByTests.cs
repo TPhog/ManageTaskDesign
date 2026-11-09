@@ -1,5 +1,9 @@
 using System.Net;
 using System.Text.Json;
+using FreelanceFlow.Api.Data;
+using FreelanceFlow.Api.Features.Tasks;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FreelanceFlow.IntegrationTests.Tasks;
 
@@ -51,6 +55,70 @@ public class TaskGroupByTests(AppFactory factory) : TaskTestBase(factory)
 
         page.GetProperty("groups").EnumerateArray().Select(g => g.GetProperty("key").GetString())
             .Should().Equal(deliverableId.ToString(), "none");
+    }
+
+    [Fact]
+    public async Task Group_by_project_orders_by_project_name_with_client_label()
+    {
+        await LoginAsync();
+        var tag = Guid.NewGuid().ToString("N")[..8];
+        var b = await CreateProjectAsync("B " + tag);
+        var a = await CreateProjectAsync("A " + tag);
+        await CreateTaskAsync(b, new { title = "b1" });
+        await CreateTaskAsync(a, new { title = "a1" });
+        await CreateTaskAsync(a, new { title = "a2" });
+
+        var page = await Client.GetFromJsonAsync<JsonElement>($"/api/admin/tasks?q={tag}&groupBy=project");
+
+        var groups = page.GetProperty("groups").EnumerateArray().ToList();
+        groups.Select(g => g.GetProperty("key").GetString()).Should().Equal(a.ToString(), b.ToString());
+        groups.Select(g => g.GetProperty("count").GetInt32()).Should().Equal(2, 1);
+        groups[0].GetProperty("label").GetString().Should().StartWith("A " + tag + " · Task Client");
+        page.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("groupKey").GetString())
+            .Should().Equal(a.ToString(), a.ToString(), b.ToString());
+        page.GetProperty("truncated").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Group_by_status_follows_the_kanban_column_order()
+    {
+        await LoginAsync();
+        var projectId = await CreateProjectAsync();
+        await CreateTaskAsync(projectId, new { title = "blocked", status = "BLOCKED" });
+        await CreateTaskAsync(projectId, new { title = "done", status = "DONE" });
+        await CreateTaskAsync(projectId, new { title = "todo" });
+        await CreateTaskAsync(projectId, new { title = "review", status = "REVIEW" });
+
+        var page = await Client.GetFromJsonAsync<JsonElement>($"/api/admin/tasks?projectId={projectId}&groupBy=status");
+
+        page.GetProperty("groups").EnumerateArray().Select(g => g.GetProperty("key").GetString())
+            .Should().Equal("TODO", "REVIEW", "DONE", "BLOCKED");
+        page.GetProperty("groups")[0].GetProperty("label").GetString().Should().Be("Cần làm");
+        page.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("title").GetString())
+            .Should().Equal("todo", "review", "done", "blocked");
+    }
+
+    [Fact]
+    public async Task Above_the_cap_open_tasks_are_kept_and_truncated_is_set()
+    {
+        await LoginAsync();
+        var projectId = await CreateProjectAsync();
+        var open = (await CreateTaskAsync(projectId, new { title = "còn mở" })).GetProperty("id").GetGuid();
+        using (var scope = Factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await db.Database.ExecuteSqlRawAsync(
+                "INSERT INTO tasks (id, project_id, title, status, priority, sort_order, completed_at, created_at, updated_at) " +
+                "SELECT gen_random_uuid(), {0}, 'xong ' || g, 'DONE', 'LOW', g, now(), now(), now() FROM generate_series(1, {1}) g",
+                projectId, TasksEndpoints.MaxGroupedRows);
+        }
+
+        var page = await Client.GetFromJsonAsync<JsonElement>($"/api/admin/tasks?projectId={projectId}&groupBy=status");
+
+        page.GetProperty("truncated").GetBoolean().Should().BeTrue();
+        page.GetProperty("total").GetInt32().Should().Be(TasksEndpoints.MaxGroupedRows);
+        page.GetProperty("groups")[0].GetProperty("key").GetString().Should().Be("TODO");
+        page.GetProperty("items")[0].GetProperty("id").GetGuid().Should().Be(open);
     }
 
     [Fact]

@@ -71,6 +71,24 @@ public class TaskBlockedTests(AppFactory factory) : TaskTestBase(factory)
     }
 
     [Fact]
+    public async Task A_cycle_longer_than_twenty_steps_is_still_refused()
+    {
+        await LoginAsync();
+        var projectId = await CreateProjectAsync();
+        var ids = new List<Guid>();
+        for (var i = 0; i < 23; i++)
+            ids.Add((await CreateTaskAsync(projectId, new { title = "c" + i })).GetProperty("id").GetGuid());
+
+        async Task<HttpStatusCode> Block(Guid task, Guid by) => (await Client.PutAsJsonAsync($"/api/admin/tasks/{task}",
+            new { title = "t", status = "BLOCKED", blocked = new { reason = "r", byTaskId = by } })).StatusCode;
+
+        for (var i = 0; i < ids.Count - 1; i++)
+            (await Block(ids[i], ids[i + 1])).Should().Be(HttpStatusCode.OK);   // c0 <- c1 <- … <- c22
+
+        (await Block(ids[^1], ids[0])).Should().Be(HttpStatusCode.BadRequest);  // would close a 23-task cycle
+    }
+
+    [Fact]
     public async Task Deleting_the_blocker_keeps_reason_and_drops_the_link()
     {
         await LoginAsync();

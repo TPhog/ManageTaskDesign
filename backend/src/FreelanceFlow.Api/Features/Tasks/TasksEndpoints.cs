@@ -7,11 +7,21 @@ using FreelanceFlow.Api.Features.Storage;
 using FreelanceFlow.Api.Infrastructure;
 using FreelanceFlow.Api.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace FreelanceFlow.Api.Features.Tasks;
 
 public static class TasksEndpoints
 {
+    /// <summary>
+    /// P15 D3: groupBy orders in memory, so at most this many filtered tasks are grouped. Open tasks are kept first, then
+    /// the most recently completed DONE ones; above the cap the response says truncated=true and total/groups cover the
+    /// kept rows only.
+    /// </summary>
+    public const int MaxGroupedRows = 5000;
+
+    private const string RecurrenceSourceIndex = "ix_tasks_recurrence_source";
+
     public static void MapTasksEndpoints(this IEndpointRouteBuilder app)
     {
         var admin = app.MapGroup("/api/admin").RequireAuthorization();
@@ -85,12 +95,17 @@ public static class TasksEndpoints
         // P15 D3: with groupBy the whole filtered set is ordered by TaskGrouping (one pure implementation) before paging,
         // so pages follow group order and each group's count covers every page. Single designer: the set stays small.
         int total;
+        var truncated = false;
         List<TaskGroup> groups = [];
         List<Guid>? pageIds = null;
         Dictionary<Guid, string> groupKeys = [];
         if (groupBy != null)
         {
             var groupRows = await query
+                .OrderBy(x => x.Task.Status == "DONE")
+                .ThenByDescending(x => x.Task.CompletedAt)
+                .ThenBy(x => x.Task.Id)
+                .Take(MaxGroupedRows + 1)
                 .Select(x => new TaskGroupRow(
                     x.Task.Id,
                     x.Task.ProjectId,
@@ -104,6 +119,11 @@ public static class TasksEndpoints
                     x.Task.SortOrder,
                     x.Task.CreatedAt))
                 .ToListAsync();
+            if (groupRows.Count > MaxGroupedRows)
+            {
+                truncated = true;
+                groupRows.RemoveAt(MaxGroupedRows);
+            }
             var (orderedIds, ordered) = TaskGrouping.Order(groupBy, groupRows, today, weekEnd);
             total = orderedIds.Count;
             groups = ordered;
@@ -174,6 +194,7 @@ public static class TasksEndpoints
         {
             items, page, pageSize, total,
             groups = groups.Select(g => new TaskGroupDto(g.Key, g.Label, g.Count)).ToList(),
+            truncated,
         });
     }
 
@@ -287,7 +308,7 @@ public static class TasksEndpoints
             if (task.Status == "DONE") await SpawnIfRecurringAsync(db, activity, clock, task, clientId);
         }
 
-        await db.SaveChangesAsync();
+        if (!await TrySaveAsync(db)) return SpawnConflict();
 
         return Results.Ok(await LoadDetailAsync(db, id, clock.TodayVn));
     }
@@ -320,7 +341,7 @@ public static class TasksEndpoints
             if (task.Status == "DONE") await SpawnIfRecurringAsync(db, activity, clock, task, clientId);
         }
 
-        await db.SaveChangesAsync();
+        if (!await TrySaveAsync(db)) return SpawnConflict();
 
         return Results.Ok(await LoadDetailAsync(db, id, clock.TodayVn));
     }
@@ -548,7 +569,10 @@ public static class TasksEndpoints
 
         if (db.Entry(done).State != EntityState.Added)
             await db.Entry(done).Collection(t => t.ChecklistItems).LoadAsync();
-        var next = done.TrySpawnNext(clock, await NextSortOrderAsync(db, done.ProjectId, "TODO"));
+        // a DELIVERED/CANCELLED deliverable gets no new work: the next occurrence becomes project-level
+        var keepDeliverable = done.DeliverableId is not { } did
+            || await db.Deliverables.AnyAsync(d => d.Id == did && d.Status != "DELIVERED" && d.Status != "CANCELLED");
+        var next = done.TrySpawnNext(clock, await NextSortOrderAsync(db, done.ProjectId, "TODO"), keepDeliverable);
         if (next == null) return null;
 
         db.Tasks.Add(next);   // the whole graph: the copied checklist rows are inserted too
@@ -564,6 +588,32 @@ public static class TasksEndpoints
             data: task.Status == "BLOCKED"
                 ? (object)new { from = fromStatus, to = task.Status, title = task.Title, blockedReason = task.BlockedReason }
                 : new { from = fromStatus, to = task.Status, title = task.Title });
+
+    /// <summary>
+    /// Two DONE commands on the same recurring task can race (tasks has no row version): the unique
+    /// ix_tasks_recurrence_source lets one spawn commit; the other transaction — its whole command — rolls back and the
+    /// caller answers 409 so the client reloads. Not a silent 200: that request's own changes (sort order, drawer
+    /// fields) were not saved.
+    /// </summary>
+    private static async Task<bool> TrySaveAsync(AppDbContext db)
+    {
+        try
+        {
+            await db.SaveChangesAsync();
+            return true;
+        }
+        catch (DbUpdateException e) when (e.InnerException is PostgresException
+                                          {
+                                              SqlState: PostgresErrorCodes.UniqueViolation,
+                                              ConstraintName: RecurrenceSourceIndex,
+                                          })
+        {
+            return false;
+        }
+    }
+
+    private static IResult SpawnConflict() =>
+        Results.Conflict(new { code = "CONCURRENCY_CONFLICT", detail = "Công việc vừa được cập nhật ở nơi khác — vui lòng tải lại" });
 
     private static void AddAll(Dictionary<string, string[]> errors, Dictionary<string, string[]> more)
     {

@@ -18,6 +18,11 @@ public class ProjectTaskConfiguration : IEntityTypeConfiguration<ProjectTask>
                 "priority IN ('LOW','MEDIUM','HIGH','URGENT')");
             t.HasCheckConstraint("ck_tasks_recurrence_kind",
                 "recurrence_kind IS NULL OR recurrence_kind IN ('DAILY','WEEKLY','MONTHLY')");
+            // a stored rule is always complete: WEEKLY has a weekday, MONTHLY a day of month (RecurrenceRule.Create)
+            t.HasCheckConstraint("ck_tasks_recurrence_rule",
+                "recurrence_kind IS NULL OR recurrence_kind = 'DAILY'" +
+                " OR (recurrence_kind = 'WEEKLY' AND COALESCE(recurrence_weekdays, 0) BETWEEN 1 AND 127)" +
+                " OR (recurrence_kind = 'MONTHLY' AND COALESCE(recurrence_month_day, 0) BETWEEN 1 AND 31)");
             t.HasCheckConstraint("ck_tasks_blocked_status",
                 "(blocked_reason IS NULL AND blocked_by_task_id IS NULL) OR status = 'BLOCKED'");
             t.HasCheckConstraint("ck_tasks_links",
@@ -52,7 +57,9 @@ public class ProjectTaskConfiguration : IEntityTypeConfiguration<ProjectTask>
 
         b.HasIndex(x => new { x.ProjectId, x.Status, x.SortOrder }).HasDatabaseName("ix_tasks_project_status");
         b.HasIndex(x => x.BlockedByTaskId).HasDatabaseName("ix_tasks_blocked_by").HasFilter("blocked_by_task_id IS NOT NULL");
-        b.HasIndex(x => x.RecurrenceSourceId).HasDatabaseName("ix_tasks_recurrence_source").HasFilter("recurrence_source_id IS NOT NULL");
+        // UNIQUE: one next occurrence per task even when two DONE commands race (tasks has no row version)
+        b.HasIndex(x => x.RecurrenceSourceId).IsUnique().HasDatabaseName("ix_tasks_recurrence_source")
+            .HasFilter("recurrence_source_id IS NOT NULL");
 
         b.HasMany(x => x.ChecklistItems).WithOne(x => x.Task).HasForeignKey(x => x.TaskId)
             .OnDelete(DeleteBehavior.Cascade);

@@ -122,6 +122,7 @@ namespace FreelanceFlow.Api.Data.Migrations
                 name: "ix_tasks_recurrence_source",
                 table: "tasks",
                 column: "recurrence_source_id",
+                unique: true,
                 filter: "recurrence_source_id IS NOT NULL");
 
             migrationBuilder.AddCheckConstraint(
@@ -138,6 +139,11 @@ namespace FreelanceFlow.Api.Data.Migrations
                 name: "ck_tasks_recurrence_kind",
                 table: "tasks",
                 sql: "recurrence_kind IS NULL OR recurrence_kind IN ('DAILY','WEEKLY','MONTHLY')");
+
+            migrationBuilder.AddCheckConstraint(
+                name: "ck_tasks_recurrence_rule",
+                table: "tasks",
+                sql: "recurrence_kind IS NULL OR recurrence_kind = 'DAILY' OR (recurrence_kind = 'WEEKLY' AND COALESCE(recurrence_weekdays, 0) BETWEEN 1 AND 127) OR (recurrence_kind = 'MONTHLY' AND COALESCE(recurrence_month_day, 0) BETWEEN 1 AND 31)");
 
             migrationBuilder.AddCheckConstraint(
                 name: "ck_deliverables_links",
@@ -196,6 +202,10 @@ namespace FreelanceFlow.Api.Data.Migrations
 
             migrationBuilder.DropCheckConstraint(
                 name: "ck_tasks_recurrence_kind",
+                table: "tasks");
+
+            migrationBuilder.DropCheckConstraint(
+                name: "ck_tasks_recurrence_rule",
                 table: "tasks");
 
             migrationBuilder.DropCheckConstraint(

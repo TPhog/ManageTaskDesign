@@ -1864,6 +1864,7 @@ namespace FreelanceFlow.Api.Data.Migrations
                     b.HasIndex("DeliverableId");
 
                     b.HasIndex("RecurrenceSourceId")
+                        .IsUnique()
                         .HasDatabaseName("ix_tasks_recurrence_source")
                         .HasFilter("recurrence_source_id IS NOT NULL");
 
@@ -1881,6 +1882,8 @@ namespace FreelanceFlow.Api.Data.Migrations
                             t.HasCheckConstraint("ck_tasks_priority", "priority IN ('LOW','MEDIUM','HIGH','URGENT')");
 
                             t.HasCheckConstraint("ck_tasks_recurrence_kind", "recurrence_kind IS NULL OR recurrence_kind IN ('DAILY','WEEKLY','MONTHLY')");
+
+                            t.HasCheckConstraint("ck_tasks_recurrence_rule", "recurrence_kind IS NULL OR recurrence_kind = 'DAILY' OR (recurrence_kind = 'WEEKLY' AND COALESCE(recurrence_weekdays, 0) BETWEEN 1 AND 127) OR (recurrence_kind = 'MONTHLY' AND COALESCE(recurrence_month_day, 0) BETWEEN 1 AND 31)");
 
                             t.HasCheckConstraint("ck_tasks_status", "status IN ('TODO','IN_PROGRESS','REVIEW','DONE','BLOCKED')");
                         });

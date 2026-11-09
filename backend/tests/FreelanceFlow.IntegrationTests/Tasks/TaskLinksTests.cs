@@ -25,6 +25,8 @@ public class TaskLinksTests(AppFactory factory) : TaskTestBase(factory)
     [InlineData("javascript:alert(1)")]
     [InlineData("ftp://x.com/a")]
     [InlineData("hello")]
+    [InlineData("data:text/html,x")]
+    [InlineData("https://x.com/a b")]
     public async Task Non_http_urls_return_400(string url)
     {
         await LoginAsync();
