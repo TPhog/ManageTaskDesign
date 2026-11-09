@@ -80,6 +80,75 @@ public class PublicIntakeAbuseTests(AppFactory factory) : IntakeTestBase(factory
     }
 
     [Fact]
+    public async Task A_form_token_works_once()   // review P13-BE #2: no replay of one GET
+    {
+        var slug = await EnableIntakeAsync();
+        var anon = Anonymous();
+        var token = (await GetFormAsync(anon, slug)).GetProperty("formToken").GetString()!;
+        var before = await SubmissionCountAsync();
+
+        (await anon.PostAsync($"/api/public/intake/{slug}", IntakeForm(token, note: "lần 1"))).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var replay = await anon.PostAsync($"/api/public/intake/{slug}", IntakeForm(token, note: "lần 2"));
+
+        replay.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await replay.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("FORM_EXPIRED");
+        (await SubmissionCountAsync()).Should().Be(before + 1);
+    }
+
+    [Fact]
+    public async Task A_refused_form_keeps_its_token_for_the_corrected_resend()
+    {
+        var slug = await EnableIntakeAsync();
+        var anon = Anonymous();
+        var token = (await GetFormAsync(anon, slug)).GetProperty("formToken").GetString()!;
+
+        (await anon.PostAsync($"/api/public/intake/{slug}", IntakeForm(token, note: "x", contactPhone: "12")))
+            .StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await anon.PostAsync($"/api/public/intake/{slug}", IntakeForm(token, note: "x")))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task Posts_per_ip_are_rate_limited_per_hour()   // review P13-BE #2
+    {
+        var slug = await EnableIntakeAsync();
+        await using var host = Factory.WithWebHostBuilder(b => b.UseSetting("RateLimit:PublicIntakeSubmitPerHour", "2"));
+        var anon = Anonymous(host);
+
+        async Task<HttpStatusCode> PostFreshAsync()
+        {
+            var token = (await GetFormAsync(anon, slug)).GetProperty("formToken").GetString()!;
+            return (await anon.PostAsync($"/api/public/intake/{slug}", IntakeForm(token, note: "theo giờ"))).StatusCode;
+        }
+
+        (await PostFreshAsync()).Should().Be(HttpStatusCode.NoContent);
+        (await PostFreshAsync()).Should().Be(HttpStatusCode.NoContent);
+        (await PostFreshAsync()).Should().Be(HttpStatusCode.TooManyRequests);
+        (await anon.GetAsync($"/api/public/intake/{slug}")).StatusCode.Should().Be(HttpStatusCode.OK, "reading the form is limited separately");
+    }
+
+    [Fact]
+    public async Task One_ip_cannot_use_up_the_studio_day()   // review P13-BE #2: per-IP daily cap below the global 30
+    {
+        var slug = await EnableIntakeAsync();
+        await using var host = Factory.WithWebHostBuilder(b => b.UseSetting("PublicIntake:MaxSubmissionsPerIpPerDay", "2"));
+        var anon = Anonymous(host);
+
+        async Task<HttpResponseMessage> PostFreshAsync()
+        {
+            var token = (await GetFormAsync(anon, slug)).GetProperty("formToken").GetString()!;
+            return await anon.PostAsync($"/api/public/intake/{slug}", IntakeForm(token, note: "theo ngày"));
+        }
+
+        (await PostFreshAsync()).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await PostFreshAsync()).StatusCode.Should().Be(HttpStatusCode.NoContent);
+        var third = await PostFreshAsync();
+
+        third.StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+        (await third.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("RATE_LIMITED");
+    }
+
+    [Fact]
     public async Task Full_storage_refuses_photos_but_still_takes_text()   // AC-INT6, decision 2b
     {
         var slug = await EnableIntakeAsync();

@@ -85,7 +85,9 @@ public sealed class AppFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("RateLimit:LoginPerMinute", "1000");
         builder.UseSetting("RateLimit:PortalSessionPerMinute", "1000");
         builder.UseSetting("RateLimit:PublicIntakePerMinute", "1000");
+        builder.UseSetting("RateLimit:PublicIntakeSubmitPerHour", "1000");
         builder.UseSetting("PublicIntake:MinFillSeconds", "0"); // tests post right after GET
+        builder.UseSetting("PublicIntake:MaxSubmissionsPerIpPerDay", "1000"); // every test client is the same "unknown" IP
         builder.UseSetting("DataProtection:KeysPath", ""); // never /data/keys; DataProtectionKeysTests sets a temp folder
         builder.UseSetting("Notifications:Discord:WebhookUrl", ""); // never hit the network
         builder.UseSetting("Storage:ReconcileIntervalHours", "0"); // no background reconciliation in tests

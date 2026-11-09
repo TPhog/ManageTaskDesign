@@ -25,15 +25,28 @@ namespace FreelanceFlow.Api.Features.Intake;
 /// </summary>
 public static class PublicIntakeEndpoints
 {
+    /// <summary>Per IP per minute, reading the form.</summary>
     public const string RateLimitPolicy = "public-intake";
+    /// <summary>Per IP per hour, posting the form (review P13-BE #2) — stricter than the read limit, so it replaces it on POST.</summary>
+    public const string SubmitRateLimitPolicy = "public-intake-submit";
     private const long MaxBodyBytes = ImageLimits.MaxPublicIntakeBodyBytes;
+    /// <summary>Serialises the studio-wide daily count with the insert (pg_advisory_xact_lock key, plan 13).</summary>
+    private const long DailyCapLockKey = 20261113090000;
 
     public static void MapPublicIntakeEndpoints(this IEndpointRouteBuilder app)
     {
-        var pub = app.MapGroup("/api/public/intake").AllowAnonymous().RequireRateLimiting(RateLimitPolicy);
-        pub.MapGet("{slug}", GetForm);
-        pub.MapPost("{slug}", Submit).WithMetadata(new RequestSizeLimitAttribute(MaxBodyBytes));
+        var pub = app.MapGroup("/api/public/intake").AllowAnonymous();
+        pub.MapGet("{slug}", GetForm).RequireRateLimiting(RateLimitPolicy);
+        pub.MapPost("{slug}", Submit).RequireRateLimiting(SubmitRateLimitPolicy)
+            .WithMetadata(new RequestSizeLimitAttribute(MaxBodyBytes));
     }
+
+    private static IResult DailyCapReached() => Results.Json(
+        new { code = "RATE_LIMITED", detail = "Hôm nay studio đã nhận nhiều yêu cầu — vui lòng liên hệ trực tiếp hoặc gửi lại vào ngày mai" },
+        statusCode: StatusCodes.Status429TooManyRequests);
+
+    private static IResult FormExpired() =>
+        Results.BadRequest(new { code = "FORM_EXPIRED", detail = "Biểu mẫu đã hết hạn — vui lòng tải lại trang rồi gửi lại" });
 
     private sealed record StudioRow(string DisplayName, string? ContactPhone, string? ContactEmail);
 
@@ -61,17 +74,21 @@ public static class PublicIntakeEndpoints
 
     private static async Task<IResult> Submit(
         string slug, HttpRequest http, AppDbContext db, ActivityWriter activity, ImageUploader uploader,
-        StorageAlertService storageAlerts, IntakeFormToken tokens, IOptions<IntakeOptions> options, IClock clock,
-        INotifier notifier, IOptions<AppSettings> appSettings, ILogger<PublicIntakeEndpointsLog> logger)
+        StorageAlertService storageAlerts, IntakeFormToken tokens, IntakeIpDailyCounter perIp, IOptions<IntakeOptions> options,
+        IClock clock, INotifier notifier, IOptions<AppSettings> appSettings, ILogger<PublicIntakeEndpointsLog> logger)
     {
         var ct = http.HttpContext.RequestAborted;
         if (await FindFormAsync(db, slug, ct) is null) return Results.NotFound();
 
         // cheap refusals before the (up to 61 MB) body is read
-        var dayStart = ClientRequest.DayStartUtc(clock.TodayVn);   // BR-137
+        var today = clock.TodayVn;
+        var dayStart = ClientRequest.DayStartUtc(today);   // BR-137: studio-wide, then per IP
         if (await db.IntakeSubmissions.CountAsync(s => s.CreatedAt >= dayStart, ct) >= IntakeSubmission.DailyLimit)
+            return DailyCapReached();
+        var ip = http.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        if (perIp.Count(ip, today) >= options.Value.MaxSubmissionsPerIpPerDay)
             return Results.Json(
-                new { code = "RATE_LIMITED", detail = "Hôm nay studio đã nhận nhiều yêu cầu — vui lòng liên hệ trực tiếp hoặc gửi lại vào ngày mai" },
+                new { code = "RATE_LIMITED", detail = "Bạn đã gửi nhiều yêu cầu hôm nay — vui lòng liên hệ trực tiếp với studio hoặc gửi lại vào ngày mai" },
                 statusCode: StatusCodes.Status429TooManyRequests);
         var blocked = await ImageForms.EnsureUploadsAllowedAsync(storageAlerts, http, imagesOptional: true, ct);
         if (blocked is not null) return blocked;
@@ -84,11 +101,11 @@ public static class PublicIntakeEndpoints
             logger.LogInformation("Public intake dropped (honeypot)");
             return Results.NoContent();
         }
-        var age = tokens.SecondsSinceIssued(form["formToken"].ToString(), slug);
-        if (age is null)
-            return Results.BadRequest(new { code = "FORM_EXPIRED", detail = "Biểu mẫu đã hết hạn — vui lòng tải lại trang rồi gửi lại" });
-        if (age < options.Value.MinFillSeconds)
+        var ticket = tokens.Read(form["formToken"].ToString(), slug);
+        if (ticket is null) return FormExpired();   // malformed, other link, older than 24 h or already used
+        if (ticket.AgeSeconds < options.Value.MinFillSeconds)
         {
+            tokens.TryConsume(ticket.Id);
             logger.LogInformation("Public intake dropped (filled too fast)");
             return Results.NoContent();
         }
@@ -123,7 +140,8 @@ public static class PublicIntakeEndpoints
             errors[field] = messages;
         if (errors.Count == 0 && TemplateRenderer.Render(template?.Name, answers, note).Length > IntakeSubmission.MaxBody)
             errors["answers"] = ["Nội dung quá dài — vui lòng rút gọn câu trả lời"];
-        if (errors.Count > 0) return Results.ValidationProblem(errors);
+        if (errors.Count > 0) return Results.ValidationProblem(errors);   // the token stays valid for the corrected resend
+        if (!tokens.TryConsume(ticket.Id)) return FormExpired();   // a concurrent post of the same token won
 
         var submission = IntakeSubmission.Create(contactName, contactPhone, contactEmail, template?.Id, template?.Name, answers, note);
         db.IntakeSubmissions.Add(submission);
@@ -140,7 +158,16 @@ public static class PublicIntakeEndpoints
                 activity.Write("intake_submission", submission.Id, "image.uploaded", actorType: "CLIENT",
                     data: new { count = images.Count, bytes = images.Sum(i => i.SizeBytes), ownerType = ImageOwnerTypes.IntakeSubmission });
             }
+            // BR-137: concurrent posts re-count under one advisory lock, so the studio cap cannot be overshot
+            await using var tx = await db.Database.BeginTransactionAsync(ct);
+            await db.Database.ExecuteSqlAsync($"SELECT pg_advisory_xact_lock({DailyCapLockKey})", ct);
+            if (await db.IntakeSubmissions.CountAsync(s => s.CreatedAt >= dayStart, ct) >= IntakeSubmission.DailyLimit)
+            {
+                await uploader.DiscardAsync();
+                return DailyCapReached();
+            }
             await db.SaveChangesAsync(ct);
+            await tx.CommitAsync(ct);
         }
         catch (DomainException ex)
         {
@@ -152,6 +179,7 @@ public static class PublicIntakeEndpoints
             await uploader.DiscardAsync();
             throw;
         }
+        perIp.Record(ip, today);
         if (images.Count > 0) await storageAlerts.EvaluateSafelyAsync(CancellationToken.None);
 
         await NotifyDesignerAsync(notifier, appSettings.Value, logger, submission, images.Count);

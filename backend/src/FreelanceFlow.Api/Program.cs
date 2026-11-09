@@ -79,6 +79,7 @@ else if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironm
 // Public intake form (plan 13): signed form token + minimum fill time
 builder.Services.Configure<IntakeOptions>(builder.Configuration.GetSection("PublicIntake"));
 builder.Services.AddSingleton<IntakeFormToken>();
+builder.Services.AddSingleton<IntakeIpDailyCounter>();
 builder.Services.AddScoped<StorageSweeper>();
 builder.Services.AddSingleton(new FreelanceFlow.Api.Infrastructure.Images.ImageProcessingGate(
     builder.Configuration.GetValue("Storage:MaxConcurrentImageProcessing",
@@ -171,6 +172,7 @@ var loginPermitLimit = builder.Configuration.GetValue("RateLimit:LoginPerMinute"
 var portalSessionPermitLimit = builder.Configuration.GetValue("RateLimit:PortalSessionPerMinute", 10);
 var portalStudioPermitLimit = builder.Configuration.GetValue("RateLimit:PortalStudioPerMinute", 60);
 var publicIntakePermitLimit = builder.Configuration.GetValue("RateLimit:PublicIntakePerMinute", 10);
+var publicIntakeSubmitPermitLimit = builder.Configuration.GetValue("RateLimit:PublicIntakeSubmitPerHour", 5);
 builder.Services.AddRateLimiter(opt =>
 {
     opt.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
@@ -204,6 +206,16 @@ builder.Services.AddRateLimiter(opt =>
         {
             PermitLimit = publicIntakePermitLimit,
             Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
+    // ...and its POST, per IP per hour (one GET must not be replayable into the studio-wide daily cap)
+    opt.AddPolicy(PublicIntakeEndpoints.SubmitRateLimitPolicy, ctx => RateLimitPartition.GetSlidingWindowLimiter(
+        partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new SlidingWindowRateLimiterOptions
+        {
+            PermitLimit = publicIntakeSubmitPermitLimit,
+            Window = TimeSpan.FromHours(1),
+            SegmentsPerWindow = 6,
             QueueLimit = 0,
         }));
     opt.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
