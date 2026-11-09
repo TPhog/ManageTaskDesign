@@ -44,7 +44,7 @@ describe('PortalRequestForm (CF-11/12)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Gửi yêu cầu' }))
     expect(await screen.findByRole('button', { name: 'Đang gửi 1 ảnh…' })).toBeDisabled()
 
-    resolve({ id: 'r1', projectId: 'p1', projectName: 'Tiệm bánh Mây', deliverableId: 'd1', deliverableName: 'Logo', createdAt: '2026-11-08T03:00:00Z', content: 'Đổi màu chữ sang xanh', status: 'NEW', declineReason: null, attachments: [] })
+    resolve({ id: 'r1', projectId: 'p1', projectName: 'Tiệm bánh Mây', deliverableId: 'd1', deliverableName: 'Logo', createdAt: '2026-11-08T03:00:00Z', content: 'Đổi màu chữ sang xanh', status: 'NEW', declineReason: null, attachments: [], templateName: null })
     await waitFor(() => expect(onSent).toHaveBeenCalledWith(expect.objectContaining({ imageCount: 1, remainingRounds: 2 })))
   })
 })
@@ -52,7 +52,7 @@ describe('PortalRequestForm (CF-11/12)', () => {
 describe('RequestSentSummary (CF-13)', () => {
   it('recaps the request with the expected response time', () => {
     const summary: SentRequestSummary = {
-      request: { id: 'r1', projectId: 'p1', projectName: 'Tiệm bánh Mây', deliverableId: 'd1', deliverableName: 'Logo', createdAt: '2026-11-08T03:00:00Z', content: 'Đổi màu chữ sang xanh', status: 'NEW', declineReason: null, attachments: [] },
+      request: { id: 'r1', projectId: 'p1', projectName: 'Tiệm bánh Mây', deliverableId: 'd1', deliverableName: 'Logo', createdAt: '2026-11-08T03:00:00Z', content: 'Đổi màu chữ sang xanh', status: 'NEW', declineReason: null, attachments: [], templateName: null },
       imageCount: 2, remainingRounds: 2,
     }
     wrap(<RequestSentSummary summary={summary} deliverableName="Logo" actions={null} />)

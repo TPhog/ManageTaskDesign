@@ -6,7 +6,7 @@ function request(overrides: Partial<PortalRequest> = {}): PortalRequest {
   return {
     id: 'r1', projectId: 'p1', projectName: 'Nhận diện ABC', deliverableId: 'd1', deliverableName: 'Logo',
     createdAt: '2026-11-08T03:00:00Z', content: 'Đổi màu chữ sang xanh navy', status: 'NEW',
-    declineReason: null, attachments: [], ...overrides,
+    declineReason: null, attachments: [], templateName: null, ...overrides,
   }
 }
 

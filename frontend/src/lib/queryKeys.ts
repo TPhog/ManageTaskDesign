@@ -92,6 +92,7 @@ export const qk = {
     detail: (id: string) => ['request-templates', id]  as const,
   },
   intakeLink: ['settings', 'intake'] as const,
+  publicIntake: (slug: string) => ['public-intake', slug] as const,
 
   portal: {
     images:   (id: string) => ['portal', 'projects', id, 'images']    as const,
@@ -105,5 +106,6 @@ export const qk = {
     quotationVersion: (id: string, version: number) => ['portal', 'quotations', 'detail', id, 'version', version] as const,
     requests: (projectId?: string) => ['portal', 'requests', projectId ?? 'all'] as const,
     revisions: (id: string) => ['portal', 'projects', id, 'revisions'] as const,
+    requestTemplates: ['portal', 'request-templates'] as const,
   },
 } as const

@@ -184,6 +184,8 @@ export interface PortalRequest {
   /** set when DECLINED (BR-52) */
   declineReason: string | null
   attachments: PortalRequestAttachment[]
+  /** plan 13: name of the template used, null for free text */
+  templateName: string | null
 }
 
 export type PortalBilling = 'FREE_FIX' | 'IN_QUOTA' | 'CHARGEABLE'

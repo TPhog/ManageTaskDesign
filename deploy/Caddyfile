@@ -19,6 +19,15 @@ https://{$DOMAIN} {
     rewrite * /index.html
     file_server
   }
+  # Public intake form for new clients: the path carries the form slug (07-security s4.5)
+  handle /f/* {
+    log_skip
+    header Referrer-Policy no-referrer
+    header X-Robots-Tag noindex
+    root * /srv
+    rewrite * /index.html
+    file_server
+  }
   handle {
     root * /srv
     try_files {path} /index.html

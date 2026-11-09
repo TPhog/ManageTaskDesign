@@ -11,6 +11,7 @@ import type {
   PortalRequest,
   PortalRevisions,
 } from '@/lib/portalTypes'
+import type { AnswerValue, PublicRequestTemplate } from '@/lib/requestTemplateTypes'
 import { toRequestForm, type RequestFormValues } from './requests'
 
 const byProject = (projectId?: string) => (projectId ? `?projectId=${encodeURIComponent(projectId)}` : '')
@@ -60,11 +61,21 @@ export function usePortalRequests(projectId?: string, enabled = true) {
   })
 }
 
+/** Plan 13: the designer's active request templates (public DTO). */
+export function usePortalRequestTemplates(enabled = true) {
+  return useQuery({
+    queryKey: qk.portal.requestTemplates,
+    queryFn: () => api.get<PublicRequestTemplate[]>('/portal/request-templates'),
+    staleTime: 5 * 60_000,
+    enabled,
+  })
+}
+
 export function useSendPortalRequest() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ files = [], ...values }: RequestFormValues & { files?: File[] }) =>
-      api.postForm<PortalRequest>(`/portal/projects/${values.projectId}/requests`, toRequestForm(values, files)),
+    mutationFn: ({ files = [], answers, ...values }: RequestFormValues & { files?: File[]; answers?: Record<string, AnswerValue> }) =>
+      api.postForm<PortalRequest>(`/portal/projects/${values.projectId}/requests`, toRequestForm(values, files, answers)),
     // the new request can flip a product to "Đang sửa theo yêu cầu của bạn": refresh the home list and project pages too
     onSuccess: () => Promise.all([
       qc.invalidateQueries({ queryKey: ['portal', 'requests'] }),

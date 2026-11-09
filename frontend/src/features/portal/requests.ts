@@ -2,6 +2,8 @@ import { z } from 'zod'
 import type { ApiError } from '@/lib/api'
 import { imageErrorMessage, isStorageFull } from '@/lib/images'
 import type { ProjectStatus } from '@/lib/types'
+import type { AnswerValue } from '@/lib/requestTemplateTypes'
+import { TEMPLATE_LIMITS } from '@/lib/requestTemplates'
 
 export const REQUEST_MAX_LENGTH = 5000
 /** BR-54 */
@@ -12,24 +14,39 @@ export function acceptsRequests(status: ProjectStatus): boolean {
   return status === 'DRAFT' || status === 'QUOTED' || status === 'IN_PROGRESS' || status === 'ON_HOLD'
 }
 
-export const requestSchema = z.object({
-  projectId: z.string().min(1, 'Chọn dự án'),
-  /** '' = no specific deliverable */
-  deliverableId: z.string(),
-  content: z
-    .string()
-    .trim()
-    .min(1, 'Nhập nội dung yêu cầu')
-    .max(REQUEST_MAX_LENGTH, `Tối đa ${REQUEST_MAX_LENGTH} ký tự`),
-})
+export const requestSchema = z
+  .object({
+    projectId: z.string().min(1, 'Chọn dự án'),
+    /** '' = no specific deliverable */
+    deliverableId: z.string(),
+    /** '' = free text (plan 13) */
+    templateId: z.string().default(''),
+    /** free text: the request; with a template: the optional "Ghi chú thêm" */
+    content: z.string().trim().max(REQUEST_MAX_LENGTH, `Tối đa ${REQUEST_MAX_LENGTH} ký tự`),
+  })
+  .superRefine((v, ctx) => {
+    if (!v.templateId && v.content.length === 0)
+      ctx.addIssue({ code: 'custom', path: ['content'], message: 'Nhập nội dung yêu cầu' })
+    if (v.templateId && v.content.length > TEMPLATE_LIMITS.maxNote)
+      ctx.addIssue({ code: 'custom', path: ['content'], message: `Tối đa ${TEMPLATE_LIMITS.maxNote} ký tự` })
+  })
 
 export type RequestFormValues = z.infer<typeof requestSchema>
 
-/** multipart body of POST /api/portal/projects/{id}/requests (docs/05 §4): text fields, then ≤ 5 photos (plan 08). */
-export function toRequestForm(values: Pick<RequestFormValues, 'deliverableId' | 'content'>, files: File[] = []): FormData {
+/** multipart body of POST /api/portal/projects/{id}/requests (docs/05 §4): text fields, template answers (plan 13), ≤ 5 photos. */
+export function toRequestForm(
+  values: Pick<RequestFormValues, 'deliverableId' | 'content' | 'templateId'>,
+  files: File[] = [],
+  answers?: Record<string, AnswerValue>,
+): FormData {
   const form = new FormData()
-  form.append('content', values.content.trim())
+  const content = values.content.trim()
+  if (content || !values.templateId) form.append('content', content)
   if (values.deliverableId) form.append('deliverableId', values.deliverableId)
+  if (values.templateId) {
+    form.append('templateId', values.templateId)
+    form.append('answers', JSON.stringify(answers ?? {}))
+  }
   for (const f of files) form.append('files', f)
   return form
 }
@@ -53,6 +70,7 @@ export function requestErrorMessage(err: unknown): string {
   if (e.status === 403) return 'Vui lòng tải lại trang rồi gửi lại.'
   if (e.status === 422) return unprocessableMessage(e.detail)
   if (e.status === 404) return 'Không tìm thấy dự án này.'
+  if (e.errors?.templateId) return 'Mẫu yêu cầu vừa được nhà thiết kế thay đổi — vui lòng tải lại trang.'
   const firstFieldError = e.errors ? Object.values(e.errors)[0]?.[0] : undefined
   return firstFieldError ?? 'Không gửi được yêu cầu. Vui lòng thử lại.'
 }

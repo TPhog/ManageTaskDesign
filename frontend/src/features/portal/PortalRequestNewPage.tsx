@@ -61,7 +61,7 @@ export default function PortalRequestNewPage() {
         </div>
       ) : (
         <div className="border-t-[3px] border-rule pt-5">
-          <PortalRequestForm projects={openProjects} defaultProjectId={defaultProjectId} onSent={setSent} />
+          <PortalRequestForm projects={openProjects} defaultProjectId={defaultProjectId} withTemplates onSent={setSent} />
         </div>
       )}
     </div>

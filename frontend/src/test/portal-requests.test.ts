@@ -27,13 +27,13 @@ describe('requestSchema', () => {
 
 describe('toRequestForm', () => {
   it('sends trimmed content and the chosen deliverable', () => {
-    const form = toRequestForm({ deliverableId: 'd1', content: ' Sửa logo ' })
+    const form = toRequestForm({ deliverableId: 'd1', content: ' Sửa logo ', templateId: '' })
     expect(form.get('content')).toBe('Sửa logo')
     expect(form.get('deliverableId')).toBe('d1')
   })
 
   it('omits an empty deliverable', () => {
-    expect(toRequestForm({ deliverableId: '', content: 'Sửa' }).has('deliverableId')).toBe(false)
+    expect(toRequestForm({ deliverableId: '', content: 'Sửa', templateId: '' }).has('deliverableId')).toBe(false)
   })
 })
 
