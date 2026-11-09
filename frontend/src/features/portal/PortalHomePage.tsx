@@ -1,5 +1,7 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { ChevronRight, FolderOpen, Sparkles } from 'lucide-react'
+import { ChevronRight, FolderOpen, PencilRuler, Sparkles } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/StatusBadge'
 import { EmptyState } from '@/components/EmptyState'
@@ -16,8 +18,24 @@ import { usePortalMe, usePortalProjects, usePortalQuotations } from './usePortal
 /** CF-14: a letter to the client — greeting, "Việc bạn cần làm", then the projects. */
 export default function PortalHomePage() {
   const { data: me } = usePortalMe()
-  const { data, isLoading } = usePortalProjects()
-  const { data: quotations, isLoading: quotationsLoading } = usePortalQuotations()
+  const { data, isLoading, isError: projectsError, refetch: refetchProjects } = usePortalProjects()
+  const { data: quotations, isLoading: quotationsLoading, isError: quotationsError, refetch: refetchQuotations } = usePortalQuotations()
+  // A failed load must never read as "nothing to do" / "no projects" (review I-3)
+  const retry = (
+    <Button type="button" variant="outline" className="h-11" onClick={() => { void refetchProjects(); void refetchQuotations() }}>
+      Thử lại
+    </Button>
+  )
+  // P13: the designer's public form, for a brand-new design order (hidden while the form is off)
+  const intakeUrl = me?.designer.intakeUrl ?? null
+  const orderNew = intakeUrl && (
+    <Button asChild variant="outline" size="touch" className="w-full sm:w-auto">
+      <a href={intakeUrl}>
+        <PencilRuler aria-hidden="true" />
+        Đặt thiết kế mới
+      </a>
+    </Button>
+  )
   // QA C-06 / BR-48: projects that wait for the client come first; the rest keep the server's order
   const projects = data
     ? [...data].sort((a, b) => Number(b.deliverableSummary.awaitingClient > 0) - Number(a.deliverableSummary.awaitingClient > 0))
@@ -29,6 +47,10 @@ export default function PortalHomePage() {
 
       {isLoading || quotationsLoading ? (
         <Skeleton className="h-24 w-full" />
+      ) : projectsError || quotationsError ? (
+        <EditorialSection id="portal-todo" number="I." title="Việc bạn cần làm">
+          <LoadError what="việc cần làm" action={retry} />
+        </EditorialSection>
       ) : (
         <PortalTodoList number="I." items={buildTodoList(projects ?? [], quotations ?? [])} />
       )}
@@ -38,11 +60,14 @@ export default function PortalHomePage() {
           <div className="mt-3 space-y-3">
             {Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-24 w-full" />)}
           </div>
+        ) : projectsError ? (
+          <LoadError what="danh sách dự án" action={retry} />
         ) : !projects || projects.length === 0 ? (
           <EmptyState
             icon={FolderOpen}
             title="Chưa có dự án nào"
             description="Khi nhà thiết kế tạo dự án cho bạn, dự án sẽ hiện ở đây."
+            action={orderNew || undefined}
           />
         ) : (
           <ul className="m-0 list-none border-b border-border p-0 [&>li+li]:border-t [&>li+li]:border-border">
@@ -92,7 +117,17 @@ export default function PortalHomePage() {
             })}
           </ul>
         )}
+        {orderNew && projects && projects.length > 0 && <div className="mt-4">{orderNew}</div>}
       </EditorialSection>
+    </div>
+  )
+}
+
+function LoadError({ what, action }: { what: string; action: ReactNode }) {
+  return (
+    <div role="alert" className="space-y-3 border-b border-border py-3">
+      <p className="font-serif text-base italic text-foreground">Không tải được {what}. Vui lòng kiểm tra kết nối rồi thử lại.</p>
+      {action}
     </div>
   )
 }
