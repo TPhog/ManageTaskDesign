@@ -113,7 +113,10 @@ export function TaskCalendar({ projectId, onOpen, readOnly = false, unit: unitPr
                 <button
                   type="button"
                   onClick={() => { setAnchor(iso); setUnit('week') }}
-                  className="min-h-7 rounded-sm px-1 text-left text-xs font-medium text-muted-foreground hover:text-foreground hover:underline"
+                  // 44px target (WCAG 2.5.5) that still reads as a small text link inside the cell
+                  className="-mb-1 flex min-h-11 w-full items-center rounded-sm px-1 text-left text-xs font-medium text-muted-foreground hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  // the name starts with the visible text (WCAG 2.5.3) and says what the button does
+                  aria-label={`+${extra} nữa ngày ${dm(iso)}, mở tuần đó`}
                 >
                   +{extra} nữa
                 </button>
@@ -336,7 +339,7 @@ function CalendarChip({ task, draggable, onOpen, showProject, showRange }: {
       // keyboard path: Enter opens the drawer, where "Hạn hoàn thành" changes the date
       onClick={() => onOpen(task.id)}
       data-testid={`calendar-task-${task.id}`}
-      className={cn('block w-full min-w-0 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', isDragging && 'opacity-40', draggable && 'cursor-grab')}
+      className={cn('block w-full min-w-0 rounded-sm text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', isDragging && 'opacity-40', draggable && 'cursor-grab touch-manipulation')}
       {...listeners}
     >
       <ChipBody task={task} showProject={showProject} showRange={showRange} />

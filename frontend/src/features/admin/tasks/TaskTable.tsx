@@ -1,7 +1,7 @@
-import { Fragment } from 'react'
 import { Link } from 'react-router-dom'
 import { Link2, ListChecks, Repeat } from 'lucide-react'
 import { StatusBadge } from '@/components/StatusBadge'
+import { cn } from '@/lib/utils'
 import type { TaskGroup, TaskListItem } from '@/lib/types'
 import { BlockedLine, DueText, PriorityBadge } from './TaskMeta'
 import { taskStatusLabel, todayVn } from './taskUtils'
@@ -19,6 +19,15 @@ export function TaskTable({ tasks, onOpen, showProject = false, groups }: Props)
   const today = todayVn()
   const columns = showProject ? 7 : 6
   const groupOf = (key: string) => groups?.find(g => g.key === key)
+  // one <tbody> per group, so the rowgroup header really heads its rows; a single body without grouping
+  const grouped = !!groups && groups.length > 0
+  const runs: { key: string | null; rows: TaskListItem[] }[] = []
+  for (const t of tasks) {
+    const key = grouped ? t.groupKey ?? null : null
+    const last = runs[runs.length - 1]
+    if (last && last.key === key) last.rows.push(t)
+    else runs.push({ key, rows: [t] })
+  }
 
   return (
     <div className="overflow-x-auto">
@@ -34,18 +43,18 @@ export function TaskTable({ tasks, onOpen, showProject = false, groups }: Props)
             <th scope="col" className="hidden px-4 py-3 text-right sm:table-cell">Checklist</th>
           </tr>
         </thead>
-        <tbody className="divide-y">
-          {tasks.map((t, i) => (
-            <Fragment key={t.id}>
-              {groups && groups.length > 0 && t.groupKey != null && t.groupKey !== tasks[i - 1]?.groupKey && (
-                <tr>
-                  <th scope="rowgroup" colSpan={columns} className="bg-muted/50 px-4 py-2 text-left text-xs font-semibold text-foreground">
-                    {groupOf(t.groupKey)?.label ?? t.groupKey}
-                    <span className="ml-2 tabular-nums text-muted-foreground">{groupOf(t.groupKey)?.count ?? ''}</span>
-                  </th>
-                </tr>
-              )}
-              <tr className="transition-colors duration-150 hover:bg-muted/40">
+        {runs.map((run, r) => (
+          <tbody key={`${r}-${run.key ?? ''}`} className={cn('divide-y', r > 0 && 'border-t')}>
+            {run.key != null && (
+              <tr>
+                <th scope="rowgroup" colSpan={columns} className="bg-muted/50 px-4 py-2 text-left text-xs font-semibold text-foreground">
+                  {groupOf(run.key)?.label ?? run.key}
+                  <span className="ml-2 tabular-nums text-muted-foreground">{groupOf(run.key)?.count ?? ''}</span>
+                </th>
+              </tr>
+            )}
+            {run.rows.map(t => (
+              <tr key={t.id} className="transition-colors duration-150 hover:bg-muted/40">
                 <td className="px-4 py-3">
                   <button
                     type="button"
@@ -99,9 +108,9 @@ export function TaskTable({ tasks, onOpen, showProject = false, groups }: Props)
                   )}
                 </td>
               </tr>
-            </Fragment>
-          ))}
-        </tbody>
+            ))}
+          </tbody>
+        ))}
       </table>
     </div>
   )
