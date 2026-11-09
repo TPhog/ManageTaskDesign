@@ -13,5 +13,7 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    // designTokens.test.ts reads index.css as text; every other CSS import stays disabled in tests
+    css: { include: [/\.css\?raw$/] },
   },
 })

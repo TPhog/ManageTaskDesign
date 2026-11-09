@@ -1,38 +1,252 @@
 @import "tailwindcss";
 
-/* Design tokens — shadcn/ui contract. Indigo primary, slate neutrals.
-   Text pairs are chosen for ≥ 4.5:1 contrast on their background. */
+/* P16 design system — docs/08 §6. Three layers: primitives → semantic → component scopes.
+   Admin = Studio Bento (:root). Client portal = Editorial ([data-theme="editorial"], set on <html> by usePortalTheme).
+   A future dark mode only adds a [data-theme="dark"] block that overrides layer 2. */
+
+@custom-variant editorial (&:where([data-theme="editorial"], [data-theme="editorial"] *));
+
+/* ---------- 1. PRIMITIVES (raw values; components never reference these) ---------- */
 :root {
-  --radius: 0.625rem;
+  --paper-50: #faf7f2;
+  --paper-100: #f5f1ea;
+  --paper-200: #ece6db;
+  --paper-300: #e4ddd1;
+  --paper-400: #d5ccbd;
+  --stone-300: #c9c1b4;
+  --stone-500: #8c8378;
+  --stone-600: #6b6359;
+  --ink-700: #3a362f;
+  --ink-750: #34302a;
+  --ink-800: #26231f;
+  --ink-900: #1c1a17;
+  --white: #ffffff;
+  --vermilion-100: #ffe7df;
+  --vermilion-300: #ffb39f;
+  --vermilion-500: #ff5a36;
+  --vermilion-700: #b93a1a;
+  --green-100: #e3f1e8;
+  --green-700: #1c6b47;
+  --amber-100: #fbefd9;
+  --amber-700: #8a5300;
+  --red-100: #fde7e4;
+  --red-700: #b42318;
 
-  --background: #f8fafc;
-  --foreground: #0f172a;
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
+  --cream-50: #faf7f0;
+  --cream-100: #f3eee3;
+  --cream-200: #eae3d4;
+  --cream-300: #d6ccba;
+  --sepia-500: #8c8273;
+  --sepia-600: #6a6155;
+  --sepia-800: #3b3631;
+  --sepia-900: #1b1916;
+  --oxblood-700: #9b2c1c;
+  --moss-700: #2f5a3c;
+  --ochre-700: #8a5a00;
 
-  --primary: #4f46e5;
-  --primary-foreground: #ffffff;
-  --secondary: #eef2ff;
-  --secondary-foreground: #3730a3;
-  --muted: #f1f5f9;
-  --muted-foreground: #64748b;
-  --accent: #eef2ff;
-  --accent-foreground: #312e81;
-  --destructive: #dc2626;
-  --destructive-foreground: #ffffff;
-  --success: #059669;
-  --success-foreground: #ffffff;
-  --warning: #d97706;
-
-  --border: #e2e8f0;
-  --input: #cbd5e1;
-  --ring: #6366f1;
+  --family-bricolage: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif;
+  --family-be-vietnam: "Be Vietnam Pro", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  --family-fraunces: "Fraunces Variable", Georgia, "Times New Roman", serif;
+  --family-public-sans: "Public Sans Variable", ui-sans-serif, system-ui, "Segoe UI", sans-serif;
 }
 
+/* ---------- 2a. SEMANTIC — Studio Bento (admin, default) ---------- */
+:root {
+  --background: var(--paper-100);
+  --foreground: var(--ink-900);
+  --card: var(--white);
+  --card-foreground: var(--ink-900);
+  --popover: var(--white);
+  --popover-foreground: var(--ink-900);
+  --surface-sunk: var(--paper-50);
+  --surface-hover: var(--paper-200);
+  --surface-inverse: var(--ink-900);
+  --surface-inverse-raised: var(--ink-800);
+  --on-inverse: var(--paper-100);
+  --on-inverse-muted: var(--stone-300);
+  --on-inverse-accent: var(--vermilion-300);
+
+  --primary: var(--ink-900);
+  --primary-foreground: var(--paper-100);
+  --secondary: var(--paper-200);
+  --secondary-foreground: var(--ink-900);
+  --muted: var(--paper-200);
+  --muted-foreground: var(--stone-600);
+  --accent: var(--paper-200);
+  --accent-foreground: var(--ink-900);
+
+  /* the one accent: "needs you now". Text on it is always ink; vermilion is never a text colour */
+  --highlight: var(--vermilion-500);
+  --highlight-foreground: var(--ink-900);
+  --highlight-soft: var(--vermilion-100);
+  --highlight-text: var(--vermilion-700);
+
+  --destructive: var(--red-700);
+  --destructive-foreground: var(--white);
+  --success: var(--green-700);
+  --success-foreground: var(--white);
+  --success-soft: var(--green-100);
+  --warning: var(--amber-700);
+  --warning-foreground: var(--white);
+  --warning-soft: var(--amber-100);
+  --danger: var(--red-700);
+  --danger-soft: var(--red-100);
+
+  --border: var(--paper-300);
+  --border-strong: var(--paper-400);
+  --rule: var(--ink-900);
+  --input: var(--stone-500);
+  --ring: var(--ink-900);
+
+  --font-body: var(--family-be-vietnam);
+  --font-heading: var(--family-bricolage);
+  --heading-weight: 700;
+
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+  --radius: var(--r-lg);
+  --elev-card: 0 1px 0 rgb(28 26 23 / 0.04), 0 1px 3px rgb(28 26 23 / 0.05);
+  --elev-pop: 0 16px 40px -16px rgb(28 26 23 / 0.28);
+  --overlay: rgb(28 26 23 / 0.45);
+}
+
+/* ---------- 2b. SEMANTIC — Editorial (client portal). Keep AFTER 2a: same specificity, later wins. ---------- */
+[data-theme="editorial"] {
+  --background: var(--cream-100);
+  --foreground: var(--sepia-900);
+  --card: var(--cream-50);
+  --card-foreground: var(--sepia-900);
+  --popover: var(--cream-50);
+  --popover-foreground: var(--sepia-900);
+  --surface-sunk: var(--cream-50);
+  --surface-hover: var(--cream-200);
+  --surface-inverse: var(--sepia-900);
+  --surface-inverse-raised: var(--sepia-800);
+  --on-inverse: var(--cream-100);
+  --on-inverse-muted: var(--cream-300);
+  --on-inverse-accent: var(--cream-300);
+
+  --primary: var(--sepia-900);
+  --primary-foreground: var(--cream-100);
+  --secondary: var(--cream-200);
+  --secondary-foreground: var(--sepia-900);
+  --muted: var(--cream-200);
+  --muted-foreground: var(--sepia-600);
+  --accent: var(--cream-200);
+  --accent-foreground: var(--sepia-900);
+
+  --highlight: var(--oxblood-700);
+  --highlight-foreground: var(--cream-100);
+  --highlight-soft: var(--cream-200);
+  --highlight-text: var(--oxblood-700);
+
+  --destructive: var(--oxblood-700);
+  --destructive-foreground: var(--cream-100);
+  --success: var(--moss-700);
+  --success-foreground: var(--cream-100);
+  --success-soft: var(--cream-200);
+  --warning: var(--ochre-700);
+  --warning-foreground: var(--cream-100);
+  --warning-soft: var(--cream-200);
+  --danger: var(--oxblood-700);
+  --danger-soft: var(--cream-200);
+
+  --border: var(--cream-300);
+  --border-strong: var(--sepia-900);
+  --rule: var(--sepia-900);
+  --input: var(--sepia-500);
+  --ring: var(--oxblood-700);
+
+  --font-body: var(--family-public-sans);
+  --font-heading: var(--family-fraunces);
+  --heading-weight: 500;
+
+  --r-sm: 0px;
+  --r-md: 0px;
+  --r-lg: 0px;
+  --r-xl: 0px;
+  --elev-card: none;
+  --elev-pop: 0 18px 40px -20px rgb(27 25 22 / 0.35);
+  --overlay: rgb(27 25 22 / 0.5);
+}
+
+/* ---------- 3. COMPONENT SCOPES — re-point semantic tokens inside a surface so nested parts adapt ---------- */
+@utility tone-inverse {
+  background-color: var(--surface-inverse);
+  color: var(--on-inverse);
+  --background: var(--surface-inverse);
+  --foreground: var(--on-inverse);
+  --card: var(--surface-inverse-raised);
+  --card-foreground: var(--on-inverse);
+  --muted: var(--surface-inverse-raised);
+  --muted-foreground: var(--on-inverse-muted);
+  --surface-sunk: var(--surface-inverse-raised);
+  --surface-hover: var(--surface-inverse-raised);
+  --accent: var(--surface-inverse-raised);
+  --accent-foreground: var(--on-inverse);
+  --primary: var(--on-inverse);
+  --primary-foreground: var(--surface-inverse);
+  --highlight-text: var(--on-inverse-accent);
+  --border: var(--ink-750);
+  --border-strong: var(--ink-700);
+  /* light accent, not the highlight token (oxblood on editorial ink is only 1.95 to 1) */
+  --ring: var(--on-inverse-accent);
+}
+
+@utility tone-highlight {
+  background-color: var(--highlight);
+  color: var(--highlight-foreground);
+  --background: var(--highlight);
+  --foreground: var(--highlight-foreground);
+  --muted-foreground: var(--highlight-foreground);
+  --border: color-mix(in srgb, var(--highlight-foreground) 20%, transparent);
+  --ring: var(--highlight-foreground);
+}
+
+@utility link-inline {
+  color: var(--foreground);
+  font-weight: 600;
+  text-decoration-line: underline;
+  text-decoration-color: var(--highlight);
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+  &:hover {
+    text-decoration-thickness: 2.5px;
+  }
+}
+
+@utility link-hover {
+  &:hover {
+    text-decoration-line: underline;
+    text-decoration-color: var(--highlight);
+    text-decoration-thickness: 1.5px;
+    text-underline-offset: 3px;
+  }
+}
+
+@utility kicker {
+  font-size: 0.6875rem; /* = --text-kicker; literal because unused @theme variables may be tree-shaken */
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* dotted leader between a label and an amount (editorial invoice rows) */
+@utility leader {
+  flex: 1 1 0%;
+  min-width: 1rem;
+  border-bottom: 1.5px dotted var(--muted-foreground);
+  transform: translateY(-0.25em);
+}
+
+/* ---------- Tailwind mapping ---------- */
 @theme inline {
-  --font-sans: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-sans: var(--font-body);
+  --font-display: var(--font-heading);
+  --font-serif: var(--family-fraunces);
 
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -48,31 +262,81 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-highlight: var(--highlight);
+  --color-highlight-foreground: var(--highlight-foreground);
+  --color-highlight-soft: var(--highlight-soft);
+  --color-highlight-text: var(--highlight-text);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-surface-sunk: var(--surface-sunk);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-inverse: var(--surface-inverse);
+  --color-surface-inverse-raised: var(--surface-inverse-raised);
+  --color-on-inverse: var(--on-inverse);
+  --color-on-inverse-muted: var(--on-inverse-muted);
+  --color-on-inverse-accent: var(--on-inverse-accent);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-rule: var(--rule);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-overlay: var(--overlay);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
+  --radius-2xl: var(--r-xl);
 
-  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
+  --shadow-card: var(--elev-card);
+  --shadow-pop: var(--elev-pop);
+}
+
+@theme {
+  --text-display-2xl: 3.5rem;
+  --text-display-2xl--line-height: 1;
+  --text-display-2xl--letter-spacing: -0.04em;
+  --text-display-lg: 2rem;
+  --text-display-lg--line-height: 1.1;
+  --text-display-lg--letter-spacing: -0.025em;
+  --text-display-md: 1.5625rem;
+  --text-display-md--line-height: 1.15;
+  --text-display-md--letter-spacing: -0.02em;
+  --text-title: 1.0625rem;
+  --text-title--line-height: 1.25;
+  --text-title--letter-spacing: -0.01em;
+  --text-kicker: 0.6875rem;
+  --text-kicker--line-height: 1.2;
+  --text-kicker--letter-spacing: 0.12em;
 }
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
   }
 
   body {
     @apply bg-background text-foreground font-sans antialiased;
     margin: 0;
+  }
+
+  /* fallback focus ring for anything that does not draw its own ring (shadcn parts use focus-visible:ring-*) */
+  :where(a[href], button, [role="button"], input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background-color: var(--highlight-soft);
+    color: var(--foreground);
   }
 
   button:not(:disabled),
