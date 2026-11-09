@@ -1,158 +1,87 @@
-import type { ReactNode } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowRight, FileText, FolderKanban, TriangleAlert } from 'lucide-react'
+import { FileText, ListChecks, TriangleAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { MoneyText } from '@/components/MoneyText'
 import { PageHeader } from '@/components/PageHeader'
-import { StatusBadge } from '@/components/StatusBadge'
-import type { MonthTotal } from '@/lib/dashboardTypes'
-import { formatDate, formatVnd } from '@/lib/format'
-import { barPercent, dashboardLinks, monthLabel } from './dashboardUtils'
-import { panelClass, Section } from './DashboardSection'
+import { Tile } from '@/components/Tile'
+import { cn } from '@/lib/utils'
+import { AcceptedTile } from './AcceptedTile'
 import { ClientActivityBlock } from './ClientActivityBlock'
 import { FlowTodoBlock } from './FlowTodoBlock'
 import { MoneyInsightsBlock } from './MoneyInsightsBlock'
 import { ProjectHealthBlock } from './ProjectHealthBlock'
+import { ProjectsTile } from './ProjectsTile'
 import { ScheduleBlock } from './ScheduleBlock'
 import { SetupChecklistCard } from './SetupChecklistCard'
 import { StorageWidget } from './StorageWidget'
+import { TodayTile } from './TodayTile'
+import { greetingFor, isSetupVisible, weekdayLong, weekSummary } from './dashboardUtils'
 import { useDashboard } from './useDashboard'
+import { useDashboardSchedule, useSetupChecklist } from './useDashboardBlocks'
 
-/** One metric; the whole tile links to the filtered list (docs/08 §2.2). */
-function StatTile({ to, label, value, testId }: { to: string; label: string; value: ReactNode; testId: string }) {
-  return (
-    <Link
-      to={to}
-      className="group flex flex-col rounded-lg border p-3 transition-colors duration-150 hover:border-primary/40 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-    >
-      <span className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-        {label}
-        <ArrowRight className="h-4 w-4 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden="true" />
-      </span>
-      <span data-testid={testId} className="mt-1 text-2xl font-semibold tabular-nums text-foreground">{value}</span>
-    </Link>
-  )
-}
+/** Grid cell: the tile inside stretches to the row height. */
+const cell = 'min-w-0 *:h-full'
 
-/** DSH-04: one series → one hue, no legend (the caption names it); hover shows the value; a table carries the numbers for screen readers. */
-function AcceptedChart({ data }: { data: MonthTotal[] }) {
-  const max = Math.max(0, ...data.map(d => d.total))
-  return (
-    <figure data-testid="dsh-chart" className="space-y-2">
-      <figcaption className="text-sm font-medium text-foreground">Giá trị đã chốt 6 tháng gần nhất</figcaption>
-      <div className="flex h-36 items-end gap-2 border-b" aria-hidden="true">
-        {data.map((d, i) => (
-          <div key={d.month} className="group relative flex h-full flex-1 flex-col justify-end">
-            <span className={`pointer-events-none absolute top-0 z-10 -translate-y-full whitespace-nowrap ${i >= data.length - 2 ? 'right-0' : 'left-1/2 -translate-x-1/2'} rounded-md bg-foreground px-2 py-1 text-xs text-background opacity-0 shadow transition-opacity group-hover:opacity-100`}>
-              {monthLabel(d.month)}: {formatVnd(d.total)}
-            </span>
-            <div className="mx-auto w-full max-w-10 rounded-t-[4px] bg-primary" style={{ height: `${barPercent(d.total, max)}%` }} />
-          </div>
-        ))}
-      </div>
-      <div className="flex gap-2 text-xs text-muted-foreground" aria-hidden="true">
-        {/* min-w-0 + a break after "/": six "T11/2026" labels do not fit on one line at 390px */}
-        {data.map(d => <span key={d.month} className="min-w-0 flex-1 text-center tabular-nums">{monthLabel(d.month).replace('/', '/​')}</span>)}
-      </div>
-      <table className="sr-only">
-        <caption>Giá trị đã chốt theo tháng</caption>
-        <thead>
-          <tr><th scope="col">Tháng</th><th scope="col">Giá trị</th></tr>
-        </thead>
-        <tbody>
-          {data.map(d => (
-            <tr key={d.month}><td>{monthLabel(d.month)}</td><td>{formatVnd(d.total)}</td></tr>
-          ))}
-        </tbody>
-      </table>
-    </figure>
-  )
-}
+/** A bento column: tiles stack, the last one grows so both columns end on the same line (xl). */
+const column = 'flex min-w-0 flex-col gap-4 xl:[&>*:last-child]:flex-1'
 
-/** docs/08 §2.2 "/admin" + spec 06b §6: Việc cần làm (DSH-01 + flow next steps) · Dự án (DSH-02) · Tiền (DSH-03/04). */
+/**
+ * docs/08 §2.2 "/admin" — Studio Bento (P16). xl = the 12-column bento of the mockup:
+ * Hôm nay (+ Thiết lập) · Lịch 7 ngày · [Việc cần làm, Sức khỏe] | [Dự án, Đã chốt, Dung lượng, Khách] · Tiền.
+ * Below xl everything stacks in that order; the narrow column pairs up from md.
+ */
 export default function DashboardPage() {
   const { data, isLoading, error, refetch } = useDashboard()
+  const { data: schedule } = useDashboardSchedule()
+  const { data: setup } = useSetupChecklist()
+  /** Local hour once per visit: the greeting must not flip on a re-render */
+  const [hour] = useState(() => new Date().getHours())
+  const setupVisible = isSetupVisible(setup)
+  const ready = !!data && !isLoading && !error
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Tổng quan" description="Lịch tuần này, sức khỏe dự án, tiền thu và hoạt động của khách." />
+      <PageHeader
+        eyebrow={schedule ? weekdayLong(schedule.today) : undefined}
+        title={<>
+          <span className="sr-only">Tổng quan — </span>
+          {greetingFor(hour)}.
+          {schedule && <span className="font-semibold text-muted-foreground"> {weekSummary(schedule)}</span>}
+        </>}
+        actions={<>
+          <Button asChild variant="outline"><Link to="/admin/quotations"><FileText aria-hidden="true" />Báo giá</Link></Button>
+          <Button asChild><Link to="/admin/tasks"><ListChecks aria-hidden="true" />Bảng công việc</Link></Button>
+        </>}
+      />
 
-      <SetupChecklistCard />
-
-      {isLoading ? (
-        <div className="space-y-6">
-          <Skeleton className="h-64 w-full rounded-xl" />
-          <div className="grid gap-6 lg:grid-cols-2">
-            {[0, 1].map(i => <Skeleton key={i} className="h-72 w-full rounded-xl" />)}
-          </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        <div className={cn(cell, setupVisible ? 'xl:col-span-7' : 'xl:col-span-12')}>
+          {isLoading ? <Skeleton className="h-64 w-full rounded-xl" />
+            : error || !data ? (
+              <Tile as="div" className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                <TriangleAlert className="h-4 w-4 text-warning" aria-hidden="true" />
+                Không tải được số liệu tổng quan.
+                <Button variant="link" className="px-0" onClick={() => refetch()}>Thử lại</Button>
+              </Tile>
+            ) : <TodayTile summary={data.actionRequired} wide={!setupVisible} />}
         </div>
-      ) : error || !data ? (
-        <div className={`${panelClass} flex flex-wrap items-center gap-2 text-sm text-muted-foreground`}>
-          <TriangleAlert className="h-4 w-4 text-amber-600" aria-hidden="true" />
-          Không tải được số liệu tổng quan.
-          <Button variant="link" className="px-0" onClick={() => refetch()}>Thử lại</Button>
+        {setupVisible && <div className={cn(cell, 'xl:col-span-5')}><SetupChecklistCard /></div>}
+
+        <div className="min-w-0 xl:col-span-12"><ScheduleBlock /></div>
+
+        <div className={cn(column, 'xl:col-span-8')}>
+          <FlowTodoBlock />
+          <ProjectHealthBlock />
         </div>
-      ) : (
-        <FlowTodoBlock summary={data.actionRequired} />
-      )}
-
-      <ScheduleBlock />
-
-      {data && !isLoading && !error && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          <Section title="Dự án" icon={FolderKanban}>
-            <div className="grid grid-cols-2 gap-3">
-              <StatTile to={dashboardLinks.inProgress} label="Đang làm" value={data.projects.inProgress} testId="dsh-inProgress" />
-              <StatTile to={dashboardLinks.onHold} label="Tạm dừng" value={data.projects.onHold} testId="dsh-onHold" />
-            </div>
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium text-foreground">Deadline trong 7 ngày</h3>
-              {data.projects.dueIn7Days.length === 0 ? (
-                <p className="text-sm text-muted-foreground">Không có dự án nào đến hạn trong 7 ngày tới.</p>
-              ) : (
-                <ul data-testid="dsh-dueIn7Days" className="divide-y">
-                  {data.projects.dueIn7Days.map(p => (
-                    <li key={p.id}>
-                      <Link
-                        to={`/admin/projects/${p.id}`}
-                        className="flex items-center justify-between gap-3 rounded-md py-2 text-sm hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate font-medium text-foreground">{p.name}</span>
-                          <span className="block truncate text-xs text-muted-foreground">{p.clientName}</span>
-                        </span>
-                        <span className="flex shrink-0 flex-col items-end gap-1">
-                          <span className="tabular-nums text-foreground">{formatDate(p.dueDate)}</span>
-                          <StatusBadge status={p.status} />
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </Section>
-
-          <Section title="Tiền" icon={FileText}>
-            <div className="grid gap-3">
-              <StatTile to={dashboardLinks.outstanding} label="Đang chờ thu" value={<MoneyText amount={data.money.outstanding} />} testId="dsh-outstanding" />
-              <div className="grid grid-cols-2 gap-3">
-                <StatTile to={dashboardLinks.acceptedThisMonth} label="Đã chốt tháng này" value={<MoneyText amount={data.money.acceptedThisMonth} />} testId="dsh-acceptedThisMonth" />
-                <StatTile to={dashboardLinks.additionalThisMonth} label="Phát sinh tháng này" value={<MoneyText amount={data.money.additionalThisMonth} />} testId="dsh-additionalThisMonth" />
-              </div>
-            </div>
-            <AcceptedChart data={data.acceptedByMonth} />
-          </Section>
+        <div className={cn(column, 'md:grid md:grid-cols-2 xl:col-span-4 xl:flex')}>
+          {ready && <ProjectsTile projects={data.projects} />}
+          {ready && <AcceptedTile money={data.money} acceptedByMonth={data.acceptedByMonth} />}
+          <StorageWidget className="md:col-span-2 xl:col-span-1" />
+          <ClientActivityBlock className="md:col-span-2 xl:col-span-1" />
         </div>
-      )}
 
-      <ProjectHealthBlock />
-      <MoneyInsightsBlock />
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <ClientActivityBlock />
-        <StorageWidget />
+        <div className="min-w-0 xl:col-span-12"><MoneyInsightsBlock /></div>
       </div>
     </div>
   )

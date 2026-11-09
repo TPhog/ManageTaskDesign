@@ -19,19 +19,21 @@ export function ClientActivityView({ activity }: { activity: ClientActivity }) {
     return <p className="text-sm text-muted-foreground">Chưa có hoạt động nào từ khách.</p>
   }
   return (
-    <ul className="divide-y">
+    <ul>
       {activity.items.map(i => {
         const Icon = KIND_ICON[i.kind] ?? Inbox
         const who = [i.clientName, i.projectName].filter(Boolean).join(' · ')
         return (
-          <li key={i.id}>
+          <li key={i.id} className="border-t border-border first:border-t-0">
             <Link
               to={i.href}
-              className="flex min-h-11 items-start gap-3 rounded-md py-2.5 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="group flex min-h-11 items-start gap-3 rounded-md py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-surface-hover text-foreground">
+                <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+              </span>
               <span className="min-w-0">
-                <span className="block break-words text-sm text-foreground">{i.text}</span>
+                <span className="block break-words text-sm font-medium text-foreground group-hover:underline group-hover:decoration-highlight group-hover:decoration-[1.5px] group-hover:underline-offset-[3px]">{i.text}</span>
                 <span className="block truncate text-xs text-muted-foreground">
                   {who && `${who} · `}{formatDatetime(i.occurredAt)}
                 </span>
@@ -44,17 +46,17 @@ export function ClientActivityView({ activity }: { activity: ClientActivity }) {
   )
 }
 
-export function ClientActivityBlock() {
+export function ClientActivityBlock({ className }: { className?: string }) {
   const { data, isLoading, error, refetch } = useClientActivity(10)
   return (
-    <Section title="Hoạt động của khách" icon={MessageSquare}>
+    <Section title="Hoạt động của khách" icon={MessageSquare} className={className}>
       {isLoading ? (
         <div className="space-y-2">
           {[0, 1, 2].map(i => <Skeleton key={i} className="h-11 w-full" />)}
         </div>
       ) : error || !data ? (
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          <TriangleAlert className="h-4 w-4 text-amber-600" aria-hidden="true" />
+          <TriangleAlert className="h-4 w-4 text-warning" aria-hidden="true" />
           Không tải được hoạt động của khách.
           <Button variant="link" className="px-0" onClick={() => refetch()}>Thử lại</Button>
         </div>

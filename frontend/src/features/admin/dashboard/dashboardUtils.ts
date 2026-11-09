@@ -1,4 +1,4 @@
-import type { DashboardSchedule, ScheduleTask, HealthRisk, MoneyPeriod, ReceivableItem } from '@/lib/dashboardTypes'
+import type { DashboardSchedule, ScheduleTask, HealthRisk, MoneyPeriod, ReceivableItem, SetupChecklist } from '@/lib/dashboardTypes'
 import { paymentReminderMessage } from '@/lib/messageTemplates'
 import type { FlowProjectActions } from '@/lib/flowTypes'
 
@@ -56,6 +56,12 @@ function parseYmd(date: string): [number, number, number] {
 export function dayMonth(date: string): string {
   const [, m, d] = parseYmd(date)
   return `${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}`
+}
+
+/** 'T2'…'CN' from 'yyyy-MM-dd' (no timezone shift). */
+export function weekdayShort(date: string): string {
+  const [y, m, d] = parseYmd(date)
+  return WEEKDAY[new Date(y, m - 1, d).getDay()]
 }
 
 /** 'Hôm nay · 15/05' | 'Ngày mai · 16/05' | 'T4 · 17/05' */
@@ -152,4 +158,46 @@ export function lastDayOf(endExclusive: string): string {
   const [y, m, d] = parseYmd(endExclusive)
   const prev = new Date(y, m - 1, d - 1)
   return `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}-${String(prev.getDate()).padStart(2, '0')}`
+}
+
+/** Vietnamese greeting for a local hour 0–23. */
+export function greetingFor(hour: number): string {
+  if (hour >= 4 && hour < 11) return 'Chào buổi sáng'
+  if (hour >= 11 && hour < 14) return 'Chào buổi trưa'
+  if (hour >= 14 && hour < 18) return 'Chào buổi chiều'
+  return 'Chào buổi tối'
+}
+
+const WEEKDAY_LONG = ['Chủ nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy']
+
+/** Server VN calendar date 'yyyy-MM-dd' → 'Thứ Hai, 09/11/2026' (calendar arithmetic only, no timezone shift). */
+export function weekdayLong(date: string): string {
+  const [y, m, d] = parseYmd(date)
+  const weekday = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+  return `${WEEKDAY_LONG[weekday]}, ${String(d).padStart(2, '0')}/${String(m).padStart(2, '0')}/${y}`
+}
+
+/** One line under the greeting: open tasks of the next 7 days (+ overdue). */
+export function weekSummary(s: DashboardSchedule): string {
+  const week = s.days.reduce((n, d) => n + d.tasks.length + d.hiddenTasks, 0)
+  const overdue = s.overdue.total
+  if (week === 0 && overdue === 0) return 'Tuần này còn trống.'
+  const parts = [`${week} việc trong 7 ngày tới`]
+  if (overdue > 0) parts.push(`${overdue} việc quá hạn`)
+  return `${parts.join(', ')}.`
+}
+
+/** Same rule SetupChecklistCard used inline: hidden while loading, once dismissed or complete. */
+export function isSetupVisible(c: SetupChecklist | undefined): boolean {
+  return !!c && !c.dismissed && !c.complete
+}
+
+const oneDecimal = (n: number) => (Math.round(n * 10) / 10).toLocaleString('vi-VN', { maximumFractionDigits: 1 })
+
+/** Short VND for direct chart labels ('52 tr', '38,5 tr', '1,3 tỷ'); exact amounts stay in the tooltip and the table. */
+export function compactVnd(amount: number): string {
+  if (amount >= 1_000_000_000) return `${oneDecimal(amount / 1_000_000_000)} tỷ`
+  if (amount >= 1_000_000) return `${oneDecimal(amount / 1_000_000)} tr`
+  if (amount >= 1_000) return `${Math.round(amount / 1_000)} N`
+  return String(amount)
 }

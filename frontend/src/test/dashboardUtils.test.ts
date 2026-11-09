@@ -1,3 +1,4 @@
+import { compactVnd, greetingFor, isSetupVisible, weekdayLong, weekdayShort, weekSummary } from '@/features/admin/dashboard/dashboardUtils'
 import {
   DASHBOARD_FLOW_LIMIT, barPercent, dashboardLinks, dayHeading, monthLabel, projectsNeedingAction, removeTaskFromSchedule,
   restoreTaskInSchedule, scheduleIsEmpty, deadlineLabel, deltaLabel, receivableReminder,
@@ -147,5 +148,43 @@ describe('restoreTaskInSchedule', () => {
     const back = restoreTaskInSchedule(removed, task('c', '2030-05-15'))
     expect(back.days[0].tasks.map(t => t.id)).toEqual(['c'])
     expect(restoreTaskInSchedule(back, task('c', '2030-05-15'))).toBe(back)
+  })
+})
+
+describe('dashboard header helpers (P16)', () => {
+  it('greets by the hour', () => {
+    expect(greetingFor(7)).toBe('Chào buổi sáng')
+    expect(greetingFor(12)).toBe('Chào buổi trưa')
+    expect(greetingFor(15)).toBe('Chào buổi chiều')
+    expect(greetingFor(21)).toBe('Chào buổi tối')
+    expect(greetingFor(2)).toBe('Chào buổi tối')
+  })
+  it('spells the server VN date with its weekday', () => {
+    expect(weekdayLong('2026-11-09')).toBe('Thứ Hai, 09/11/2026')
+    expect(weekdayLong('2026-11-15')).toBe('Chủ nhật, 15/11/2026')
+  })
+  it('names the short weekday of a calendar date', () => {
+    expect(weekdayShort('2026-11-09')).toBe('T2')
+    expect(weekdayShort('2026-11-15')).toBe('CN')
+  })
+  it('summarises the week', () => {
+    const day = (tasks: number, hiddenTasks = 0) => ({ date: '2026-11-09', tasks: Array.from({ length: tasks }, () => ({}) as never), hiddenTasks, deadlines: [] })
+    const base = { today: '2026-11-09', undatedOpenTasks: 0, overdue: { total: 0, items: [] } }
+    expect(weekSummary({ ...base, days: [day(0)] })).toBe('Tuần này còn trống.')
+    expect(weekSummary({ ...base, days: [day(2, 1), day(1)] })).toBe('4 việc trong 7 ngày tới.')
+    expect(weekSummary({ ...base, overdue: { total: 2, items: [] }, days: [day(1)] })).toBe('1 việc trong 7 ngày tới, 2 việc quá hạn.')
+  })
+  it('shows the setup card only while it is neither dismissed nor complete', () => {
+    expect(isSetupVisible(undefined)).toBe(false)
+    expect(isSetupVisible({ dismissed: false, complete: false, doneCount: 1, total: 6, items: [] })).toBe(true)
+    expect(isSetupVisible({ dismissed: true, complete: false, doneCount: 1, total: 6, items: [] })).toBe(false)
+    expect(isSetupVisible({ dismissed: false, complete: true, doneCount: 6, total: 6, items: [] })).toBe(false)
+  })
+  it('shortens VND for chart labels', () => {
+    expect(compactVnd(0)).toBe('0')
+    expect(compactVnd(850_000)).toBe('850 N')
+    expect(compactVnd(52_000_000)).toBe('52 tr')
+    expect(compactVnd(38_450_000)).toBe('38,5 tr')
+    expect(compactVnd(1_250_000_000)).toBe('1,3 tỷ')
   })
 })

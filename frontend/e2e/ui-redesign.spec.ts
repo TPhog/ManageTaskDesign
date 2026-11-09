@@ -24,6 +24,27 @@ test.describe('UI redesign (P16) — Studio Bento admin', () => {
     expect(await active.evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(28, 26, 23)')
   })
 
+  test('dashboard is a 12-column bento at 1440 and one column without sideways scroll at 390', async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/admin')
+    const today = page.getByRole('region', { name: 'Hôm nay của bạn' })
+    await expect(today).toBeVisible()
+    const columns = (el: Element) => getComputedStyle(el.parentElement!.parentElement!).gridTemplateColumns.split(' ').length
+    expect(await today.evaluate(columns)).toBe(12)
+    const schedule = page.getByRole('region', { name: 'Lịch làm việc 7 ngày' })
+    const days = schedule.locator('section[aria-label]:visible')
+    if (!(await schedule.getByText(/Tuần này chưa có việc nào/).isVisible())) expect(await days.count()).toBeGreaterThanOrEqual(7)
+    await expect(page.getByRole('region', { name: 'Tiền đã thu và công nợ' }).locator('[data-tone="inverse"]')).toBeVisible()
+    await capture(page, testInfo, 'dashboard-bento-1440')
+
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.reload()
+    await expect(today).toBeVisible()
+    expect(await today.evaluate(columns)).toBe(1)
+    expect(await overflowPx(page)).toBeLessThanOrEqual(0)
+    await capture(page, testInfo, 'dashboard-bento-390')
+  })
+
   for (const width of WIDTHS) {
     test(`captures every admin page at ${width}px`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 900 })
