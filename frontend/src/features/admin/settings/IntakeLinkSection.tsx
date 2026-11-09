@@ -1,11 +1,11 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { SettingsSection } from './SettingsSection'
 import { useIntakeLink, useRegenerateIntakeLink, useUpdateIntakeLink } from '@/features/admin/request-templates/useRequestTemplates'
 
 /** Plan 13: turn the public "new client" form on/off, copy its link, or replace the link. */
@@ -32,14 +32,12 @@ export function IntakeLinkSection() {
   }
 
   return (
-    <section aria-labelledby="intake-title" className="grid gap-6 rounded-xl border bg-card p-6 shadow-card md:grid-cols-3">
-      <div>
-        <h2 id="intake-title" className="font-semibold text-foreground">Form nhận yêu cầu khách mới</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Gửi link này lên Facebook/Zalo để khách mới tự điền yêu cầu theo mẫu. Hồ sơ vào mục Khách mới.
-        </p>
-      </div>
-      <div className="space-y-5 md:col-span-2">
+    <SettingsSection
+      id="intake-title"
+      title="Form nhận yêu cầu khách mới"
+      description="Gửi link này lên Facebook/Zalo để khách mới tự điền yêu cầu theo mẫu. Hồ sơ vào mục Khách mới."
+    >
+      <div className="space-y-5">
         {link.isLoading ? (
           <Skeleton className="h-24 w-full" />
         ) : link.isError || !data ? (
@@ -54,7 +52,7 @@ export function IntakeLinkSection() {
                 checked={data.enabled}
                 disabled={update.isPending}
                 onChange={e => toggle(e.target.checked)}
-                className="relative h-5 w-9 shrink-0 cursor-pointer appearance-none rounded-full bg-muted-foreground/40 transition-colors before:absolute before:left-0.5 before:top-0.5 before:h-4 before:w-4 before:rounded-full before:bg-white before:transition-transform checked:bg-primary checked:before:translate-x-4"
+                className="relative h-5 w-9 shrink-0 cursor-pointer appearance-none rounded-full bg-muted-foreground/40 transition-colors before:absolute before:left-0.5 before:top-0.5 before:h-4 before:w-4 before:rounded-full before:bg-card before:transition-transform checked:bg-primary checked:before:translate-x-4"
               />
               Bật form khách mới
             </label>
@@ -73,14 +71,11 @@ export function IntakeLinkSection() {
                 )}
               </div>
             )}
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <Link to="/admin/settings/request-templates" className="text-sm font-medium text-foreground underline-offset-4 hover:underline">
-                Quản lý mẫu yêu cầu →
-              </Link>
-              {data.slug && (
+            {data.slug && (
+              <div className="flex justify-end border-t border-border pt-4">
                 <Button type="button" variant="outline" size="sm" onClick={() => setConfirming(true)}>Tạo link mới</Button>
-              )}
-            </div>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -96,6 +91,6 @@ export function IntakeLinkSection() {
           onError: () => toast.error('Không tạo được link mới. Vui lòng thử lại.'),
         })}
       />
-    </section>
+    </SettingsSection>
   )
 }

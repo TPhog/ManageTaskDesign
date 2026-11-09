@@ -102,7 +102,7 @@ export default function StoragePage() {
 
   return (
     <div className="space-y-6">
-      <Link to="/admin/settings" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+      <Link to="/admin/settings?tab=images" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         Cài đặt
       </Link>

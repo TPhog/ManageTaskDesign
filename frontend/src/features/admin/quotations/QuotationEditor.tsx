@@ -303,7 +303,7 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
         {bankMissing && (
           <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
             Chưa có tài khoản nhận tiền — cần cấu hình trước khi gửi (mã VietQR lấy từ đây).{' '}
-            <Link to="/admin/settings" className="font-medium underline">Mở Cài đặt</Link>
+            <Link to="/admin/settings?tab=payment" className="font-medium underline">Mở Cài đặt</Link>
           </p>
         )}
         {blockers.length > 0 && (

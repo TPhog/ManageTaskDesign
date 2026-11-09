@@ -30,7 +30,7 @@ export default function RequestTemplatesPage() {
 
   return (
     <div className="space-y-6">
-      <Link to="/admin/settings" className="inline-flex min-h-10 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
+      <Link to="/admin/settings?tab=portal" className="inline-flex min-h-10 items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Cài đặt
       </Link>
       <PageHeader

@@ -175,7 +175,7 @@ export function PortalLinkDialog({ client, onClose }: Props) {
                 <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>
                   Khách sẽ không thấy cách liên hệ bạn trên portal — thêm số điện thoại hoặc email trong{' '}
-                  <Link to="/admin/settings" className="font-medium underline" onClick={() => handleOpenChange(false)}>Cài đặt</Link>.
+                  <Link to="/admin/settings?tab=studio" className="font-medium underline" onClick={() => handleOpenChange(false)}>Cài đặt</Link>.
                 </span>
               </p>
             )}

@@ -6,6 +6,8 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { ApiError } from '@/lib/api'
 import { useUpdateWatermark, useWatermark } from './useStorage'
+import { useReportDirty } from './settingsForm'
+import { SaveBar, SettingsSection } from './SettingsSection'
 
 const MIN = 10
 const MAX = 40
@@ -35,25 +37,24 @@ export function WatermarkSection() {
   }
 
   const sample = text.trim() || data?.effectiveText || ''
+  useReportDirty('watermark', !!data && (enabled !== data.enabled || text !== (data.text ?? '') || opacity !== data.opacityPercent))
 
   return (
-    <section aria-labelledby="settings-watermark" className="grid gap-6 rounded-xl border bg-card p-6 shadow-card md:grid-cols-3">
-      <div>
-        <h2 id="settings-watermark" className="font-semibold text-foreground">Watermark ảnh</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Khách chỉ xem bản có watermark. Thay đổi chỉ áp dụng cho ảnh tải lên sau khi lưu.
-        </p>
-      </div>
-      {isLoading ? <Skeleton className="h-40 w-full md:col-span-2" /> : isError ? (
-        <p className="text-sm text-muted-foreground md:col-span-2">Không tải được cấu hình watermark.</p>
+    <SettingsSection
+      id="settings-watermark"
+      title="Watermark ảnh"
+      description="Khách chỉ xem bản có watermark. Thay đổi chỉ áp dụng cho ảnh tải lên sau khi lưu."
+    >
+      {isLoading ? <Skeleton className="h-40 w-full" /> : isError ? (
+        <p className="text-sm text-muted-foreground">Không tải được cấu hình watermark.</p>
       ) : (
-        <form onSubmit={submit} noValidate className="space-y-5 md:col-span-2">
+        <form onSubmit={submit} noValidate className="space-y-5">
           <label className="flex items-center gap-2 text-sm text-foreground">
             <input type="checkbox" checked={enabled} onChange={e => setEnabled(e.target.checked)} className="h-4 w-4 accent-primary" />
             Bật watermark cho ảnh gửi khách
           </label>
           {!enabled && (
-            <p role="alert" className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <p role="alert" className="rounded-md border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning">
               Khách sẽ nhận ảnh gốc độ phân giải đầy đủ, không watermark
             </p>
           )}
@@ -85,22 +86,23 @@ export function WatermarkSection() {
           </div>
           <div
             aria-hidden="true"
-            className="relative h-28 overflow-hidden rounded-lg bg-gradient-to-br from-slate-300 to-slate-500"
+            className="relative h-28 overflow-hidden rounded-lg bg-linear-to-br from-border-strong to-muted-foreground"
           >
             {enabled && (
-              <div className="absolute inset-[-50%] flex rotate-[-30deg] flex-wrap content-center gap-x-10 gap-y-6 text-xs font-bold text-white"
+              <div className="absolute inset-[-50%] flex rotate-[-30deg] flex-wrap content-center gap-x-10 gap-y-6 text-xs font-bold text-card"
                 style={{ opacity: opacity / 100 }}>
                 {Array.from({ length: 24 }, (_, i) => <span key={i}>{sample}</span>)}
               </div>
             )}
           </div>
-          <div className="flex justify-end">
-            <Button type="submit" variant="outline" disabled={save.isPending}>
+          {/* stays enabled when unchanged: saving as is confirms the review (setup checklist WATERMARK) */}
+          <SaveBar>
+            <Button type="submit" disabled={save.isPending} className="min-w-36">
               {save.isPending ? 'Đang lưu…' : 'Lưu watermark'}
             </Button>
-          </div>
+          </SaveBar>
         </form>
       )}
-    </section>
+    </SettingsSection>
   )
 }
