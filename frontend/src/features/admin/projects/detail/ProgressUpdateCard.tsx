@@ -20,6 +20,7 @@ import type { ClientDetail, ProjectDetail } from '@/lib/types'
 import { errorText } from '@/features/admin/revisions/revisionUtils'
 import { useClientTimeline, usePostProgressUpdate } from '@/features/admin/revisions/useRevisions'
 import { useProjectImages } from '@/features/admin/images/useImages'
+import { copyWhenReady } from '@/lib/clipboard'
 
 const MAX = 1000
 
@@ -169,14 +170,10 @@ function ShareProgressLink({ projectId }: { projectId: string }) {
 
   async function copyLink() {
     setAsking(false)
-    const url = await portal.create()
-    if (!url) return
-    try {
-      await navigator.clipboard.writeText(portalInviteMessage(client!.name, url))
-      toast.success('Đã sao chép tin nhắn kèm link portal — dán vào Zalo cho khách')
-    } catch {
-      toast.error('Không copy được, hãy tạo link ở trang Khách hàng')
-    }
+    const { text, copied } = await copyWhenReady(portal.create().then(url => (url ? portalInviteMessage(client!.name, url) : null)))
+    if (text === null) return
+    if (copied) toast.success('Đã sao chép tin nhắn kèm link portal — dán vào Zalo cho khách')
+    else toast.error('Không copy được, hãy tạo link ở trang Khách hàng')
   }
 
   if (client.hasPortalLink && !client.portalEnabled) {

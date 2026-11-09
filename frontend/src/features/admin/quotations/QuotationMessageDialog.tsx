@@ -14,6 +14,7 @@ import { quotationSentMessage } from '@/lib/messageTemplates'
 import { qk } from '@/lib/queryKeys'
 import type { QuotationDetail } from '@/lib/quotationTypes'
 import type { ClientDetail, ProjectDetail } from '@/lib/types'
+import { copyWhenReady } from '@/lib/clipboard'
 
 interface Props {
   quotation: QuotationDetail
@@ -85,10 +86,14 @@ export function QuotationMessageDialog({ quotation: q, open, onOpenChange, justS
   /** Creates the link, puts it into the message and copies that message in one go. */
   async function createAndCopy() {
     setConfirming(null)
-    const url = await portal.create()
-    if (!url) return
     setCopied(false)
-    await copy(quotationSentMessage(q, url), 'Đã tạo link và sao chép tin nhắn', true)
+    // the clipboard write starts inside the click; the text arrives once the link exists
+    const { text, copied: ok } = await copyWhenReady(portal.create().then(url => (url ? quotationSentMessage(q, url) : null)))
+    if (text === null) return
+    if (ok) {
+      toast.success('Đã tạo link và sao chép tin nhắn')
+      setCopied(true)
+    } else toast.error('Không copy được, hãy chọn và copy thủ công')
   }
 
   let hint: string | null = null
