@@ -118,6 +118,44 @@ test.describe('Lark-style task upgrades', () => {
     expect(detail.dueDate).toBe(target)
   })
 
+  test.describe('on a touch phone', () => {
+    test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } })
+
+    test('calendar: a long press picks the chip up, a quick swipe does not (AC-TSK2-11)', async ({ page }) => {
+      const { projectId, stamp } = await seedProject(page, 'touch')
+      const today = vnToday()
+      const taskId = await createTask(page, projectId, { title: `Chạm ${stamp}`, dueDate: today })
+      // stay inside today's Monday-first week
+      const target = (new Date(`${today}T00:00:00Z`).getUTCDay() + 6) % 7 <= 4 ? add(today, 2) : add(today, -2)
+
+      await page.goto(`/admin/projects/${projectId}?tab=tasks`)
+      await page.getByRole('button', { name: 'Lịch', exact: true }).click()
+      await page.getByRole('button', { name: 'Tuần', exact: true }).click()
+      const chip = page.getByTestId(`calendar-task-${taskId}`)
+      const cdp = await page.context().newCDPSession(page)
+      const touch = (type: 'touchStart' | 'touchMove' | 'touchEnd', x = 0, y = 0) =>
+        cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y }] })
+      async function gesture(holdMs: number) {
+        await chip.evaluate(el => el.scrollIntoView({ block: 'center' }))
+        const a = (await chip.boundingBox())!
+        const b = (await page.locator(`[data-day="${target}"]`).first().boundingBox())!
+        const [x0, y0, x1, y1] = [a.x + a.width / 2, a.y + a.height / 2, b.x + b.width / 2, b.y + b.height / 2]
+        await touch('touchStart', x0, y0)
+        await page.waitForTimeout(holdMs)
+        for (let i = 1; i <= 12; i++) await touch('touchMove', x0 + ((x1 - x0) * i) / 12, y0 + ((y1 - y0) * i) / 12)
+        await touch('touchEnd')
+      }
+
+      await gesture(0)
+      await page.waitForTimeout(800)
+      expect((await (await page.request.get(`/api/admin/tasks/${taskId}`)).json()).dueDate).toBe(today)
+
+      await gesture(400) // TouchSensor delay is 250 ms
+      await expectToast(page, 'Đã đổi hạn')
+      expect((await (await page.request.get(`/api/admin/tasks/${taskId}`)).json()).dueDate).toBe(target)
+    })
+  })
+
   test('task link: javascript: is rejected, https is saved with safe attributes (AC-TSK2-7)', async ({ page }) => {
     const { projectId, stamp } = await seedProject(page, 'link')
     const title = `Link ${stamp}`
