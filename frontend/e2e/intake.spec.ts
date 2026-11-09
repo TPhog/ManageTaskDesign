@@ -1,9 +1,10 @@
 import { test, expect, request as pwRequest } from '@playwright/test'
 import { API_BASE, csrfToken, expectToast } from './helpers'
 import { archiveClient } from './cleanup'
+import { pngFile } from './imageHelpers'
 
 /** Plan 13: public form submission -> "Khách mới" inbox -> one-click conversion. Runs against the dev API (form token minimum fill time is 3 s). */
-async function submitPublicIntake(slug: string, fields: Record<string, string>) {
+async function submitPublicIntake(slug: string, fields: Record<string, string | ReturnType<typeof pngFile>>) {
   const anon = await pwRequest.newContext({ baseURL: API_BASE })
   try {
     const form = await anon.get(`/api/public/intake/${slug}`)
@@ -18,7 +19,10 @@ async function submitPublicIntake(slug: string, fields: Record<string, string>) 
 }
 
 test.describe('Khách mới inbox', () => {
-  test('converts a public-form submission into client + project + brief', async ({ page }) => {
+  // every test flips the shared settings/intake.enabled (as does public-intake.spec): never interleave them
+  test.describe.configure({ mode: 'serial' })
+
+  test('converts a public-form submission with a photo into client + project + brief', async ({ page }) => {
     await page.goto('/admin')
     const csrf = { 'X-CSRF-Token': await csrfToken(page), Origin: new URL(page.url()).origin }
     const before = await (await page.request.get('/api/admin/settings/intake')).json() as { enabled: boolean }
@@ -29,7 +33,7 @@ test.describe('Khách mới inbox', () => {
     const phone = `09${String(stamp).slice(-8)}`
     const note = `Cần thiết kế menu quán cà phê ${stamp}`
     try {
-      await submitPublicIntake(link.slug, { contactName: name, contactPhone: phone, note })
+      await submitPublicIntake(link.slug, { contactName: name, contactPhone: phone, note, files: pngFile('menu-cu.png') })
 
       await page.goto('/admin/intake')
       const row = page.getByRole('link', { name: new RegExp(name) })
@@ -55,6 +59,8 @@ test.describe('Khách mới inbox', () => {
       // brief v1 holds what the client wrote
       await page.goto(`/admin/projects/${projectId}?tab=brief`)
       await expect(page.getByRole('region', { name: 'Nội dung brief' })).toContainText(note)
+      // the photo moved to the project with the conversion and shows on the Brief tab
+      await expect(page.getByRole('region', { name: 'Ảnh khách gửi kèm yêu cầu ban đầu' }).getByRole('img')).toHaveCount(1)
 
       // the client exists with the phone from the form
       const clients = await (await page.request.get(`/api/admin/clients?q=${encodeURIComponent(name)}`)).json() as { items: { id: string; name: string }[] }
