@@ -48,6 +48,7 @@ type Pair = [fg: string, bg: string, min: number]
 const bento: Pair[] = [
   ['foreground', 'background', TEXT], ['foreground', 'card', TEXT], ['foreground', 'surface-sunk', TEXT], ['foreground', 'surface-hover', TEXT],
   ['muted-foreground', 'background', TEXT], ['muted-foreground', 'card', TEXT], ['muted-foreground', 'surface-sunk', TEXT], ['muted-foreground', 'muted', TEXT],
+  ['muted-foreground', 'surface-hover', TEXT],
   ['primary-foreground', 'primary', TEXT], ['secondary-foreground', 'secondary', TEXT], ['accent-foreground', 'accent', TEXT],
   ['highlight-foreground', 'highlight', TEXT], ['highlight-text', 'background', TEXT], ['highlight-text', 'card', TEXT], ['highlight-text', 'highlight-soft', TEXT],
   ['success', 'success-soft', TEXT], ['success', 'card', TEXT], ['success-foreground', 'success', TEXT],
@@ -60,7 +61,9 @@ const bento: Pair[] = [
 const editorialPairs: Pair[] = [
   ['foreground', 'background', TEXT], ['foreground', 'card', TEXT], ['foreground', 'muted', TEXT],
   ['muted-foreground', 'background', TEXT], ['muted-foreground', 'card', TEXT], ['muted-foreground', 'muted', TEXT],
+  ['muted-foreground', 'surface-hover', TEXT],
   ['primary-foreground', 'primary', TEXT], ['highlight-foreground', 'highlight', TEXT],
+  ['secondary-foreground', 'secondary', TEXT], ['accent-foreground', 'accent', TEXT],
   ['highlight-text', 'background', TEXT], ['highlight-text', 'card', TEXT], ['highlight-text', 'highlight-soft', TEXT],
   ['success', 'background', TEXT], ['success', 'success-soft', TEXT], ['success-foreground', 'success', TEXT],
   ['warning', 'background', TEXT], ['warning', 'warning-soft', TEXT], ['warning-foreground', 'warning', TEXT],
@@ -94,15 +97,32 @@ describe('design tokens (P16)', () => {
     check(editorialInverse, scoped)
   })
   it('vermilion tiles (tone-highlight) keep ink text', () => check(highlight, highlightPairs))
+  it('::selection is readable in both themes and no tone scope re-points it', () => {
+    const rule = css.match(/::selection\s*\{([^}]*)\}/)?.[1] ?? ''
+    const bg = rule.match(/background-color:\s*var\(--([\w-]+)\)/)?.[1]
+    const fg = rule.match(/(?:^|[;\s])color:\s*var\(--([\w-]+)\)/m)?.[1]
+    expect(bg && fg, `::selection must use var() tokens (got ${rule.trim()})`).toBeTruthy()
+    check(root, [[fg!, bg!, TEXT]])
+    check(editorial, [[fg!, bg!, TEXT]])
+    // the selection tokens are computed on <html>; a tone utility overriding them would bring back paper-on-tint
+    for (const re of [/@utility tone-inverse\s*\{([^}]*)\}/, /@utility tone-highlight\s*\{([^}]*)\}/]) {
+      expect(blockOf(re)).not.toHaveProperty(bg!)
+      expect(blockOf(re)).not.toHaveProperty(fg!)
+    }
+  })
   it('self-hosts the four families with a Vietnamese subset and drops Plus Jakarta Sans', () => {
+    // only real import statements count: a commented-out line must not satisfy the check
+    const activeImports = [...mainTsx.matchAll(/^import\s+'([^']+)'/gm)].map(m => m[1])
     for (const entry of [
       '@fontsource-variable/bricolage-grotesque/opsz.css',
       '@fontsource/be-vietnam-pro/400.css',
+      '@fontsource/be-vietnam-pro/500.css',
+      '@fontsource/be-vietnam-pro/600.css',
       '@fontsource/be-vietnam-pro/700.css',
       '@fontsource-variable/fraunces/opsz.css',
       '@fontsource-variable/fraunces/opsz-italic.css',
       '@fontsource-variable/public-sans/wght.css',
-    ]) expect(mainTsx).toContain(entry)
+    ]) expect(activeImports, entry).toContain(entry)
     expect(indexHtml).not.toMatch(/fonts\.(googleapis|gstatic)\.com/)
     expect(css).not.toMatch(/Plus Jakarta/)
   })

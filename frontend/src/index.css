@@ -97,6 +97,9 @@
   --rule: var(--ink-900);
   --input: var(--stone-500);
   --ring: var(--ink-900);
+  /* declared on the theme root so they compute once on <html>: selected text stays ink on tint even inside tone-inverse tiles */
+  --selection: var(--highlight-soft);
+  --selection-foreground: var(--foreground);
 
   --font-body: var(--family-be-vietnam);
   --font-heading: var(--family-bricolage);
@@ -335,8 +338,8 @@
   }
 
   ::selection {
-    background-color: var(--highlight-soft);
-    color: var(--foreground);
+    background-color: var(--selection);
+    color: var(--selection-foreground);
   }
 
   button:not(:disabled),
