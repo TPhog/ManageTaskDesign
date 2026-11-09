@@ -32,10 +32,15 @@ public class CsrfMiddleware(RequestDelegate next, IOptions<AppSettings> settings
         var publicBase = settings.Value.PublicBaseUrl?.TrimEnd('/');
         if (!string.IsNullOrEmpty(publicBase))
         {
+            var allowed = settings.Value.AdditionalOrigins
+                .Select(o => o.TrimEnd('/'))
+                .Where(o => o.Length > 0)
+                .Prepend(publicBase)
+                .ToArray();
             var origin = ctx.Request.Headers.Origin.FirstOrDefault();
             var referer = ctx.Request.Headers.Referer.FirstOrDefault();
-            var fromOrigin = origin != null && string.Equals(origin.TrimEnd('/'), publicBase, StringComparison.OrdinalIgnoreCase);
-            var fromReferer = referer != null && referer.StartsWith(publicBase, StringComparison.OrdinalIgnoreCase);
+            var fromOrigin = origin != null && allowed.Any(a => string.Equals(origin.TrimEnd('/'), a, StringComparison.OrdinalIgnoreCase));
+            var fromReferer = referer != null && allowed.Any(a => referer.StartsWith(a + "/", StringComparison.OrdinalIgnoreCase));
             if (!fromOrigin && !fromReferer)
             {
                 ctx.Response.StatusCode = StatusCodes.Status403Forbidden;
