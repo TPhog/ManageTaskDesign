@@ -15,12 +15,12 @@ export function StorageBanner() {
       role="status"
       className={cn(
         'mb-6 flex flex-wrap items-center gap-2 rounded-lg border px-4 py-3 text-sm',
-        banner.tone === 'warning' ? 'border-amber-200 bg-amber-50 text-amber-900' : 'border-red-200 bg-red-50 text-red-900',
+        banner.tone === 'warning' ? 'border-warning/30 bg-warning-soft text-warning' : 'border-danger/30 bg-danger-soft text-danger',
       )}
     >
       <TriangleAlert className="h-4 w-4 shrink-0" aria-hidden="true" />
       <span className="flex-1">{banner.text}</span>
-      <Link to="/admin/settings/storage" className="font-medium underline underline-offset-2">Mở Dung lượng</Link>
+      <Link to="/admin/settings/storage" className="link-inline">Mở Dung lượng</Link>
     </div>
   )
 }

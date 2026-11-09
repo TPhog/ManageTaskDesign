@@ -72,7 +72,7 @@ export function TaskTemplateEditor({ value, onChange, error }: Props) {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-red-700"
+                className="h-8 w-8 shrink-0 text-muted-foreground hover:bg-danger-soft hover:text-danger"
                 aria-label={`Xoá bước ${i + 1}`}
                 onClick={() => onChange(value.filter((_, j) => j !== i))}
               >

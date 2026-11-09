@@ -117,7 +117,7 @@ export function PortalLinkDialog({ client, onClose }: Props) {
             </div>
 
             {link ? (
-              <div className="space-y-2 rounded-lg border bg-muted/40 p-3">
+              <div className="space-y-2 rounded-lg border bg-surface-sunk p-3">
                 <Label htmlFor="portal-link">Link gửi khách</Label>
                 <Input
                   id="portal-link"
@@ -126,7 +126,7 @@ export function PortalLinkDialog({ client, onClose }: Props) {
                   onFocus={e => e.currentTarget.select()}
                   className="font-mono text-xs"
                 />
-                <p className="flex items-start gap-1.5 text-xs text-amber-700">
+                <p className="flex items-start gap-1.5 text-xs font-medium text-warning">
                   <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                   Link chỉ hiển thị một lần. Hãy copy và gửi cho khách ngay.
                 </p>
@@ -171,17 +171,17 @@ export function PortalLinkDialog({ client, onClose }: Props) {
             )}
 
             {noContact && (
-              <p className="flex items-start gap-1.5 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
+              <p className="flex items-start gap-1.5 rounded-lg border border-warning/30 bg-warning-soft p-3 text-xs text-warning">
                 <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                 <span>
                   Khách sẽ không thấy cách liên hệ bạn trên portal — thêm số điện thoại hoặc email trong{' '}
-                  <Link to="/admin/settings?tab=studio" className="font-medium underline" onClick={() => handleOpenChange(false)}>Cài đặt</Link>.
+                  <Link to="/admin/settings?tab=studio" className="link-inline" onClick={() => handleOpenChange(false)}>Cài đặt</Link>.
                 </span>
               </p>
             )}
 
             {confirming && (
-              <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+              <div className="space-y-3 rounded-lg border border-warning/30 bg-warning-soft p-3 text-sm text-warning">
                 <p>
                   {confirming === 'regenerate'
                     ? 'Link cũ và mọi phiên khách đang mở sẽ bị vô hiệu ngay. Bạn cần gửi link mới cho khách.'

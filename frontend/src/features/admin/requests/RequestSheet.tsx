@@ -65,10 +65,10 @@ function RequestSheetBody({ requestId }: { requestId: string }) {
   const r = data.request
   return (
     <div className="space-y-5">
-      <SheetHeader className="space-y-1 text-left">
+      <SheetHeader className="space-y-1 pr-10 text-left">
         <SheetTitle>Yêu cầu từ {r.clientName}</SheetTitle>
         <SheetDescription>
-          <Link to={`/admin/projects/${r.projectId}?tab=revisions`} className="underline-offset-2 hover:underline">{r.projectName}</Link>
+          <Link to={`/admin/projects/${r.projectId}?tab=revisions`} className="link-inline">{r.projectName}</Link>
           {' · '}{requestSourceLabel[r.source]} · {formatDatetime(r.createdAt)}
         </SheetDescription>
       </SheetHeader>
@@ -90,7 +90,7 @@ function RequestSheetBody({ requestId }: { requestId: string }) {
       <RequestAttachments attachments={r.attachments} />
       {r.status === 'NEW' && <TriagePanel detail={data} />}
       {r.status === 'DECLINED' && (
-        <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">Lý do từ chối: {r.declineReason}</p>
+        <p className="rounded-lg border border-danger/30 bg-danger-soft p-3 text-sm text-danger">Lý do từ chối: {r.declineReason}</p>
       )}
       {r.status === 'TRIAGED' && <TriagedSummary detail={data} />}
     </div>
@@ -120,7 +120,7 @@ function TriagePanel({ detail }: { detail: RequestDetail }) {
 
   return (
     <section aria-label="Tiếp nhận yêu cầu" className="space-y-3">
-      <h3 className="text-sm font-semibold text-foreground">Tách thành vòng sửa</h3>
+      <h3 className="font-display text-title font-bold text-foreground">Tách thành vòng sửa</h3>
       {rounds[0] && rounds[0].items.length > 1 && (
         <p className="text-xs text-muted-foreground">Đã tách {rounds[0].items.length} mục từ nội dung — sửa hoặc xoá nếu chưa đúng</p>
       )}
@@ -149,7 +149,7 @@ function TriagePanel({ detail }: { detail: RequestDetail }) {
         Thêm vòng cho hạng mục khác
       </Button>
       <div className="flex flex-wrap justify-end gap-2 border-t pt-4">
-        <Button type="button" variant="outline" className="text-red-700 hover:text-red-700" onClick={() => setDeclineOpen(true)}>
+        <Button type="button" variant="outline" className="text-danger hover:bg-danger-soft hover:text-danger" onClick={() => setDeclineOpen(true)}>
           Từ chối
         </Button>
         <Button type="button" disabled={triage.isPending} onClick={save}>
@@ -183,8 +183,8 @@ function TriagedSummary({ detail }: { detail: RequestDetail }) {
   return (
     <section aria-label="Vòng sửa đã tạo" className="space-y-3">
       {quotable.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-lg border border-orange-200 bg-orange-50 p-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-sm text-orange-900">{quotable.length} mục tính phí chưa báo giá</p>
+        <div className="flex flex-col gap-3 rounded-lg border border-warning/30 bg-warning-soft p-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm font-medium text-warning">{quotable.length} mục tính phí chưa báo giá</p>
           <Button size="sm" onClick={() => setQuoteOpen(true)}>
             <Receipt aria-hidden="true" />
             Tạo báo giá phát sinh

@@ -17,7 +17,7 @@ describe('StorageWidgetView', () => {
     expect(screen.getByText('Gần đầy')).toBeInTheDocument()
     const bar = screen.getByRole('progressbar', { name: 'Dung lượng ảnh đã dùng' })
     expect(bar).toHaveAttribute('aria-valuetext', expect.stringContaining('90,0%'))
-    expect(bar.firstElementChild).toHaveClass('bg-amber-500')
+    expect(bar.firstElementChild).toHaveClass('bg-warning')
     expect(screen.getByRole('link', { name: 'Quản lý dung lượng' })).toHaveAttribute('href', '/admin/settings/storage')
   })
 

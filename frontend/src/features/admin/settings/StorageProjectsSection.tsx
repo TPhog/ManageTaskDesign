@@ -18,7 +18,7 @@ export function StorageProjectsSection({ onSelect }: { onSelect: (projectId: str
   const shown = showAll ? data : data?.slice(0, SHOWN_PROJECTS)
   return (
     <section aria-label="Dung lượng theo dự án" className="rounded-xl border bg-card shadow-card">
-      <h2 className="border-b px-5 py-3 font-semibold text-foreground">Theo dự án</h2>
+      <h2 className="border-b px-5 py-4 font-display text-title font-bold text-foreground">Theo dự án</h2>
       {isLoading ? (
         <div className="space-y-2 p-5"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
       ) : isError ? (
@@ -28,10 +28,10 @@ export function StorageProjectsSection({ onSelect }: { onSelect: (projectId: str
       ) : (
         <ul className="divide-y">
           {(shown ?? []).map(p => (
-            <li key={p.projectId} className="flex flex-wrap items-center gap-3 px-5 py-3">
+            <li key={p.projectId} className="flex flex-wrap items-center gap-3 px-5 py-3 transition-colors duration-150 hover:bg-surface-sunk">
               <div className="min-w-0 flex-1 space-y-0.5">
                 <p className="truncate text-sm font-medium text-foreground">
-                  <Link to={`/admin/projects/${p.projectId}`} className="hover:underline">{p.projectName}</Link>
+                  <Link to={`/admin/projects/${p.projectId}`} className="link-hover">{p.projectName}</Link>
                 </p>
                 <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                   <span className="truncate">{p.clientName}</span>

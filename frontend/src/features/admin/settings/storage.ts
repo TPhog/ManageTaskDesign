@@ -33,11 +33,11 @@ export function storageBanner(usage: StorageUsage | undefined): { tone: 'warning
 
 export function usageBarClass(level: StorageLevel): string {
   switch (level) {
-    case 'OK': return 'bg-emerald-500'
-    case 'NOTICE': return 'bg-sky-500'
-    case 'WARNING': return 'bg-amber-500'
-    case 'BLOCKED': return 'bg-red-500'
-    case 'CRITICAL': return 'bg-red-600'
+    case 'OK': return 'bg-success'
+    case 'NOTICE': return 'bg-foreground'
+    case 'WARNING': return 'bg-warning'
+    case 'BLOCKED': return 'bg-danger'
+    case 'CRITICAL': return 'bg-danger'
   }
 }
 

@@ -72,7 +72,7 @@ export function AcceptDialog({ quotation, open, onClose }: DialogProps) {
         </DialogHeader>
         <div className="space-y-4 py-2">
           {pending.length > 0 && (
-            <div className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-sm text-sky-900">
+            <div className="rounded-lg border border-highlight/30 bg-highlight-soft p-3 text-sm text-foreground">
               <p className="font-medium">
                 {!outcome
                   ? `Có ${pending.length} hạng mục mới trong báo giá này:`

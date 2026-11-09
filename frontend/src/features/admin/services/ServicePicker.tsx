@@ -48,7 +48,7 @@ export function ServicePicker({ id, value, selectedLabel, onPick, placeholder, c
     return (
       <p className="flex flex-wrap items-center gap-1 text-xs text-muted-foreground">
         Không tải được dịch vụ.
-        <button type="button" className="text-primary underline-offset-2 hover:underline" onClick={() => refetch()}>Thử lại</button>
+        <button type="button" className="link-inline" onClick={() => refetch()}>Thử lại</button>
       </p>
     )
   }

@@ -72,7 +72,7 @@ function TemplateRow({ t, index, count, saving, onMove }: {
     <li className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border bg-card p-4 shadow-card">
       <div className="min-w-0 flex-1 basis-60">
         <div className="flex flex-wrap items-center gap-2">
-          <Link to={`/admin/settings/request-templates/${t.id}`} className="font-display text-base font-bold text-foreground hover:underline">
+          <Link to={`/admin/settings/request-templates/${t.id}`} className="font-display text-base font-bold text-foreground link-hover">
             {t.name}
           </Link>
           <StatusBadge status={t.active ? 'ACTIVE' : 'INACTIVE'} label={t.active ? 'Đang dùng' : 'Đã ẩn'} />

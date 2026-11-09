@@ -36,13 +36,13 @@ export default function QuotationPage() {
 
   return (
     <div className="space-y-6">
-      <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-sm text-muted-foreground">
-        <Link to="/admin/projects" className="rounded-sm hover:text-foreground">Dự án</Link>
-        <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+      <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+        <Link to="/admin/projects" className="shrink-0 rounded-sm hover:text-foreground">Dự án</Link>
+        <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         <Link to={`/admin/projects/${quotation.projectId}`} className="truncate rounded-sm hover:text-foreground">
           {quotation.projectName}
         </Link>
-        <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+        <ChevronRight className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
         <span className="truncate font-medium text-foreground" aria-current="page">
           {quotation.number ? `${quotation.number} · v${quotation.version}` : 'Báo giá nháp'}
         </span>

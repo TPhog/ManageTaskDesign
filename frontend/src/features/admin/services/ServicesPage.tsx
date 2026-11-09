@@ -17,6 +17,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { StatusBadge } from '@/components/StatusBadge'
+import { tableHeadRowClass, tableRowClass } from '@/components/dataTable'
 import { TaskTemplateEditor } from './TaskTemplateEditor'
 import { templateError } from './templateUtils'
 
@@ -181,7 +182,7 @@ export default function ServicesPage() {
           <div className="relative min-w-0 max-w-full overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="whitespace-nowrap border-b bg-muted/50 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <tr className={tableHeadRowClass}>
                   <th scope="col" className="px-4 py-3">Tên</th>
                   <th scope="col" className="px-4 py-3 text-right">Giá cơ bản</th>
                   <th scope="col" className="hidden px-4 py-3 text-right sm:table-cell">Vòng sửa</th>
@@ -190,11 +191,11 @@ export default function ServicesPage() {
                   <th scope="col" className="px-4 py-3"><span className="sr-only">Thao tác</span></th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody>
                 {visible.map(svc => (
-                  <tr key={svc.id} className={`transition-colors duration-150 hover:bg-muted/40 ${svc.active ? '' : 'opacity-60'}`}>
+                  <tr key={svc.id} className={`${tableRowClass} ${svc.active ? '' : 'opacity-60'}`}>
                     <td className="px-4 py-3.5">
-                      <div className="font-medium text-foreground">{svc.name}</div>
+                      <div className="font-semibold text-foreground">{svc.name}</div>
                       {svc.description && <div className="max-w-xs truncate text-xs text-muted-foreground">{svc.description}</div>}
                       {(svc.taskTemplate?.length ?? 0) > 0 && (
                         <div className="text-xs text-muted-foreground">{svc.taskTemplate.length} bước mẫu</div>

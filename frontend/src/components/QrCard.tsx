@@ -41,7 +41,7 @@ export function QrCard({ options, bank, pngUrl }: QrCardProps) {
 
   return (
     <section aria-label="Thanh toán qua VietQR" className="rounded-xl border bg-card p-5 shadow-card">
-      <h2 className="mb-3 text-sm font-semibold text-foreground">Chuyển khoản VietQR</h2>
+      <h2 className="mb-3 font-display text-title font-bold text-foreground">Chuyển khoản VietQR</h2>
       {options.length > 1 && (
         <div role="radiogroup" aria-label="Chọn khoản thanh toán" className="mb-4 flex flex-wrap gap-2">
           {options.map(o => (
@@ -55,7 +55,7 @@ export function QrCard({ options, bank, pngUrl }: QrCardProps) {
                 'rounded-full border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 o.purpose === current.purpose
                   ? 'border-primary bg-primary text-primary-foreground'
-                  : 'bg-background text-foreground hover:bg-muted',
+                  : 'border-border-strong bg-card text-foreground hover:bg-surface-sunk',
               )}
             >
               {o.label}
@@ -63,7 +63,7 @@ export function QrCard({ options, bank, pngUrl }: QrCardProps) {
           ))}
         </div>
       )}
-      <div className="flex justify-center rounded-lg border bg-white p-3">
+      <div className="flex justify-center rounded-lg border bg-card p-3">
         <QRCodeSVG
           value={current.payload}
           size={240}
@@ -85,7 +85,7 @@ export function QrCard({ options, bank, pngUrl }: QrCardProps) {
         </Line>
         <Line label="Chủ tài khoản">{bank.accountName || '—'}</Line>
         <Line label="Số tiền">
-          <span data-testid="qr-amount" className="text-base font-semibold"><MoneyText amount={current.amount} /></span>
+          <span data-testid="qr-amount" className="font-display text-xl font-bold"><MoneyText amount={current.amount} /></span>
         </Line>
         <Line label="Nội dung chuyển khoản">
           <span className="inline-flex items-center gap-1">

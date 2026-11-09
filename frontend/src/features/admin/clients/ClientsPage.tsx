@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { MoneyText } from '@/components/MoneyText'
 import { Pagination } from '@/components/Pagination'
 import { StatusBadge } from '@/components/StatusBadge'
+import { tableHeadRowClass, tableRowClass } from '@/components/dataTable'
 import { api, emptyToNull } from '@/lib/api'
 import type { PagedResult, ClientListItem } from '@/lib/types'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
@@ -128,10 +129,10 @@ export default function ClientsPage() {
             />
           )
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="whitespace-nowrap border-b bg-muted/50 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <tr className={tableHeadRowClass}>
                   <th scope="col" className="px-4 py-3">Tên</th>
                   <th scope="col" className="hidden px-4 py-3 md:table-cell">Công ty</th>
                   <th scope="col" className="hidden px-4 py-3 lg:table-cell">SĐT</th>
@@ -141,17 +142,17 @@ export default function ClientsPage() {
                   <th scope="col" className="px-4 py-3 text-right">Portal</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody>
                 {clients.map(c => (
-                  <tr key={c.id} className="transition-colors duration-150 hover:bg-muted/40">
+                  <tr key={c.id} className={tableRowClass}>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-semibold uppercase text-secondary-foreground" aria-hidden="true">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary font-display text-xs font-bold uppercase text-secondary-foreground" aria-hidden="true">
                           {c.name.slice(0, 1)}
                         </div>
                         <Link
                           to={`/admin/clients/${c.id}`}
-                          className="rounded-sm font-medium text-foreground hover:text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="rounded-sm font-semibold text-foreground link-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                           {c.name}
                         </Link>
@@ -174,7 +175,7 @@ export default function ClientsPage() {
                         onClick={() => setPortalClient({ id: c.id, name: c.name })}
                       >
                         <Link2 aria-hidden="true" />
-                        <span className={c.portalEnabled ? 'text-emerald-700' : 'text-muted-foreground'}>
+                        <span className={c.portalEnabled ? 'text-success' : 'text-muted-foreground'}>
                           {c.portalEnabled ? 'Đang bật' : 'Chưa bật'}
                         </span>
                       </Button>

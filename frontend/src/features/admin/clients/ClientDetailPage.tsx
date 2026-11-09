@@ -26,17 +26,17 @@ const panelClass = 'rounded-xl border bg-card p-5 shadow-card'
 function Info({ label, value }: { label: string; value: string | null }) {
   return (
     <div>
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-sm font-medium text-foreground">{value || '—'}</dd>
+      <dt className="kicker text-muted-foreground">{label}</dt>
+      <dd className="mt-1.5 text-sm font-medium text-foreground">{value || '—'}</dd>
     </div>
   )
 }
 
 function Stat({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="rounded-xl border bg-card p-4 shadow-card">
-      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
-      <dd className="mt-1 text-lg font-semibold tabular-nums text-foreground">{children}</dd>
+    <div className="min-w-0 rounded-xl border bg-card p-4 shadow-card">
+      <dt className="text-[0.8125rem] font-medium text-muted-foreground">{label}</dt>
+      <dd className="mt-2 font-display text-xl font-bold leading-tight tracking-[-0.02em] tabular-nums text-foreground">{children}</dd>
     </div>
   )
 }
@@ -101,7 +101,7 @@ export default function ClientDetailPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground">{client.name}</h1>
+              <h1 className="min-w-0 break-words font-display text-[1.75rem] font-bold leading-[1.1] tracking-[-0.025em] text-foreground sm:text-display-lg">{client.name}</h1>
               <StatusBadge status={client.status} />
             </div>
             {client.company && <p className="mt-1 text-sm text-muted-foreground">{client.company}</p>}
@@ -124,7 +124,7 @@ export default function ClientDetailPage() {
         </dl>
         {client.notes && (
           <div className="mt-5">
-            <p className="mb-1.5 text-xs font-medium text-muted-foreground">Ghi chú nội bộ (khách không thấy)</p>
+            <p className="kicker mb-1.5 text-muted-foreground">Ghi chú nội bộ (khách không thấy)</p>
             <p className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm text-foreground">{client.notes}</p>
           </div>
         )}
@@ -136,12 +136,12 @@ export default function ClientDetailPage() {
         <Stat label="Chờ thu"><MoneyText amount={client.outstanding} /></Stat>
         <Stat label="Báo giá chờ phản hồi"><MoneyText amount={client.pendingQuotationTotal} /></Stat>
         <Stat label="Yêu cầu mới">
-          {client.newRequests > 0 ? <Link to="/admin/requests" className="text-primary hover:underline">{client.newRequests}</Link> : 0}
+          {client.newRequests > 0 ? <Link to="/admin/requests" className="link-inline">{client.newRequests}</Link> : 0}
         </Stat>
       </dl>
 
       <section aria-labelledby="client-projects" className="rounded-xl border bg-card shadow-card">
-        <h2 id="client-projects" className="border-b p-4 text-sm font-semibold text-foreground">Dự án</h2>
+        <h2 id="client-projects" className="border-b px-5 py-4 font-display text-title font-bold text-foreground">Dự án</h2>
         {!projects ? (
           <Skeleton className="m-4 h-16" />
         ) : projects.items.length === 0 ? (
@@ -152,8 +152,8 @@ export default function ClientDetailPage() {
         ) : (
           <ul className="divide-y">
             {projects.items.map(p => (
-              <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                <Link to={`/admin/projects/${p.id}`} className="min-w-0 truncate text-sm font-medium text-foreground hover:text-primary hover:underline">
+              <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 transition-colors duration-150 hover:bg-surface-sunk">
+                <Link to={`/admin/projects/${p.id}`} className="min-w-0 truncate text-sm font-semibold text-foreground link-hover">
                   {p.name}
                 </Link>
                 <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -165,8 +165,8 @@ export default function ClientDetailPage() {
           </ul>
         )}
         {projects && projects.total > projects.items.length && (
-          <div className="border-t p-4 text-sm">
-            <Link to={`/admin/projects?clientId=${id}`} className="font-medium text-primary hover:underline">
+          <div className="border-t px-5 py-4 text-sm">
+            <Link to={`/admin/projects?clientId=${id}`} className="link-inline">
               Xem tất cả {projects.total} dự án
             </Link>
           </div>
@@ -174,7 +174,7 @@ export default function ClientDetailPage() {
       </section>
 
       <section aria-labelledby="client-quotations" className="rounded-xl border bg-card shadow-card">
-        <h2 id="client-quotations" className="border-b p-4 text-sm font-semibold text-foreground">Báo giá</h2>
+        <h2 id="client-quotations" className="border-b px-5 py-4 font-display text-title font-bold text-foreground">Báo giá</h2>
         {!quotations ? (
           <Skeleton className="m-4 h-16" />
         ) : quotations.items.length === 0 ? (
@@ -182,8 +182,8 @@ export default function ClientDetailPage() {
         ) : (
           <ul className="divide-y">
             {quotations.items.map(q => (
-              <li key={q.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
-                <Link to={`/admin/quotations/${q.id}`} className="min-w-0 truncate text-sm font-medium text-foreground hover:text-primary hover:underline">
+              <li key={q.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3 transition-colors duration-150 hover:bg-surface-sunk">
+                <Link to={`/admin/quotations/${q.id}`} className="min-w-0 truncate text-sm font-semibold text-foreground link-hover">
                   {q.number ? `${q.number} · v${q.version}` : 'Bản nháp'} — {q.title}
                 </Link>
                 <div className="flex items-center gap-3 text-xs">

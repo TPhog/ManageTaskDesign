@@ -14,14 +14,15 @@ import { AcceptDialog, PaymentDialog, RejectDialog } from './QuotationActionDial
 import { clientStatementNotes, kindLabel, paymentActions, quotationErrorMessage, type PaymentAction } from './quotationUtils'
 import { useQuotationCommand } from './useQuotations'
 import { QuotationMessageDialog } from './QuotationMessageDialog'
+import { tableHeadRowClass, tableRowClass } from '@/components/dataTable'
 
 const panelClass = 'rounded-xl border bg-card p-5 shadow-card'
 
 function TotalLine({ label, strong, testId, children }: { label: string; strong?: boolean; testId?: string; children: ReactNode }) {
   return (
-    <div className={cn('flex items-center justify-between gap-3', strong && 'border-t pt-2 text-base font-semibold')}>
-      <dt className={strong ? 'text-foreground' : 'text-muted-foreground'}>{label}</dt>
-      <dd data-testid={testId} className="tabular-nums text-foreground">{children}</dd>
+    <div className={cn('flex items-baseline justify-between gap-3 border-b py-2 text-sm', strong && 'border-foreground')}>
+      <dt className={strong ? 'font-semibold text-foreground' : 'text-muted-foreground'}>{label}</dt>
+      <dd data-testid={testId} className={cn('tabular-nums text-foreground', strong && 'font-display text-display-md font-bold')}>{children}</dd>
     </div>
   )
 }
@@ -70,7 +71,7 @@ export function QuotationView({ quotation: q }: { quotation: QuotationDetail }) 
       <div className="space-y-6">
         <div className={`${panelClass} space-y-4`}>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">{s.title}</h1>
+            <h1 className="font-display text-[1.5rem] font-bold leading-[1.1] tracking-[-0.02em] text-foreground sm:text-[1.75rem]">{s.title}</h1>
             <StatusBadge status={q.effectiveStatus} />
             {q.status === 'ACCEPTED' && <StatusBadge status={q.paymentStatus} />}
           </div>
@@ -82,7 +83,7 @@ export function QuotationView({ quotation: q }: { quotation: QuotationDetail }) 
             <p key={t} role="status" className="rounded-lg bg-highlight-soft p-3 text-sm text-foreground">{t}</p>
           ))}
           {q.effectiveStatus === 'EXPIRED' && (
-            <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+            <p className="rounded-lg border border-warning/30 bg-warning-soft p-3 text-sm text-warning">
               Báo giá đã quá hạn. Vẫn có thể đánh dấu chấp nhận nếu khách đồng ý muộn, hoặc tạo version mới để gia hạn.
             </p>
           )}
@@ -97,13 +98,13 @@ export function QuotationView({ quotation: q }: { quotation: QuotationDetail }) 
           {q.status === 'SUPERSEDED' && latest && latest.id !== q.id && (
             <p className="text-sm text-muted-foreground">
               Đã có version mới thay thế.{' '}
-              <Link className="text-primary hover:underline" to={`/admin/quotations/${latest.id}`}>Xem v{latest.version}</Link>
+              <Link className="link-inline" to={`/admin/quotations/${latest.id}`}>Xem v{latest.version}</Link>
             </p>
           )}
           {draft && (
             <p className="text-sm text-muted-foreground">
               Đang soạn v{draft.version}.{' '}
-              <Link className="text-primary hover:underline" to={`/admin/quotations/${draft.id}`}>Mở bản nháp</Link>
+              <Link className="link-inline" to={`/admin/quotations/${draft.id}`}>Mở bản nháp</Link>
             </p>
           )}
           <div className="flex flex-wrap gap-2">
@@ -140,30 +141,30 @@ export function QuotationView({ quotation: q }: { quotation: QuotationDetail }) 
         <div className={`${panelClass} space-y-6`}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Bên báo giá</p>
+              <p className="kicker text-muted-foreground">Bên báo giá</p>
               <p className="mt-1 text-sm font-medium text-foreground">{s.designer.displayName}</p>
               <p className="text-sm text-muted-foreground">{[s.designer.phone, s.designer.email].filter(Boolean).join(' · ')}</p>
             </div>
             <div>
-              <p className="text-xs font-medium text-muted-foreground">Khách hàng</p>
+              <p className="kicker text-muted-foreground">Khách hàng</p>
               <p className="mt-1 text-sm font-medium text-foreground">{s.client.name}</p>
               {s.client.company && <p className="text-sm text-muted-foreground">{s.client.company}</p>}
             </div>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b text-left text-xs font-medium text-muted-foreground">
-                <tr>
-                  <th className="py-2 pr-3">Mô tả</th>
-                  <th className="py-2 pr-3 text-right">SL</th>
-                  <th className="py-2 pr-3 text-right">Đơn giá</th>
-                  <th className="py-2 text-right">Thành tiền</th>
+              <thead>
+                <tr className={tableHeadRowClass}>
+                  <th className="py-2.5 pr-3">Mô tả</th>
+                  <th className="py-2.5 pr-3 text-right">SL</th>
+                  <th className="py-2.5 pr-3 text-right">Đơn giá</th>
+                  <th className="py-2.5 text-right">Thành tiền</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody>
                 {s.items.map((it, i) => (
-                  <tr key={`${i}-${it.description}`}>
+                  <tr key={`${i}-${it.description}`} className={tableRowClass}>
                     <td className="py-2.5 pr-3">
                       <p className="font-medium text-foreground">{it.description}</p>
                       {it.details && <p className="text-xs text-muted-foreground">{it.details}</p>}
@@ -177,7 +178,7 @@ export function QuotationView({ quotation: q }: { quotation: QuotationDetail }) 
             </table>
           </div>
 
-          <dl className="ml-auto max-w-xs space-y-2 text-sm">
+          <dl className="ml-auto w-full max-w-sm text-sm">
             <TotalLine label="Tạm tính"><MoneyText amount={s.subtotal} /></TotalLine>
             <TotalLine label="Giảm giá">− <MoneyText amount={s.discountAmount} /></TotalLine>
             <TotalLine label={`VAT ${s.vatPercent}%`}><MoneyText amount={s.vatAmount} /></TotalLine>
@@ -187,19 +188,19 @@ export function QuotationView({ quotation: q }: { quotation: QuotationDetail }) 
 
           {s.terms && (
             <div>
-              <p className="mb-1 text-xs font-medium text-muted-foreground">Điều khoản</p>
+              <p className="kicker mb-1.5 text-muted-foreground">Điều khoản</p>
               <p className="whitespace-pre-wrap text-sm text-foreground">{s.terms}</p>
             </div>
           )}
           {s.notesToClient && (
             <div>
-              <p className="mb-1 text-xs font-medium text-muted-foreground">Ghi chú cho khách</p>
+              <p className="kicker mb-1.5 text-muted-foreground">Ghi chú cho khách</p>
               <p className="whitespace-pre-wrap text-sm text-foreground">{s.notesToClient}</p>
             </div>
           )}
           {q.internalNotes && (
             <div>
-              <p className="mb-1 text-xs font-medium text-muted-foreground">Ghi chú nội bộ (khách không thấy)</p>
+              <p className="kicker mb-1.5 text-muted-foreground">Ghi chú nội bộ (khách không thấy)</p>
               <p className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm text-foreground">{q.internalNotes}</p>
             </div>
           )}
@@ -211,7 +212,7 @@ export function QuotationView({ quotation: q }: { quotation: QuotationDetail }) 
           <QrCard options={q.qrOptions} bank={s.bank} pngUrl={purpose => `/api/admin/quotations/${q.id}/qr/${purpose}.png`} />
         ) : q.status === 'ACCEPTED' && q.paymentStatus === 'PAID' ? (
           <div className={panelClass}>
-            <p className="font-semibold text-emerald-700">Đã thanh toán</p>
+            <p className="font-semibold text-success">Đã thanh toán</p>
             <p className="mt-1 text-sm text-muted-foreground">Nhận đủ ngày {formatDate(q.paidAt)}</p>
           </div>
         ) : (
@@ -220,13 +221,13 @@ export function QuotationView({ quotation: q }: { quotation: QuotationDetail }) 
           </div>
         )}
         <div className={panelClass}>
-          <h2 className="mb-3 text-sm font-semibold text-foreground">Phiên bản</h2>
+          <h2 className="mb-3 font-display text-title font-bold text-foreground">Phiên bản</h2>
           <ul className="space-y-2">
             {q.versions.map(v => (
               <li key={v.id} className="flex items-center justify-between gap-2 text-sm">
                 {v.id === q.id
                   ? <span className="font-medium text-foreground">v{v.version} (đang xem)</span>
-                  : <Link className="text-primary hover:underline" to={`/admin/quotations/${v.id}`}>v{v.version}</Link>}
+                  : <Link className="link-inline" to={`/admin/quotations/${v.id}`}>v{v.version}</Link>}
                 <StatusBadge status={v.effectiveStatus} />
               </li>
             ))}

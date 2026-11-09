@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { MoneyText } from '@/components/MoneyText'
 import { PageHeader } from '@/components/PageHeader'
 import { StatusBadge } from '@/components/StatusBadge'
+import { tableHeadRowClass, tableRowClass } from '@/components/dataTable'
 import { formatDate } from '@/lib/format'
 import { SearchCombobox } from '@/components/SearchCombobox'
 import { useClientOptions } from '@/lib/pickers'
@@ -114,32 +115,32 @@ export default function QuotationsPage() {
             description="Không có báo giá nào khớp bộ lọc. Tạo báo giá trong tab Báo giá của từng dự án."
           />
         ) : (
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="border-b bg-muted/40 text-left text-xs font-medium text-muted-foreground">
-                <tr>
-                  <th className="px-4 py-2.5">Số báo giá</th>
-                  <th className="px-4 py-2.5">Tiêu đề</th>
-                  <th className="px-4 py-2.5">Dự án</th>
-                  <th className="px-4 py-2.5">Khách</th>
-                  <th className="px-4 py-2.5 text-right">Tổng</th>
-                  <th className="px-4 py-2.5">Trạng thái</th>
-                  <th className="px-4 py-2.5">Thanh toán</th>
-                  <th className="px-4 py-2.5 text-right">Chờ thu</th>
-                  <th className="px-4 py-2.5">Hết hạn</th>
+              <thead>
+                <tr className={tableHeadRowClass}>
+                  <th className="px-4 py-3">Số báo giá</th>
+                  <th className="px-4 py-3">Tiêu đề</th>
+                  <th className="px-4 py-3">Dự án</th>
+                  <th className="px-4 py-3">Khách</th>
+                  <th className="px-4 py-3 text-right">Tổng</th>
+                  <th className="px-4 py-3">Trạng thái</th>
+                  <th className="px-4 py-3">Thanh toán</th>
+                  <th className="px-4 py-3 text-right">Chờ thu</th>
+                  <th className="px-4 py-3">Hết hạn</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody>
                 {items.map(q => (
-                  <tr key={q.id} className="hover:bg-muted/30">
+                  <tr key={q.id} className={tableRowClass}>
                     <td className="whitespace-nowrap px-4 py-3 font-medium">
-                      <Link to={`/admin/quotations/${q.id}`} className="text-primary hover:underline">
+                      <Link to={`/admin/quotations/${q.id}`} className="font-semibold text-foreground link-hover">
                         {q.number ? `${q.number} · v${q.version}` : 'Bản nháp'}
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-foreground">{q.title}</td>
                     <td className="px-4 py-3">
-                      <Link to={`/admin/projects/${q.projectId}`} className="text-foreground hover:underline">{q.projectName}</Link>
+                      <Link to={`/admin/projects/${q.projectId}`} className="text-foreground link-hover">{q.projectName}</Link>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{q.clientName}</td>
                     <td className="px-4 py-3 text-right"><MoneyText amount={q.total} /></td>

@@ -37,7 +37,7 @@ export function LinkifiedText({ text, className }: { text: string; className?: s
               target="_blank"
               rel="noopener noreferrer"
               referrerPolicy="no-referrer"
-              className="font-medium text-primary underline underline-offset-2 hover:text-primary/80"
+              className="link-inline break-words"
             >
               {url}
             </a>

@@ -127,7 +127,7 @@ export function QuotationMessageDialog({ quotation: q, open, onOpenChange, justS
           {!client && !link ? (
             <Skeleton className="h-4 w-2/3" />
           ) : hint ? (
-            <p className={link || portalOff ? 'text-xs text-amber-700' : 'text-xs text-muted-foreground'}>{hint}</p>
+            <p className={link || portalOff ? 'text-xs text-warning' : 'text-xs text-muted-foreground'}>{hint}</p>
           ) : null}
 
           <div className="flex flex-wrap justify-end gap-2">

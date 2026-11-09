@@ -68,9 +68,9 @@ function Field({ id, label, hint, className, children }: { id: string; label: st
 
 function TotalLine({ label, strong, testId, children }: { label: string; strong?: boolean; testId?: string; children: ReactNode }) {
   return (
-    <div className={cn('flex items-center justify-between gap-3', strong && 'border-t pt-2 text-base font-semibold')}>
-      <dt className={strong ? 'text-foreground' : 'text-muted-foreground'}>{label}</dt>
-      <dd data-testid={testId} className="tabular-nums text-foreground">{children}</dd>
+    <div className={cn('flex items-baseline justify-between gap-3 border-b py-2 text-sm', strong && 'border-foreground')}>
+      <dt className={strong ? 'font-semibold text-foreground' : 'text-muted-foreground'}>{label}</dt>
+      <dd data-testid={testId} className={cn('tabular-nums text-foreground', strong && 'font-display text-display-md font-bold')}>{children}</dd>
     </div>
   )
 }
@@ -161,7 +161,7 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
       <div className="space-y-6">
         <div className={panelClass}>
           <div className="mb-5 flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight text-foreground">Soạn báo giá</h1>
+            <h1 className="font-display text-[1.5rem] font-bold leading-[1.1] tracking-[-0.02em] text-foreground sm:text-[1.75rem]">Soạn báo giá</h1>
             <StatusBadge status="DRAFT" />
             <span className="text-sm text-muted-foreground">
               {kindLabel[quotation.kind]} · v{quotation.version}{quotation.number ? ` · ${quotation.number}` : ''}
@@ -188,14 +188,14 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
 
         <div className={panelClass}>
           <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-semibold text-foreground">Dòng báo giá</h2>
+            <h2 className="font-display text-title font-bold text-foreground">Dòng báo giá</h2>
             <Button type="button" size="sm" variant="outline" onClick={addRow}>
               <Plus aria-hidden="true" />
               Thêm dòng
             </Button>
           </div>
           {zeroRows.length > 0 && (
-            <p className="mb-3 flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+            <p className="mb-3 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning-soft p-3 text-sm text-warning">
               <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
               {zeroRows.length} dòng có đơn giá 0 ₫. Nhập đơn giá hoặc bấm “Chọn từ dịch vụ” ở dòng đó; để 0 ₫ nếu là phần tặng khách.
             </p>
@@ -204,7 +204,7 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
             <p className="text-sm text-muted-foreground">Chưa có dòng nào — thêm ít nhất 1 dòng trước khi gửi.</p>
           ) : (
             <div className="space-y-3">
-              <div aria-hidden="true" className="hidden gap-3 px-3 text-xs font-medium text-muted-foreground sm:grid sm:grid-cols-[1fr_5rem_9rem_8rem_2.5rem]">
+              <div aria-hidden="true" className="kicker hidden gap-3 px-3 text-muted-foreground sm:grid sm:grid-cols-[1fr_5rem_9rem_8rem_2.5rem]">
                 <span>Mô tả</span>
                 <span>SL</span>
                 <span>Đơn giá (₫)</span>
@@ -216,7 +216,7 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
                   key={r.key}
                   className={cn(
                     'relative grid gap-3 rounded-lg border p-3 sm:grid-cols-[1fr_5rem_9rem_8rem_2.5rem] sm:items-end',
-                    r.unitPrice === 0 && 'border-amber-300 bg-amber-50/40',
+                    r.unitPrice === 0 && 'border-warning/40 bg-warning-soft/40',
                   )}
                 >
                   <div className="space-y-1 pr-12 sm:pr-0">
@@ -256,7 +256,7 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
                       ariaLabel={`Chọn từ dịch vụ cho dòng ${i + 1}`}
                       className="w-full sm:w-64"
                     />
-                    {r.unitPrice === 0 && <p className="text-xs text-amber-800">Đơn giá đang là 0 ₫</p>}
+                    {r.unitPrice === 0 && <p className="text-xs font-medium text-warning">Đơn giá đang là 0 ₫</p>}
                   </div>
                   <Textarea
                     aria-label={`Chi tiết dòng ${i + 1}`}
@@ -287,8 +287,8 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
 
       <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
         <div className={panelClass}>
-          <h2 className="mb-3 text-sm font-semibold text-foreground">Tổng tiền (xem trước)</h2>
-          <dl className="space-y-2 text-sm">
+          <h2 className="mb-2 font-display text-title font-bold text-foreground">Tổng tiền (xem trước)</h2>
+          <dl className="text-sm">
             <TotalLine label="Tạm tính"><MoneyText amount={preview.subtotal} /></TotalLine>
             <TotalLine label="Giảm giá">− <MoneyText amount={header.discountAmount} /></TotalLine>
             <TotalLine label={`VAT ${header.vatPercent}%`}><MoneyText amount={preview.vatAmount} /></TotalLine>
@@ -301,9 +301,9 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
           <p className="mt-3 text-xs text-muted-foreground">Máy chủ tính lại khi lưu (làm tròn nửa lên đến đồng).</p>
         </div>
         {bankMissing && (
-          <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+          <p className="rounded-lg border border-warning/30 bg-warning-soft p-3 text-sm text-warning">
             Chưa có tài khoản nhận tiền — cần cấu hình trước khi gửi (mã VietQR lấy từ đây).{' '}
-            <Link to="/admin/settings?tab=payment" className="font-medium underline">Mở Cài đặt</Link>
+            <Link to="/admin/settings?tab=payment" className="link-inline">Mở Cài đặt</Link>
           </p>
         )}
         {blockers.length > 0 && (
@@ -315,7 +315,7 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
             Gửi báo giá
           </Button>
           <Button variant="outline" onClick={save} disabled={invalid || busy} aria-describedby={blockers.length > 0 ? 'quotation-blockers' : undefined}>Lưu nháp</Button>
-          <Button variant="ghost" className="text-red-700 hover:bg-red-50 hover:text-red-700" onClick={() => setConfirmDelete(true)} disabled={busy}>
+          <Button variant="ghost" className="text-danger hover:bg-danger-soft hover:text-danger" onClick={() => setConfirmDelete(true)} disabled={busy}>
             <Trash2 aria-hidden="true" />
             Xóa báo giá
           </Button>
@@ -330,7 +330,7 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
           <>
             Bản nháp được lưu rồi gửi: số báo giá được cấp và nội dung bị khóa. Muốn sửa sau đó phải tạo version mới.
             {sendRisky && (
-              <span className="mt-2 block rounded-lg bg-amber-50 p-2 font-medium text-amber-800">
+              <span className="mt-2 block rounded-lg border border-warning/30 bg-warning-soft p-2 font-medium text-warning">
                 {preview.total === 0 ? 'Tổng tiền đang là 0 ₫. ' : ''}
                 {zeroNames.length > 0 && (
                   <>

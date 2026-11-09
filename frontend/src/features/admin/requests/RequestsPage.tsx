@@ -120,16 +120,16 @@ export default function RequestsPage() {
               <li key={r.id}>
                 <Link
                   to={`/admin/requests/${r.id}`}
-                  className="flex flex-col gap-1.5 px-4 py-3.5 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-center sm:gap-4"
+                  className="flex flex-col gap-1.5 px-4 py-3.5 transition-colors duration-150 hover:bg-surface-sunk focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-center sm:gap-4"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground">
+                    <p className="truncate text-sm font-semibold text-foreground">
                       {r.clientName} · {r.projectName}{r.deliverableName ? ` · ${r.deliverableName}` : ''}
                     </p>
                     <p className="line-clamp-2 text-sm text-muted-foreground">{r.content}</p>
                   </div>
-                  <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
-                    <span>{requestSourceLabel[r.source]}</span>
+                  <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-muted-foreground">
+                    <span className="whitespace-nowrap rounded-full border border-border bg-surface-sunk px-2 py-0.5 font-medium">{requestSourceLabel[r.source]}</span>
                     <span className="tabular-nums">{formatDatetime(r.createdAt)}</span>
                     <StatusBadge status={r.status} label={requestStatusLabel[r.status]} />
                   </div>

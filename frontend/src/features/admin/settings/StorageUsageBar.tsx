@@ -34,7 +34,7 @@ export function StorageUsageBar({ usage }: { usage: StorageUsage }) {
         ))}
       </div>
       {usage.uploadsBlocked && (
-        <p className="text-sm font-medium text-red-700">Đang chặn tải ảnh mới (≥ 90%). Xoá bớt ảnh để mở lại.</p>
+        <p className="text-sm font-medium text-danger">Đang chặn tải ảnh mới (≥ 90%). Xoá bớt ảnh để mở lại.</p>
       )}
     </div>
   )

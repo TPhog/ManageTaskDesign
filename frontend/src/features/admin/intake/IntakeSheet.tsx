@@ -74,7 +74,7 @@ function IntakeDetailView({ d, onClose }: { d: IntakeDetail; onClose: () => void
 
   return (
     <div className="space-y-5">
-      <SheetHeader className="space-y-1 text-left">
+      <SheetHeader className="space-y-1 pr-10 text-left">
         <SheetTitle>Khách mới: {d.contactName}</SheetTitle>
         <SheetDescription>{d.templateName ?? 'Yêu cầu khác'} · {formatDatetime(d.createdAt)}</SheetDescription>
       </SheetHeader>
@@ -94,7 +94,7 @@ function IntakeDetailView({ d, onClose }: { d: IntakeDetail; onClose: () => void
           <ul className="mt-1 space-y-0.5">
             {d.matchingClients.map(c => (
               <li key={c.id}>
-                <Link to={`/admin/clients/${c.id}`} className="underline underline-offset-2">{c.name}</Link>
+                <Link to={`/admin/clients/${c.id}`} className="link-inline">{c.name}</Link>
                 {' '}({c.phone ?? c.email})
               </li>
             ))}
@@ -127,7 +127,7 @@ function IntakeDetailView({ d, onClose }: { d: IntakeDetail; onClose: () => void
         <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-success-soft p-3 text-sm text-success">
           <span className="flex-1">Đã chuyển thành dự án lúc {d.convertedAt ? formatDatetime(d.convertedAt) : ''}</span>
           <Button asChild size="sm"><Link to={`/admin/projects/${d.convertedProjectId}`}>Mở dự án</Link></Button>
-          <Link to={`/admin/clients/${d.convertedClientId}`} className="underline underline-offset-2">Mở khách</Link>
+          <Link to={`/admin/clients/${d.convertedClientId}`} className="link-inline">Mở khách</Link>
         </div>
       )}
 

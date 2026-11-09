@@ -159,7 +159,7 @@ export default function StoragePage() {
               onChange={e => update({ completedOnly: e.target.checked })} />
             Chỉ dự án đã hoàn thành
           </label>
-          <Button type="button" variant="outline" size="sm" onClick={() => update({ ...CLEANUP_SUGGESTION, projectId: undefined })}>
+          <Button type="button" variant="outline" size="sm" className="h-auto min-h-9 whitespace-normal py-1.5 text-left" onClick={() => update({ ...CLEANUP_SUGGESTION, projectId: undefined })}>
             <Sparkles aria-hidden="true" />
             Gợi ý: ảnh của dự án đã hoàn thành &gt; 6 tháng
           </Button>
@@ -188,7 +188,7 @@ export default function StoragePage() {
         ) : (
           <ul className="divide-y">
             {items.map((img, i) => (
-              <li key={img.id} className="flex items-center gap-3 px-5 py-3">
+              <li key={img.id} className="flex items-center gap-3 px-5 py-3 transition-colors duration-150 hover:bg-surface-sunk">
                 <input type="checkbox" className="h-4 w-4 accent-primary" checked={selected.has(img.id)}
                   onChange={() => toggle(img.id)} aria-label={`Chọn ${img.originalName}`} />
                 <button type="button" onClick={() => setViewer(i)} aria-label={`Xem ảnh ${img.originalName}`}
@@ -198,11 +198,11 @@ export default function StoragePage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-foreground">{img.originalName}</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    <Link to={`/admin/projects/${img.projectId}`} className="hover:underline">{img.projectName}</Link>
+                    <Link to={`/admin/projects/${img.projectId}`} className="link-hover">{img.projectName}</Link>
                     {` · ${img.clientName} · ${ownerLabel(img)}`}
                   </p>
                   {img.originalDeletedAt && (
-                    <p className="text-xs text-amber-700">Đã xoá bản gốc · {formatDate(img.originalDeletedAt)}</p>
+                    <p className="text-xs font-medium text-warning">Đã xoá bản gốc · {formatDate(img.originalDeletedAt)}</p>
                   )}
                 </div>
                 <div className="text-right text-xs tabular-nums text-muted-foreground">

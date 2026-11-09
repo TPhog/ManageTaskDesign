@@ -66,10 +66,10 @@ export default function IntakePage() {
               <li key={s.id}>
                 <Link
                   to={`/admin/intake/${s.id}`}
-                  className="flex flex-col gap-1.5 px-4 py-3.5 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-center sm:gap-4"
+                  className="flex flex-col gap-1.5 px-4 py-3.5 transition-colors duration-150 hover:bg-surface-sunk focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-row sm:items-center sm:gap-4"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground">{s.contactName} · {s.templateName ?? 'Yêu cầu khác'}</p>
+                    <p className="truncate text-sm font-semibold text-foreground">{s.contactName} · {s.templateName ?? 'Yêu cầu khác'}</p>
                     <p className="line-clamp-2 text-sm text-muted-foreground">{s.excerpt}</p>
                   </div>
                   <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">

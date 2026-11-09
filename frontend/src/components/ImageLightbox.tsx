@@ -44,7 +44,7 @@ export function ImageLightbox({ images, index, onIndexChange }: Props) {
   return (
     <Dialog open={open} onOpenChange={o => { if (!o) onIndexChange(null) }}>
       <DialogContent
-        className="max-w-[min(96vw,1400px)] border-none bg-black/95 p-2 text-white sm:p-4"
+        className="tone-inverse max-w-[min(96vw,1400px)] border-none bg-background p-2 text-foreground sm:p-4"
         onContextMenu={block}
       >
         <DialogTitle className="sr-only">{current?.alt ?? 'Ảnh'}</DialogTitle>
@@ -68,7 +68,7 @@ export function ImageLightbox({ images, index, onIndexChange }: Props) {
                   aria-label="Ảnh trước"
                   disabled={at === 0}
                   onClick={() => onIndexChange(at - 1)}
-                  className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 hover:bg-black/70 disabled:opacity-30"
+                  className="absolute left-1 top-1/2 -translate-y-1/2 rounded-full bg-card/80 p-2 text-foreground hover:bg-card disabled:opacity-30"
                 >
                   <ChevronLeft className="h-5 w-5" aria-hidden="true" />
                 </button>
@@ -77,13 +77,13 @@ export function ImageLightbox({ images, index, onIndexChange }: Props) {
                   aria-label="Ảnh sau"
                   disabled={at === images.length - 1}
                   onClick={() => onIndexChange(at + 1)}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-black/50 p-2 hover:bg-black/70 disabled:opacity-30"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 rounded-full bg-card/80 p-2 text-foreground hover:bg-card disabled:opacity-30"
                 >
                   <ChevronRight className="h-5 w-5" aria-hidden="true" />
                 </button>
               </>
             )}
-            <figcaption className="text-center text-xs text-white/70">
+            <figcaption className="text-center text-xs text-muted-foreground">
               {current.caption ? `${current.caption} · ` : ''}{at + 1} / {images.length}
             </figcaption>
           </figure>

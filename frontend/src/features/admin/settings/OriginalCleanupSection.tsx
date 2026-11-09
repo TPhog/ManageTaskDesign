@@ -45,7 +45,7 @@ export function OriginalCleanupSection() {
   return (
     <section aria-label="Giải phóng bản gốc" className="space-y-4 rounded-xl border bg-card p-5 shadow-card">
       <div>
-        <h2 className="font-semibold text-foreground">Xoá bản gốc của dự án đã hoàn thành</h2>
+        <h2 className="font-display text-title font-bold text-foreground">Xoá bản gốc của dự án đã hoàn thành</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Giữ bản xem có watermark và ảnh thu nhỏ — khách vẫn xem như cũ. Chỉ chạy khi bạn bấm, không bao giờ tự động.
         </p>
@@ -66,7 +66,7 @@ export function OriginalCleanupSection() {
         <div className="space-y-3">
           <p className="text-sm font-medium text-foreground" aria-live="polite">{cleanupSummary(data)}</p>
           {data.projects.length > 0 && (
-            <ul aria-label="Dự án sẽ được dọn" className="divide-y rounded-md border text-sm">
+            <ul aria-label="Dự án sẽ được dọn" className="divide-y rounded-lg border bg-surface-sunk text-sm">
               {data.projects.slice(0, SHOWN_PROJECTS).map(p => (
                 <li key={p.projectId} className="flex items-center justify-between gap-3 px-3 py-2">
                   <span className="min-w-0 truncate text-foreground">

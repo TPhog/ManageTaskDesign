@@ -25,9 +25,9 @@ describe('storageBanner', () => {
 describe('helpers', () => {
   it('formats percent with a decimal comma and colours the bar by level', () => {
     expect(formatPercent(70)).toBe('70,0%')
-    expect(usageBarClass('OK')).toBe('bg-emerald-500')
-    expect(usageBarClass('WARNING')).toBe('bg-amber-500')
-    expect(usageBarClass('CRITICAL')).toBe('bg-red-600')
+    expect(usageBarClass('OK')).toBe('bg-success')
+    expect(usageBarClass('WARNING')).toBe('bg-warning')
+    expect(usageBarClass('CRITICAL')).toBe('bg-danger')
   })
 
   it('labels the owner of an image', () => {
