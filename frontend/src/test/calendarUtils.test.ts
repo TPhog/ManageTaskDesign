@@ -1,4 +1,4 @@
-import { barSpan, rangeLabel, shiftAnchor, visibleRange, weekStart } from '@/features/admin/tasks/calendarUtils'
+import { barSpan, listDay, rangeLabel, shiftAnchor, visibleRange, weekStart } from '@/features/admin/tasks/calendarUtils'
 
 describe('weekStart', () => {
   it('returns the Monday of the week (Sunday belongs to the previous Monday)', () => {
@@ -46,5 +46,21 @@ describe('rangeLabel', () => {
   it('formats in Vietnamese', () => {
     expect(rangeLabel('2026-11-15', 'month')).toBe('Tháng 11/2026')
     expect(rangeLabel('2026-11-11', 'week')).toBe('09/11 – 15/11/2026')
+  })
+})
+
+describe('listDay', () => {
+  const days = ['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15']
+  it('lists a task on its due date, or its start date when it has no due date', () => {
+    expect(listDay({ startDate: '2026-11-07', dueDate: '2026-11-11' }, days)).toBe('2026-11-11')
+    expect(listDay({ startDate: '2026-11-12', dueDate: null }, days)).toBe('2026-11-12')
+  })
+  it('lists a span whose due date lies past the visible days on its first visible day', () => {
+    expect(listDay({ startDate: '2026-11-11', dueDate: '2026-11-18' }, days)).toBe('2026-11-11')
+    expect(listDay({ startDate: '2026-11-01', dueDate: '2026-11-30' }, days)).toBe('2026-11-09')
+  })
+  it('is null when nothing of the task is visible', () => {
+    expect(listDay({ startDate: null, dueDate: '2026-11-20' }, days)).toBeNull()
+    expect(listDay({ startDate: '2026-11-16', dueDate: '2026-11-20' }, days)).toBeNull()
   })
 })

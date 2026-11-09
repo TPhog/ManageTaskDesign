@@ -19,7 +19,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { useIsMobile } from '@/features/admin/dashboard/useIsMobile'
 import { cn } from '@/lib/utils'
 import type { CalendarMarker, CalendarTask, TaskPriority } from '@/lib/types'
-import { WEEKDAY_HEADERS, barSpan, chipDay, rangeLabel, shiftAnchor, visibleRange, type CalendarUnit } from './calendarUtils'
+import { WEEKDAY_HEADERS, barSpan, chipDay, listDay, rangeLabel, shiftAnchor, visibleRange, type CalendarUnit } from './calendarUtils'
 import { taskPriorityLabel, taskStatusLabel, todayVn } from './taskUtils'
 import { useRescheduleTask, useTaskCalendar } from './useTaskCalendar'
 
@@ -101,13 +101,14 @@ export function TaskCalendar({ projectId, onOpen, readOnly = false, unit: unitPr
     body = (
       <MonthGrid days={range.days} anchor={anchor} today={today}
         renderDay={iso => {
-          const dayTasks = tasks.filter(t => chipDay(t) === iso)
+          // a span whose due date lies past the grid is listed on its first visible day, with its dates
+          const dayTasks = tasks.filter(t => listDay(t, range.days) === iso)
           const dayMarkers = markers.filter(m => m.date === iso)
           const extra = Math.max(0, dayTasks.length - MONTH_CELL_TASKS) + Math.max(0, dayMarkers.length - MONTH_CELL_MARKERS)
           return (
             <>
               {dayMarkers.slice(0, MONTH_CELL_MARKERS).map(markerRow)}
-              {dayTasks.slice(0, MONTH_CELL_TASKS).map(t => chip(t))}
+              {dayTasks.slice(0, MONTH_CELL_TASKS).map(t => chip(t, { range: t.dueDate !== iso }))}
               {extra > 0 && (
                 <button
                   type="button"
@@ -128,7 +129,7 @@ export function TaskCalendar({ projectId, onOpen, readOnly = false, unit: unitPr
         renderDay={iso => (
           <>
             {markers.filter(m => m.date === iso).map(markerRow)}
-            {tasks.filter(t => chipDay(t) === iso).map(t => chip(t, { showProject: crossProject, range: true }))}
+            {tasks.filter(t => listDay(t, range.days) === iso).map(t => chip(t, { showProject: crossProject, range: true }))}
           </>
         )}
       />

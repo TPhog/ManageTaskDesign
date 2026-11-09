@@ -57,3 +57,14 @@ export function rangeLabel(anchor: string, unit: CalendarUnit): string {
 
 /** The day a task chip sits on: its due date, else (start-only task) its start date. */
 export const chipDay = (t: Pick<CalendarTask, 'startDate' | 'dueDate'>): string | null => t.dueDate ?? t.startDate
+
+/**
+ * The day a chip is listed on among `days` (month grid, phone week list): its chip day when visible, else — a
+ * start→due span whose due date lies outside — the span's first visible day; null when nothing of it is visible.
+ */
+export function listDay(t: Pick<CalendarTask, 'startDate' | 'dueDate'>, days: string[]): string | null {
+  const day = chipDay(t)
+  if (day && days.includes(day)) return day
+  const span = barSpan(t, days)
+  return span ? days[span.col - 1] : null
+}

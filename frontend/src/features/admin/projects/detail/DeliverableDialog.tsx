@@ -256,7 +256,7 @@ function DeliverableLinks({ deliverable }: { deliverable: Deliverable }) {
     <section aria-labelledby="deliverable-links-title" className="space-y-3 border-t pt-4">
       <div>
         <h3 id="deliverable-links-title" className="text-sm font-semibold text-foreground">Liên kết</h3>
-        <p className="text-xs text-muted-foreground">File Figma, thư mục Drive… Đánh dấu “Khách xem được” để khách thấy trong cổng khách hàng.</p>
+        <p className="text-xs text-muted-foreground">File Figma, thư mục Drive… cho hạng mục này.</p>
       </div>
       <LinkListEditor value={links} onChange={setLinks} allowClientVisible disabled={save.isPending} />
       <div className="flex justify-end">
