@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { CalendarDays, List, ListChecks, Search } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
@@ -9,10 +10,12 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { api } from '@/lib/api'
 import { useClientOptions, useProjectOptions } from '@/lib/pickers'
+import { qk } from '@/lib/queryKeys'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { cn } from '@/lib/utils'
-import type { TaskDueFilter, TaskListParams, TaskViewConfig } from '@/lib/types'
+import type { ProjectDetail, TaskDueFilter, TaskListParams, TaskViewConfig } from '@/lib/types'
 import { TaskCalendar } from './TaskCalendar'
 import { TaskDrawer } from './TaskDrawer'
 import { TaskTable } from './TaskTable'
@@ -55,6 +58,12 @@ export default function TasksPage() {
   const clients = useClientOptions(clientSearch, true, true)
   const calendar = searchParams.get('view') === 'calendar'
   const projects = useProjectOptions(projectSearch, calendar)
+  // the picker hides cancelled projects, but a saved view can still point at one: its tasks then cannot be moved
+  const pickedProject = useQuery({
+    queryKey: qk.projects.detail(projectId),
+    queryFn: () => api.get<ProjectDetail>(`/admin/projects/${projectId}`),
+    enabled: calendar && !!projectId,
+  })
 
   // due/status live in the URL so a filtered view can be linked to directly (e.g. /admin/tasks?due=overdue)
   const current = quickFilters.find(f => f.value === searchParams.get('due')) ?? quickFilters[3]
@@ -143,7 +152,7 @@ export default function TasksPage() {
 
       <div className="rounded-xl border bg-card shadow-card">
         <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:flex-wrap lg:items-center">
-          <div role="group" aria-label="Chế độ xem" className="flex w-fit items-center gap-1 rounded-lg bg-muted p-1">
+          <div role="group" aria-label="Kiểu hiển thị" className="flex w-fit items-center gap-1 rounded-lg bg-muted p-1">
             {([['list', 'Danh sách', List], ['calendar', 'Lịch', CalendarDays]] as const).map(([mode, label, Icon]) => (
               <button
                 key={mode}
@@ -254,7 +263,13 @@ export default function TasksPage() {
         </div>
 
         {calendar ? (
-          <TaskCalendar projectId={projectId || undefined} onOpen={setOpenId} unit={calendarUnit} onUnitChange={setCalendarUnit} />
+          <TaskCalendar
+            projectId={projectId || undefined}
+            onOpen={setOpenId}
+            readOnly={!!projectId && pickedProject.data?.status === 'CANCELLED'}
+            unit={calendarUnit}
+            onUnitChange={setCalendarUnit}
+          />
         ) : (
           <>
             {isLoading ? (
