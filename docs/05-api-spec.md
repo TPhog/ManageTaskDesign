@@ -115,6 +115,7 @@ Các resource có `rowVersion` (xmin, kiểu `uint`) trong response. Lệnh upda
 |---|---|---|
 | POST | `/api/admin/projects/{id}/deliverables` | `{ name, quantity, serviceId?, includedRounds?, extraRoundPrice?, dueDate }` (thiếu → lấy từ service; không service thì bắt buộc) |
 | PUT | `/api/admin/deliverables/{id}` | `{ name, quantity, includedRounds, extraRoundPrice, dueDate, sortOrder }` — trả `warnings` nếu BR-44 |
+| PUT | `/api/admin/deliverables/{id}/links` | `{ links: [{ title, url, visibleToClient }] }` → `{ links }`; ≤ 10, http/https (BR-148); `400 errors.links`; ghi `deliverable.links_updated` chỉ khi có thay đổi (không log URL) |
 | POST | `/api/admin/deliverables/{id}/status` | `{ to, deliveryUrl?, clientMessage? }` - hai trường sau chỉ đọc khi `to = DELIVERED` (BR-140): `deliveryUrl` http/https ≤ 500, `clientMessage` ≤ 500; sai → `400` (`errors.deliveryUrl` / `errors.clientMessage`) |
 
 ### 3.7 Requests
@@ -166,10 +167,17 @@ Endpoint hỗ trợ UI xem trước gợi ý trước khi lưu:
 
 | Method | Path | Ghi chú |
 |---|---|---|
-| GET | `/api/admin/tasks?projectId=&status=&due=overdue|today|week&page=` | |
+| GET | `/api/admin/tasks?projectId=&status=&due=&groupBy=none\|project\|deliverable\|due\|priority\|status&page=&pageSize=` | Item thêm `isRecurring`, `linksCount`, `blockedReason`, `blockedByTaskId`, `blockedByTitle`, `blockedByDone`, `groupKey`. Luôn có `groups: [{ key, label, count }]` (`count` là tổng toàn bộ kết quả lọc); có `groupBy` thì thứ tự theo nhóm (việc mở trước, tối đa 5000 task, vượt thì `truncated: true`); `groupBy=deliverable` hiện chỉ một nhóm `none`; `groupBy` sai → `400 errors.groupBy` (BR-150) |
+| GET | `/api/admin/tasks/calendar?from=&to=&projectId=` | `{ tasks[{id,projectId,projectName,title,status,priority,startDate,dueDate,isOverdue}], markers[{kind: DELIVERABLE\|PROJECT,id,projectId,projectName,title,date,status}], truncated }`; `from`/`to` `yyyy-MM-dd`, `to ≥ from`, khoảng ≤ 62 ngày (`400 errors.from/to`); tối đa 500 task (`truncated`); không `projectId` thì bỏ dự án CANCELLED, có `projectId` thì hiện cả dự án đã huỷ (BR-150) |
+| PUT | `/api/admin/tasks/{id}/due-date` | `{ dueDate }` - dịch `startDate` cùng số ngày nếu có; cùng ngày = no-op; DONE / dự án CANCELLED → `409 INVALID_TRANSITION`; ghi `task.rescheduled` (BR-149) |
+| GET | `/api/admin/task-views` | `{ views: [{ id, name, config, sortOrder }], last: config\|null }` |
+| POST | `/api/admin/task-views` | `{ name, config }` → `201`; trùng tên (không phân biệt hoa/thường, kể cả đua nhau) hoặc đã đủ 20 → `409 CONFLICT`; tên rỗng/quá 60 → `400` |
+| PUT | `/api/admin/task-views/{id}` | `{ name, config }` - `404` / `409 CONFLICT` |
+| DELETE | `/api/admin/task-views/{id}` | `204` |
+| PUT | `/api/admin/task-views/last` | `{ config }` - upsert "chế độ xem cuối"; `/admin/tasks` không filter áp lại khi mở trang |
 | POST | `/api/admin/projects/{id}/tasks` | `{ title, description, priority, startDate, dueDate, deliverableId?, revisionItemId? }` - `dueDate < startDate` → `400` `errors.dueDate` (BR-141) |
-| PUT | `/api/admin/tasks/{id}` | Cùng ràng buộc ngày như POST |
-| POST | `/api/admin/tasks/{id}/move` | `{ status, sortOrder }` (Kanban) |
+| PUT | `/api/admin/tasks/{id}` | Cùng ràng buộc ngày như POST. Body (cả POST) thêm `recurrence?: { kind: DAILY|WEEKLY|MONTHLY, weekdays, monthDay, until }` (sai → `400 errors.recurrence`), `blocked?: { reason, byTaskId }` (chỉ khi `status = BLOCKED`; blocker khác dự án / chính nó / vòng → `400 errors.blocked.byTaskId`; lý do > 500 → `errors.blocked.reason`), `links?: [{ title, url, visibleToClient }]` (≤ 10, http/https, ≤ 2000; sai → `400 errors.links`). Chi tiết trả thêm `recurrence`, `recurrenceSourceId`, `links`, `blocked`, `nextOccurrence`. Chuyển DONE task có `recurrence` → tạo bản kế tiếp (BR-146), response báo `nextOccurrence`; đua nhau → `409 CONCURRENCY_CONFLICT` |
+| POST | `/api/admin/tasks/{id}/move` | `{ status, sortOrder }` (Kanban); rời BLOCKED xoá lý do + blocker (BR-147); DONE spawn task lặp như PUT |
 | DELETE | `/api/admin/tasks/{id}` | Xóa cứng (task không phải dữ liệu tài chính) + activity; ảnh của task bị xóa theo (BR-88), trừ ảnh chứng từ báo giá (giữ lại, đếm trong `task.deleted`) |
 | POST/PUT/DELETE | `/api/admin/tasks/{id}/checklist[/{itemId}]` | |
 
@@ -387,7 +395,7 @@ Mọi endpoint lấy `clientId` **từ session**, không nhận `clientId` từ 
 | POST | `/api/portal/logout` | |
 | GET | `/api/portal/me` | `{ clientName, designer: { displayName, logoUrl, contactPhone, contactEmail, responseTime, intakeUrl } }` — `responseTime` từ `settings.portal_response_time`; `intakeUrl` là link form khách mới khi đang bật, ngược lại `null` (BR-133) |
 | GET | `/api/portal/projects` | `[{ id, name, designType, status, dueDate, deliverableSummary: { total, delivered, approved, inReview, awaitingClient }, hasOpenQuotation, openQuotationId }]` — `awaitingClient` = sản phẩm `AWAITING_CLIENT` (BR-97) |
-| GET | `/api/portal/projects/{id}` | Project công khai: status (+ lý do nếu public), dates, deliverables (`status`, `includedRounds`, `usedRounds`, `remainingRounds`, `progressPercent`, `clientDecision`, `reviewState` ∈ `NONE`/`AWAITING_CLIENT`/`CLIENT_APPROVED`/`CHANGES_IN_PROGRESS`, `hasOpenChangeRequest`), brief CONFIRMED mới nhất |
+| GET | `/api/portal/projects/{id}` | Project công khai: status (+ lý do nếu public), dates, deliverables (`links: [{ title, url }]` (chỉ liên kết `visibleToClient`, BR-148), `status`, `includedRounds`, `usedRounds`, `remainingRounds`, `progressPercent`, `clientDecision`, `reviewState` ∈ `NONE`/`AWAITING_CLIENT`/`CLIENT_APPROVED`/`CHANGES_IN_PROGRESS`, `hasOpenChangeRequest`), brief CONFIRMED mới nhất |
 | GET | `/api/portal/projects/{id}/revisions` | Rounds + items: `description, type, billing, workStatus` (không `internalNotes`) |
 | GET | `/api/portal/projects/{id}/files` | Chỉ `visible_to_client = true`, không xóa |
 | GET | `/api/portal/files/{id}/content` | Kiểm tra thuộc khách + visible (hoặc khách tự upload) |

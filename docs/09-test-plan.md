@@ -203,6 +203,28 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
 | AC-SET7 | Checklist thiết lập STUDIO/BANK/WATERMARK | Link dẫn tới `?tab=studio` / `payment` / `images`; hộp Khách mới rỗng dẫn tới `?tab=portal` | `SetupChecklistTests`, `intakePageEmpty.test.tsx`, e2e `dashboard-upgrade.spec.ts` |
 | AC-SET8 | 390 px | Không tràn ngang ở cả 7 tab; tab đang chọn nằm trọn trong khung | e2e `settings.spec.ts` |
 
+### AC-TSK2 — Task kiểu Lark (P15; BR-146..150)
+
+> Plan 15 gọi các quy tắc là BR-83..86; id thực tế là BR-146..149 (+ BR-150 cho nhóm/chế độ xem).
+
+| ID | Kịch bản | Hành động | Kết quả | Test |
+|---|---|---|---|---|
+| AC-TSK2-1 | Task lặp DAILY hạn hôm nay | Chuyển DONE | Có task mới TODO hạn mai, cùng project, checklist chưa tick; activity `task.created` ×2 | `TaskRecurrenceTests`, e2e `task-lark.spec.ts` |
+| AC-TSK2-2 | Task đã spawn | DONE→TODO→DONE | Không tạo thêm bản mới; hai DONE đồng thời → một bên `409 CONCURRENCY_CONFLICT` | `TaskRecurrenceTests` |
+| AC-TSK2-3 | Rule có `until` = hôm nay | DONE | Không tạo bản mới | `TaskRecurrenceTests` |
+| AC-TSK2-4 | Rule WEEKLY không chọn thứ | Lưu | 400 field `recurrence` | `TaskRecurrenceTests` |
+| AC-TSK2-5 | Task BLOCKED có lý do + blocker | Chuyển sang IN_PROGRESS | Lý do và blocker bị xoá | `TaskBlockedTests`, e2e `task-lark.spec.ts` |
+| AC-TSK2-6 | Blocker khác dự án / chính nó / vòng (kể cả chuỗi dài) | Lưu | 400 | `TaskBlockedTests` |
+| AC-TSK2-7 | Link `javascript:` | Lưu | 400 field `links` (FE báo lỗi inline) | `TaskLinksTests`, e2e `task-lark.spec.ts` |
+| AC-TSK2-8 | Hạng mục có 2 link (1 bật cờ) | Khách mở dự án | Portal chỉ thấy link bật cờ; khách B → 404 | `PortalDeliverableLinksTests`, e2e `task-lark.spec.ts` |
+| AC-TSK2-9 | Task có link | Portal mọi route | Không xuất hiện (TSK-05) | `PortalDeliverableLinksTests` |
+| AC-TSK2-10 | Khoảng lịch > 62 ngày | GET calendar | 400 | `TaskCalendarTests` |
+| AC-TSK2-11 | Task start+due | PUT due-date +8 ngày (hoặc kéo ô ngày trên Lịch) | Start dịch cùng số ngày, activity `task.rescheduled`; DONE / dự án huỷ → 409 | `TaskCalendarTests`, `calendarUtils.test.ts`, e2e `task-lark.spec.ts` |
+| AC-TSK2-12 | 6 task, groupBy=priority, pageSize=4 | Trang 2 | Thứ tự theo nhóm, `groups[].count` là tổng | `TaskGroupByTests`, `taskTableGroups.test.tsx` |
+| AC-TSK2-13 | View trùng tên (khác hoa/thường) | POST | 409 `CONFLICT` | `TaskViewsTests`, e2e `task-lark.spec.ts` |
+| AC-TSK2-14 | Mở /admin/tasks không filter, có `last` | Tải trang | Áp lại view cuối | `taskViews.test.ts`, e2e `task-lark.spec.ts` |
+
+
 ## 3. Luồng E2E (Playwright)
 
 1. **Onboarding:** đăng nhập → cấu hình ngân hàng → tạo dịch vụ → tạo khách → tạo link portal.
@@ -219,6 +241,7 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
 9. **Portal vòng 2 (P12):** khách đồng ý báo giá + báo đã chuyển cọc, designer thấy hai bước xác nhận và ghi chú của khách (AC-CF1, CF3, CF4; `portal-quotation-request.spec.ts` › "client agrees to a sent quotation …"); một giọng trạng thái duyệt qua Duyệt và Yêu cầu sửa kèm ảnh, thời gian phản hồi, không nút nổi (AC-CF5..8; `portal-round2.spec.ts`). Chữ trên các spec `portal*.spec.ts` theo bảng thuật ngữ Portal (08 §3.4).
 10. **Mẫu yêu cầu & khách mới (P13):** khách mới điền Poster qua `/f/{slug}` (có kịch bản `FORM_EXPIRED` không mất chữ đã gõ) rồi cảm ơn (`public-intake.spec.ts`); designer chuyển hồ sơ thành khách + dự án + brief hoặc từ chối/xoá (`intake.spec.ts`); khách portal gửi Poster theo mẫu và designer thấy bảng câu trả lời (`portal-template-request.spec.ts`); designer tạo/sửa/xoá mẫu và quản lý link (`request-templates.spec.ts`). Spec công khai dùng 1 lượt/IP/ngày trong trần 5 (BR-137) - chạy > 5 lần/ngày trên cùng máy dev sẽ nhận `429`.
 11. **Designer UX vòng 2 (P14, `designer-ux-round2.spec.ts`):** dự án đã báo giá hiện "Sẵn sàng bắt đầu" → bắt đầu với hạn chung → "Xem công việc"/"Đánh dấu đã nhận cọc" → gửi duyệt khi còn việc ("Vẫn gửi duyệt") → xác nhận đã duyệt → bàn giao với link sai rồi link đúng + lời nhắn, khách thấy trên timeline; Kanban 1440 px, không tràn ngang ở 390 px, Ctrl+K tìm công việc không dấu. Các spec `project-flow`, `project-full-flow`, `deliverables` bấm qua hộp xác nhận mới.
+12. **Task kiểu Lark (P15, `task-lark.spec.ts`):** đánh dấu task lặp Xong → có bản kế tiếp; chặn bởi task khác rồi mở chặn xoá lý do; kéo task sang ngày khác trên Lịch đổi hạn; link `javascript:` bị từ chối; chỉ link hạng mục bật cờ hiện trên Portal; lưu/áp/xoá chế độ xem và áp lại view cuối.
 
 ## 4. Test cô lập Portal (bắt buộc, tự động sinh)
 
@@ -238,6 +261,7 @@ Thêm:
 - Request portal không có header CSRF → 403.
 - Route mới `GET /api/portal/request-templates` (P13) có trong `RouteTable` - dữ liệu chung của studio, không có tài nguyên theo khách. `/api/public/*` nằm ngoài `/api/portal` và được kiểm riêng (AC-INT3..6).
 - Route Portal ghi mới của P12 có trong bảng isolation (`RouteTable`): `POST /api/portal/quotations/{id}/accept` và `.../payment-notice` (khách B với id báo giá của A → 404, không đổi cột `client_*` của A); `POST /api/portal/deliverables/{id}/approve` cũng vậy.
+- Plan 15 **không thêm route Portal**: `GET /api/portal/projects/{id}` chỉ thêm `deliverables[].links` (chỉ link `visibleToClient`), nên `RouteTable` không đổi; test `PortalDeliverableLinksTests` (khách B → 404, link không bật cờ và link task không lộ) bổ sung cho hàng `projects/{id}`.
 
 Triển khai: một test `[Theory]` lấy danh sách route từ `EndpointDataSource`, lọc prefix `/api/portal`,
 và **fail nếu có route mới chưa được khai báo trong bảng isolation-case** — buộc mọi endpoint mới có test.

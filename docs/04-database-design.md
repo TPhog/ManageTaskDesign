@@ -28,6 +28,7 @@ erDiagram
     projects ||--o{ tasks : has
     revision_items ||--o{ tasks : "revision_item_id"
     tasks ||--o{ task_checklist_items : has
+    tasks ||--o{ tasks : "blocked_by_task_id, recurrence_source_id (SET NULL)"
     projects ||--o{ quotations : has
     quotations ||--o{ quotation_items : has
     quotations ||--o| quotations : "previous_version_id"
@@ -279,11 +280,48 @@ CREATE TABLE tasks (
     due_date          date,
     sort_order        double precision NOT NULL DEFAULT 0,       -- thứ tự trong cột Kanban
     completed_at      timestamptz,
+    links             jsonb NOT NULL DEFAULT '[]',               -- [{title,url,visibleToClient}] ≤ 10 (BR-148)
+    recurrence_kind   text,                                      -- DAILY | WEEKLY | MONTHLY (BR-146)
+    recurrence_weekdays int,                                     -- bitmask 1..127 khi WEEKLY
+    recurrence_month_day int,                                    -- 1..31 khi MONTHLY
+    recurrence_until  date,
+    recurrence_spawned boolean NOT NULL DEFAULT false,
+    recurrence_source_id uuid REFERENCES tasks(id) ON DELETE SET NULL,
+    blocked_reason    text,                                      -- BR-147
+    blocked_by_task_id uuid REFERENCES tasks(id) ON DELETE SET NULL,
     created_at        timestamptz NOT NULL,
     updated_at        timestamptz NOT NULL
 );
 CREATE INDEX ix_tasks_project_status ON tasks (project_id, status, sort_order);
 CREATE INDEX ix_tasks_due ON tasks (due_date) WHERE status <> 'DONE';
+CREATE UNIQUE INDEX ix_tasks_recurrence_source ON tasks (recurrence_source_id) WHERE recurrence_source_id IS NOT NULL;  -- mỗi task chỉ có một bản kế tiếp
+CREATE INDEX ix_tasks_blocked_by ON tasks (blocked_by_task_id) WHERE blocked_by_task_id IS NOT NULL;
+ALTER TABLE tasks ADD CONSTRAINT ck_tasks_blocked_status CHECK ((blocked_reason IS NULL AND blocked_by_task_id IS NULL) OR status = 'BLOCKED');
+ALTER TABLE tasks ADD CONSTRAINT ck_tasks_links CHECK (jsonb_typeof(links) = 'array' AND jsonb_array_length(links) <= 10);
+ALTER TABLE tasks ADD CONSTRAINT ck_tasks_recurrence_kind CHECK (recurrence_kind IS NULL OR recurrence_kind IN ('DAILY','WEEKLY','MONTHLY'));
+ALTER TABLE tasks ADD CONSTRAINT ck_tasks_recurrence_rule CHECK (recurrence_kind IS NULL OR recurrence_kind = 'DAILY'
+    OR (recurrence_kind = 'WEEKLY' AND COALESCE(recurrence_weekdays, 0) BETWEEN 1 AND 127)
+    OR (recurrence_kind = 'MONTHLY' AND COALESCE(recurrence_month_day, 0) BETWEEN 1 AND 31));
+
+-- P15: chế độ xem đã lưu của màn Công việc (app một người dùng)
+CREATE TABLE task_views (
+    id          uuid PRIMARY KEY,
+    name        text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 60),
+    config      jsonb NOT NULL CHECK (jsonb_typeof(config) = 'object'),   -- {mode, groupBy, due, status, clientId, projectId, q, calendarUnit}
+    sort_order  int NOT NULL,
+    created_at  timestamptz NOT NULL,
+    updated_at  timestamptz NOT NULL
+);
+CREATE UNIQUE INDEX ux_task_views_name ON task_views (lower(name));        -- trùng tên không phân biệt hoa/thường → 409; tối đa 20 dòng (domain)
+CREATE TABLE task_view_state (                                               -- "chế độ xem cuối", singleton
+    id          smallint PRIMARY KEY CHECK (id = 1),
+    config      jsonb NOT NULL CHECK (jsonb_typeof(config) = 'object'),
+    updated_at  timestamptz NOT NULL
+);
+ALTER TABLE deliverables ADD COLUMN links jsonb NOT NULL DEFAULT '[]';
+ALTER TABLE deliverables ADD CONSTRAINT ck_deliverables_links CHECK (jsonb_typeof(links) = 'array' AND jsonb_array_length(links) <= 10);
+-- migration 20261114090000_AddTaskLarkUpgrades
+
 
 CREATE TABLE task_checklist_items (
     id          uuid PRIMARY KEY,

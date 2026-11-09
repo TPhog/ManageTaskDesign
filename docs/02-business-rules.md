@@ -273,7 +273,7 @@ Cả hai hành động chỉ ghi các cột `client_*` của báo giá nên đư
 | BR-81 | Quá hạn: `due_date < today(VN)` và `status ≠ DONE`. |
 | BR-82 | Task của dự án CANCELLED không xuất hiện trong "Tất cả task" mặc định. |
 
-Ngày hạn so với ngày bắt đầu: BR-141 (§14). Ảnh tải lên trong task mặc định riêng tư: BR-145.
+Ngày hạn so với ngày bắt đầu: BR-141 (§14). Lặp, bị chặn, liên kết, đổi hạn từ Lịch, nhóm & chế độ xem: BR-146..150 (§15). Ảnh tải lên trong task mặc định riêng tư: BR-145.
 
 ## 10. Files
 
@@ -326,6 +326,7 @@ Activity được ghi `visible_to_client = true` cho các action sau (kèm `clie
 | deliverable.client_approved | "Khách đã duyệt Logo" |
 | quotation.payment_status_changed | "Đã nhận tiền cọc cho BG-2026-0007" |
 | file.shared | "Đã chia sẻ file: logo_v3.png" |
+| (hạng mục) `links` | Chỉ liên kết `visibleToClient` hiện trên thẻ hạng mục, không qua activity (BR-148) |
 
 ## 13. Mẫu yêu cầu & form khách mới (Plan 13)
 
@@ -363,3 +364,17 @@ Hồ sơ khách mới:  NEW ──► CONVERTED   (designer bấm "Tạo khách 
 ### 14.1 Tìm nhanh (Ctrl+K)
 
 `GET /api/admin/search?q=` (q 2-100 ký tự, không phân biệt hoa/thường/dấu) trả thêm hai nhóm, tối đa 5 mục mỗi nhóm: `tasks` (khớp tiêu đề, kết quả bắt đầu bằng từ khoá lên trước; mỗi mục `{ id, projectId, title, projectName, status }`) và `requests` (khớp nội dung, mới nhất trước; mỗi mục `{ id, projectId, projectName, clientName, excerpt (120 ký tự đầu), status }`). Chọn kết quả mở drawer/dự án/yêu cầu tương ứng.
+
+## 15. Task kiểu Lark (Plan 15)
+
+> Plan 15 đề xuất BR-83..86 nhưng các id đó đã thuộc §10 (file/lưu trữ); dùng **BR-146..150**. Task luôn thuộc một dự án (`ProjectId` bắt buộc) - không có task "không dự án".
+
+| ID | Rule |
+|---|---|
+| BR-146 | **Task lặp.** Quy tắc `recurrence` = `DAILY` / `WEEKLY` (`weekdays` bitmask 1..127, bắt buộc ≥ 1 thứ → `400` `errors.recurrence`) / `MONTHLY` (`monthDay` 1..31, tháng ngắn lấy ngày cuối tháng) + `until` tuỳ chọn. Khi task có quy tắc chuyển sang `DONE` (cùng transaction, cùng lần lưu) hệ thống tạo **một** bản kế tiếp: `TODO`, cùng dự án/title/description/priority/quy tắc/links, checklist chưa tick; hạn = ngày đầu tiên khớp quy tắc sau `max(hạn cũ, hôm nay VN)`; `until` nhỏ hơn hạn kế tiếp thì không tạo. Chỉ spawn một lần mỗi task (`recurrence_spawned`; DONE→TODO→DONE không tạo thêm); không spawn khi dự án `CANCELLED`/`COMPLETED`; hạng mục `DELIVERED`/`CANCELLED` thì bản mới bỏ liên kết hạng mục. Hai lần DONE đồng thời chỉ một bản thắng (unique index nguồn) → bên kia `409 CONCURRENCY_CONFLICT`. Ghi `task.created` cho bản mới. |
+| BR-147 | **Bị chặn.** `blocked_reason` (≤ 500) và `blocked_by_task_id` chỉ tồn tại khi `status = BLOCKED`; rời `BLOCKED` thì cả hai bị xoá (DB check `ck_tasks_blocked_status`). Blocker phải cùng dự án, không phải chính nó, không tạo vòng (kiểm tra cả chuỗi blocker) → `400` `errors.blocked.byTaskId`. Kéo vào `BLOCKED` không bắt buộc lý do (giữ BR-80); blocker `DONE` **không** tự mở khoá (BR-01); xoá blocker thì `blocked_by_task_id` về `NULL` (FK `SET NULL`). |
+| BR-148 | **Liên kết ngoài.** Task và hạng mục có tối đa 10 liên kết `{ title, url, visibleToClient }`: `url` tuyệt đối `http`/`https`, không userinfo, không khoảng trắng, ≤ 2000 ký tự, lưu dạng `AbsoluteUri`; `title` ≤ 100. Link của **task không bao giờ ra Portal** (TSK-05); link của hạng mục chỉ ra Portal khi `visibleToClient = true` và hạng mục thuộc khách đó. URL không vào activity log (chỉ đếm). |
+| BR-149 | **Đổi hạn từ Lịch.** `PUT /api/admin/tasks/{id}/due-date` đặt `due_date` mới; nếu có `start_date` thì dịch cùng số ngày để giữ độ dài (BR-141 luôn đúng). Cùng ngày = không làm gì. Task `DONE` hoặc của dự án `CANCELLED` → `409 INVALID_TRANSITION`. Ghi `task.rescheduled { from, to, title }`. Marker hạn hạng mục/dự án trên Lịch chỉ đọc. |
+| BR-150 | **Nhóm & chế độ xem.** `groupBy` ∈ `none/project/deliverable/due/priority/status` chỉ sắp thứ tự và đếm (`groups[].count` là tổng của toàn bộ kết quả lọc, không chỉ trang); gom tối đa 5000 task (việc mở trước), vượt thì `truncated`. Lịch trả tối đa 500 task (`truncated`), khoảng ≤ 62 ngày; lọc theo dự án cụ thể thì hiện cả dự án đã huỷ. Chế độ xem đã lưu (tối đa 20, tên 1..60 không phân biệt hoa/thường, trùng/đầy → `409 CONFLICT`, kể cả khi đua nhau) và "chế độ xem cuối" (upsert một dòng) lưu ở server vì app một người dùng. |
+
+Portal (§12): hạng mục hiển thị thêm `links` đã bật cờ `visibleToClient` (không có route Portal mới).
