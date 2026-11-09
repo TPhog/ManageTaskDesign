@@ -65,7 +65,11 @@ export function useSendPortalRequest() {
   return useMutation({
     mutationFn: ({ files = [], ...values }: RequestFormValues & { files?: File[] }) =>
       api.postForm<PortalRequest>(`/portal/projects/${values.projectId}/requests`, toRequestForm(values, files)),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['portal', 'requests'] }),
+    // the new request can flip a product to "Đang sửa theo yêu cầu của bạn": refresh the home list and project pages too
+    onSuccess: () => Promise.all([
+      qc.invalidateQueries({ queryKey: ['portal', 'requests'] }),
+      qc.invalidateQueries({ queryKey: qk.portal.projects }),
+    ]),
   })
 }
 
