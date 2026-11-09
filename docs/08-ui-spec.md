@@ -7,10 +7,10 @@ Admin tối ưu desktop (≥ 1280px) nhưng dùng được trên tablet; Portal 
 
 | Component | Mô tả |
 |---|---|
-| `StatusBadge` | Màu theo trạng thái (xem §5) |
+| `StatusBadge` | Tông semantic theo trạng thái (xem §5) |
 | `MoneyText` | Định dạng VND, căn phải trong bảng |
 | `MoneyInput` | Nhập số, tự chèn dấu chấm ngăn nghìn **ngay khi gõ** (`2.000.000`), lưu số nguyên; dán `2,500,000` hay `2.500.000` đều hiểu là nghìn; phần thập phân (`1,5`) bị bỏ qua vì VND là số nguyên; Backspace trên dấu chấm giữ nguyên vị trí con trỏ |
-| `QuotaMeter` | `2/3 vòng` + thanh tiến độ; vàng khi còn 1, đỏ khi hết |
+| `QuotaMeter` | `2/3 vòng` + thanh tiến độ; mực khi còn, vàng khi còn 1, đỏ khi hết |
 | `BillingChip` | FREE_FIX "Sửa lỗi – miễn phí" · IN_QUOTA "Trong quota" · CHARGEABLE "Tính phí" |
 | `FileUploader` | Kéo thả, hiển thị tiến độ, lỗi định dạng/kích thước |
 | `FilePreview` | Lightbox ảnh, PDF viewer nhúng |
@@ -19,10 +19,17 @@ Admin tối ưu desktop (≥ 1280px) nhưng dùng được trên tablet; Portal 
 | `ReasonDialog` | Bắt buộc nhập lý do (ON_HOLD, hủy, scope override, hoàn tác thanh toán) |
 | `WarningDialog` | Hiển thị `warnings[]` từ API, nút "Vẫn tiếp tục" gửi `confirmWarnings=true` |
 | `EmptyState` | Mỗi danh sách rỗng có hướng dẫn + nút hành động chính |
+| `Tile` / `TileHeader` (`components/Tile.tsx`) | Ô bento của admin; `tone` = `default` · `inverse` (ô mực) · `highlight` (ô cam son); `TileHeader` có tiêu đề, icon, meta, action |
+| `StatTile` | Ô số liệu lớn, có thể là link (`to`), `tone`, `size` |
+| `PageHeader` | Tiêu đề trang (font display) + `eyebrow`, mô tả, nút hành động |
+| `dataTable` (`tableHeadRowClass`, `tableRowClass`) | Class dùng chung cho hàng đầu/hàng thân của bảng admin |
+| Editorial kit (`features/portal/kit/`) | `Masthead`, `EditorialSection`, `Kicker`, `LeaderList`/`LeaderRow`/`LeaderTotal`, `NumberedList`/`NumberedListItem`, `Letter`, `Figure`, `PullQuote`, `StatusText`; `usePortalTheme` đặt `data-theme="editorial"` |
 
 ## 2. Admin
 
 ### 2.1 Bố cục
+
+Sidebar kiểu Studio Bento: mục chính, rồi nhóm "Studio" (**Dịch vụ**, **Cài đặt**); mục đang mở là ô mực. Tổng quan là lưới bento: 12 cột ở ≥ 1280px, 6 cột ở 768–1279px, 1 cột dưới 768px.
 
 Sidebar: **Tổng quan** · **Yêu cầu** (badge NEW) · **Khách mới** (badge NEW, P13) · **Dự án** · **Công việc** · **Báo giá** · **Khách hàng** ·
 **Dịch vụ** · **Cài đặt**. Header: tìm kiếm nhanh (khách/dự án/số báo giá), nút "+ Tạo" (Dự án/Khách/Báo giá/Task).
@@ -100,7 +107,7 @@ Một bộ từ cho cả giao diện (`frontend/src/lib/glossary.ts`; `glossary.
 
 ### 3.1 Bố cục
 
-Header: logo + tên designer, nút liên hệ (gọi/email). Bottom nav (mobile): **Dự án** · **Báo giá** · **Yêu cầu**.
+Theme `data-theme="editorial"` trên `<html>` (nền kem, chữ Fraunces + Public Sans, không bo góc/bóng). Masthead: tên studio chữ serif, kẻ đôi, "Xin chào, {khách}" + nút Thoát (nút liên hệ gọi/email). Bottom nav kẻ mực (mobile): **Dự án** · **Báo giá** · **Yêu cầu**; Thoát và 3 link nav cao ≥ 44px.
 
 ### 3.2 Màn hình
 
@@ -149,12 +156,39 @@ Header: logo + tên designer, nút liên hệ (gọi/email). Bottom nav (mobile)
 
 ## 5. Màu trạng thái
 
-| Nhóm | Trạng thái → màu |
+`StatusBadge` dùng **tông** semantic (không còn màu theo hue); mỗi tông là một cặp token trong `index.css`.
+
+| Tông | Trạng thái |
 |---|---|
-| Project | DRAFT xám · QUOTED tím · IN_PROGRESS xanh dương · ON_HOLD cam · COMPLETED xanh lá · CANCELLED đỏ nhạt |
-| Quotation | DRAFT xám · SENT xanh dương · ACCEPTED xanh lá · REJECTED đỏ · EXPIRED cam · SUPERSEDED xám gạch ngang |
-| Payment | UNPAID xám · DEPOSIT_PAID vàng · PAID xanh lá |
-| Request | NEW xanh dương · TRIAGED xanh lá · DECLINED đỏ |
-| Billing | FREE_FIX xám · IN_QUOTA xanh lá · CHARGEABLE cam |
+| neutral | DRAFT · SUPERSEDED (gạch ngang) · UNPAID · PENDING · INACTIVE · NOT_STARTED · TODO |
+| active | QUOTED · IN_PROGRESS · SENT |
+| attention | NEW · IN_REVIEW · REVIEW |
+| success | COMPLETED · ACCEPTED · PAID · TRIAGED · CONFIRMED · ACTIVE · APPROVED · DELIVERED · DONE |
+| warning | ON_HOLD · EXPIRED · DEPOSIT_PAID |
+| danger | CANCELLED · REJECTED · DECLINED · BLOCKED |
+
+Billing: FREE_FIX neutral · IN_QUOTA success · CHARGEABLE warning.
 
 Màu luôn đi kèm chữ (không chỉ dựa vào màu — a11y). Độ tương phản chữ ≥ 4.5:1.
+
+## 6. Design system (P16)
+
+Nguồn sự thật là `frontend/src/index.css`; ADR-013 ghi lý do. Tóm tắt từ code đã giao:
+
+**Kiến trúc token 3 lớp.** (1) Primitive thô trong `:root` (`--paper-*`, `--ink-*`, `--stone-*`, `--vermilion-*`, `--cream-*`, `--sepia-*`, `--oxblood-700`, `--moss-700`, `--ochre-700`, xanh/vàng/đỏ trạng thái): component không bao giờ dùng trực tiếp. (2) Semantic (`--background`, `--foreground`, `--card`, `--primary`, `--muted-foreground`, `--highlight`, `--highlight-soft`, `--highlight-text`, `--success`/`--warning`/`--danger` và bản `-soft`, `--border`, `--border-strong`, `--rule`, `--input`, `--ring`, `--overlay`, `--font-body`/`--font-heading`, `--r-sm..xl`, `--elev-card`/`--elev-pop`): admin ở `:root`, portal ghi đè trong `[data-theme="editorial"]`. (3) Phạm vi component (`@utility tone-inverse` ô mực, `tone-highlight` ô cam son) trỏ lại token semantic trong ô để phần con tự thích nghi. `@theme inline` ánh xạ sang Tailwind (`bg-background`, `text-muted-foreground`, `font-display`, `text-title`, `text-kicker`...); shadcn dùng chung một bộ.
+
+**Hai theme.** Studio Bento (admin): nền giấy `#f5f1ea`, mực `#1c1a17`, cam son `#ff5a36` làm nền ô nhấn, bo 8/12/14/20px, bóng nhẹ. Editorial (portal): nền kem `#f3eee3`, sepia `#1b1916`, đỏ son đậm (`oxblood-700`) làm nhấn/ring, không bo góc, không bóng thẻ. Dark mode ngoài phạm vi; sau này chỉ thêm một khối `[data-theme="dark"]` ghi đè lớp semantic.
+
+**Chữ.** Admin: Bricolage Grotesque (tiêu đề) + Be Vietnam Pro (thân). Portal: Fraunces (tiêu đề, serif) + Public Sans (thân). Tự host bằng `@fontsource*` ghim đúng `5.3.0` (`@fontsource-variable/bricolage-grotesque`, `@fontsource-variable/fraunces`, `@fontsource-variable/public-sans`, `@fontsource/be-vietnam-pro`), chỉ nạp subset `latin` + `vietnamese`, `font-display: swap`. Lý do tự host: không request bên thứ ba (riêng tư cho khách, không phụ thuộc CDN) và có đủ dấu tiếng Việt. Plus Jakarta Sans đã bỏ. Thang chữ: `display-2xl` 3.5rem · `display-lg` 2rem · `display-md` 1.5625rem · `title` 1.0625rem · `kicker` 0.6875rem (hoa, giãn 0.12em); tiêu đề line-height ≥ 1.1 để không cắt dấu.
+
+**Tương phản.** `src/test/designTokens.test.ts` đọc `index.css` và kiểm cặp chữ/nền ≥ 4.5:1, ô nhập và focus ring ≥ 3:1, ở cả hai theme, trong ô mực và ô cam son, và `::selection`. Quy tắc: chữ trên cam son luôn là mực (chữ sáng trên cam son chỉ 2–3:1); cam son không làm màu chữ (dùng `--highlight-text`); viền nhạt chỉ trang trí. Đừng viết `--token:` trong comment của `index.css` (regex của test bắt nhầm).
+
+**Ánh xạ màu cũ sang token.** `bg-white` → `bg-card`; `bg-slate-50/100` → `bg-surface-sunk`/`bg-muted`; `text-slate-900` → `text-foreground`; `text-slate-500/600` → `text-muted-foreground`; `border-slate-200` → `border`; tím/xanh dương trạng thái → tông `active`/`attention`; xanh lá → `success`; cam/vàng → `warning`; đỏ → `danger`/`destructive`; overlay `bg-black/80` → `bg-overlay`.
+
+**Palette guard.** `src/test/paletteGuard.ts` (`rawPaletteHits`) cấm class bảng màu Tailwind (`bg-red-50`), `*-white`/`*-black`, hex/`rgb()`/`hsl()`/`oklch()`... và `style` màu literal. Ngoại lệ phải ghi `palette-ok: <lý do>` trong comment cùng dòng (ví dụ mã QR phải đen trên trắng). `palette.all.test.ts` quét `features/admin/**`, `components/**`, `features/portal/**`, `features/public/**`; các `palette.*.test.ts` theo vùng được giữ để báo lỗi gọn.
+
+**Editorial kit** (`features/portal/kit/`) là cách dựng trang portal/công khai: dùng `EditorialSection`, `LeaderRow` (dòng dẫn chấm), `NumberedList`, `Letter`... thay vì tự dựng card; `usePortalTheme` bật/tắt `data-theme="editorial"` theo vòng đời layout.
+
+**Cài đặt theo tab (P17).** `/admin/settings?tab=` có 7 tab (`settingsTabs.ts`): studio · payment · quotation · portal · images · notifications · account; thiếu/sai mở `studio`. Tab dùng chung token, không có màu riêng.
+
+**Thêm dark mode.** Thêm khối `[data-theme="dark"]` chỉ ghi đè lớp semantic (và `tone-*` nếu cần), thêm cặp vào `designTokens.test.ts`; không sửa component.

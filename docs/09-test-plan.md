@@ -203,6 +203,19 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
 | AC-SET7 | Checklist thiết lập STUDIO/BANK/WATERMARK | Link dẫn tới `?tab=studio` / `payment` / `images`; hộp Khách mới rỗng dẫn tới `?tab=portal` | `SetupChecklistTests`, `intakePageEmpty.test.tsx`, e2e `dashboard-upgrade.spec.ts` |
 | AC-SET8 | 390 px | Không tràn ngang ở cả 7 tab; tab đang chọn nằm trọn trong khung | e2e `settings.spec.ts` |
 
+### AC-UI — Giao diện Studio Bento / Editorial (P16)
+
+| ID | Kịch bản | Kết quả | Test |
+|---|---|---|---|
+| AC-UI-01 | Mọi cặp chữ/nền trong token, cả hai theme, ô mực và ô cam son | Chữ ≥ 4.5:1; ô nhập và focus ring ≥ 3:1 | `designTokens.test.ts` |
+| AC-UI-02 | Mở trang admin | Font tự host, đủ subset tiếng Việt; không request tới `fonts.googleapis.com`/`fonts.gstatic.com` | e2e `ui-redesign.spec.ts` |
+| AC-UI-03 | 390 px: 8 route danh sách admin, chi tiết dự án, đăng nhập; portal: trang chủ, dự án, báo giá, yêu cầu, yêu cầu mới | Không trang nào cuộn ngang (kiểm cứng) | e2e `ui-redesign.spec.ts`, `ui-portal-editorial.spec.ts` |
+| AC-UI-04 | Dashboard 1440 px / 390 px | Lưới 12 cột (lịch 7 ngày đủ cột) / 1 cột; ô quá hạn chỉ cam son khi > 0 | e2e `ui-redesign.spec.ts`, `todayTile.test.tsx` |
+| AC-UI-05 | Portal trên điện thoại | `data-theme="editorial"` trên `<html>`, nền kem, masthead Fraunces, thân Public Sans; Thoát và 3 link nav cao ≥ 44px | e2e `ui-portal-editorial.spec.ts` |
+| AC-UI-06 | Thêm class bảng màu Tailwind / hex / `rgb()` vào admin, component dùng chung, portal hoặc trang công khai | Test đỏ, trừ dòng có `palette-ok: <lý do>` | `palette.all.test.ts`, `paletteGuard.test.ts` |
+| AC-UI-07 | `StatusBadge` mọi trạng thái | Có tông và nhãn chữ | `primitives.test.tsx` |
+| AC-UI-08 | Chạy lại toàn bộ suite sau redesign | `data-testid`, tên region/heading/nút của spec P01–P17 không đổi; Vitest + Playwright xanh | toàn bộ suite |
+
 ### AC-TSK2 — Task kiểu Lark (P15; BR-146..150)
 
 > Plan 15 gọi các quy tắc là BR-83..86; id thực tế là BR-146..149 (+ BR-150 cho nhóm/chế độ xem).
@@ -242,6 +255,7 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
 10. **Mẫu yêu cầu & khách mới (P13):** khách mới điền Poster qua `/f/{slug}` (có kịch bản `FORM_EXPIRED` không mất chữ đã gõ) rồi cảm ơn (`public-intake.spec.ts`); designer chuyển hồ sơ thành khách + dự án + brief hoặc từ chối/xoá (`intake.spec.ts`); khách portal gửi Poster theo mẫu và designer thấy bảng câu trả lời (`portal-template-request.spec.ts`); designer tạo/sửa/xoá mẫu và quản lý link (`request-templates.spec.ts`). Spec công khai dùng 1 lượt/IP/ngày trong trần 5 (BR-137) - chạy > 5 lần/ngày trên cùng máy dev sẽ nhận `429`.
 11. **Designer UX vòng 2 (P14, `designer-ux-round2.spec.ts`):** dự án đã báo giá hiện "Sẵn sàng bắt đầu" → bắt đầu với hạn chung → "Xem công việc"/"Đánh dấu đã nhận cọc" → gửi duyệt khi còn việc ("Vẫn gửi duyệt") → xác nhận đã duyệt → bàn giao với link sai rồi link đúng + lời nhắn, khách thấy trên timeline; Kanban 1440 px, không tràn ngang ở 390 px, Ctrl+K tìm công việc không dấu. Các spec `project-flow`, `project-full-flow`, `deliverables` bấm qua hộp xác nhận mới.
 12. **Task kiểu Lark (P15, `task-lark.spec.ts`):** đánh dấu task lặp Xong → có bản kế tiếp; chặn bởi task khác rồi mở chặn xoá lý do; kéo task sang ngày khác trên Lịch đổi hạn; link `javascript:` bị từ chối; chỉ link hạng mục bật cờ hiện trên Portal; lưu/áp/xoá chế độ xem và áp lại view cuối.
+13. **Giao diện P16 (`ui-redesign.spec.ts`, `ui-portal-editorial.spec.ts`):** theme và font admin, dashboard bento 12 cột/1 cột, ảnh chụp 1440/390 mọi trang admin, chi tiết dự án + đăng nhập; portal editorial (theme, masthead, điểm chạm 44px). Cả hai chặn cứng cuộn ngang ở 390 px. Spec mở `/admin/tasks` không bộ lọc (`tasks.spec.ts`, `lists.spec.ts`) đặt lại "chế độ xem cuối" qua `PUT /api/admin/task-views/last` trước khi chạy.
 
 ## 4. Test cô lập Portal (bắt buộc, tự động sinh)
 

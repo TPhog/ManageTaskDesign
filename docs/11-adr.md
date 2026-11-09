@@ -77,3 +77,10 @@ Format: Bối cảnh → Quyết định → Hệ quả. Trạng thái tất c�
 - **Bối cảnh:** QA CF-03: khách không biết đồng ý báo giá hay báo đã chuyển tiền ở đâu, nên quay lại nhắn Zalo; designer không có chỗ trong hệ thống để thấy điều đó.
 - **Quyết định:** hai nút trên Portal chỉ ghi `client_accepted_at` / `client_payment_notice_*` + activity khách thấy được + Discord. Designer xác nhận bằng hành động có sẵn qua "Bước tiếp theo" (`CONFIRM_CLIENT_ACCEPTANCE` → chấp nhận như BR-31, `CONFIRM_CLIENT_PAYMENT` → đổi `payment_status` như BR-70..72). Hai nút idempotent; không đổi `status`/`payment_status`; app không xử lý hay xác minh tiền (BR-01). Trigger `fn_quotation_locked` whitelist đúng bốn cột mới.
 - **Hệ quả:** bằng chứng khách đồng ý có trong hệ thống (thời điểm + ghi chú); designer vẫn phải kiểm tra tài khoản ngân hàng trước khi xác nhận; không có tự động đổi trạng thái nên không thể "chốt nhầm" do khách bấm.
+
+## ADR-013 — Hai giao diện trên một hệ token; font tự host
+
+- **Trạng thái:** chấp nhận (P16).
+- **Bối cảnh:** designer cần công cụ có "gu"; khách nhìn portal để đánh giá chính designer, nên admin (làm việc dày đặc) và portal (đọc như thư/báo giá) cần hai giọng khác nhau mà không nhân đôi component.
+- **Quyết định:** Studio Bento cho admin, Editorial cho portal và trang công khai. Token 3 lớp (primitive, semantic, phạm vi component) trong `frontend/src/index.css`; portal ghi đè lớp semantic dưới `data-theme="editorial"` (đặt trên `<html>` bởi `usePortalTheme`). Font tự host bằng `@fontsource*` ghim `5.3.0`, subset `latin` + `vietnamese`, không gọi Google Fonts. Màu chỉ qua token semantic, ép bằng palette guard (`palette.all.test.ts`, ngoại lệ `palette-ok:`); tương phản ép bằng `designTokens.test.ts`.
+- **Hệ quả:** một bộ shadcn dùng cho cả hai theme; đổi màu chỉ sửa `index.css`; dark mode = thêm một khối semantic; không request font bên thứ ba; component mới không được tự chọn màu (guard đỏ); trang portal mới dùng editorial kit thay vì tự dựng.

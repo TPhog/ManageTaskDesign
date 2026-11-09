@@ -22,8 +22,8 @@ Thứ tự đọc khi bắt đầu feature mới: FR trong `01` → rule trong `
 
 ## Stack
 
-- **Backend:** .NET 10 Minimal APIs + EF Core 10 + Npgsql + PostgreSQL 17
-- **Frontend:** React 19 + TypeScript + Vite + Tailwind CSS 4 + shadcn/ui + TanStack Query + react-hook-form + zod
+- **Backend:** .NET 9 Minimal APIs + EF Core 9 + Npgsql + PostgreSQL 17
+- **Frontend:** React 19 + TypeScript + Vite + Tailwind CSS 4 + shadcn/ui + TanStack Query + react-hook-form + zod · font tự host `@fontsource` ghim 5.3.0 (Bricolage Grotesque + Be Vietnam Pro cho admin, Fraunces + Public Sans cho portal)
 - **Auth:** Cookie (2 scheme: `Designer` SameSite=Strict, `Portal` SameSite=Lax) — không JWT
 - **Test BE:** xUnit + FluentAssertions + Testcontainers.PostgreSql
 - **Test FE:** Vitest + Testing Library · E2E: Playwright
@@ -88,9 +88,9 @@ src/FreelanceFlow.Api/
 ```
 src/
 ├── lib/              ← api client (CSRF header), query keys, format tiền/ngày, zod schemas
-├── components/       ← shared: MoneyText, StatusBadge, QuotaMeter, FileUploader, QrCard
+├── components/       ← shared: MoneyText, StatusBadge, QuotaMeter, FileUploader, QrCard, Tile, StatTile, PageHeader, dataTable
 ├── features/admin/   ← dashboard, clients, projects, requests, tasks, quotations, settings
-└── features/portal/  ← home, project detail, quotation, request-new
+└── features/portal/  ← home, project detail, quotation, request-new; kit/ ← editorial kit + usePortalTheme
 ```
 
 ## Hard rules
@@ -117,6 +117,9 @@ src/
 ### Portal isolation
 - Mọi tài nguyên portal scope theo `clientId` từ session. Ngoài scope → 404 (không 403).
 - Endpoint portal mới **bắt buộc** thêm case vào bảng isolation test (xem `docs/09-test-plan.md` §4).
+
+### UI tokens
+- Chỉ dùng token semantic (`docs/08` §6): admin = Studio Bento (`:root`), portal/public = Editorial (`data-theme="editorial"`). Không class bảng màu Tailwind/hex trong admin, components, portal, public (test `palette.all`; ngoại lệ ghi `palette-ok: <lý do>` cùng dòng). Chữ trên cam son luôn là mực. Trang portal dùng editorial kit.
 
 ### Security
 - Không log portal token, mật khẩu, body upload.
