@@ -47,6 +47,7 @@ export function useProjectStatusChange(project: ProjectDetail): { request: (t: P
       onSuccess: () => {
         void qc.invalidateQueries({ queryKey: qk.projects.all })
         void qc.invalidateQueries({ queryKey: qk.tasks.lists })
+        void qc.invalidateQueries({ queryKey: qk.tasks.calendarAll })
         void qc.invalidateQueries({ queryKey: qk.revisions.all })
         toast.success(`Đã chuyển dự án: ${transition.label}`)
         setAsking(null)

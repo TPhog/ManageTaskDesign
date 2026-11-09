@@ -15,6 +15,8 @@ function useRefreshProjectData() {
     Promise.all([
       qc.invalidateQueries({ queryKey: qk.projects.all }),
       qc.invalidateQueries({ queryKey: qk.tasks.lists }),
+      // deliverable and project deadlines are calendar markers
+      qc.invalidateQueries({ queryKey: qk.tasks.calendarAll }),
       qc.invalidateQueries({ queryKey: qk.revisions.all }),
     ])
 }
