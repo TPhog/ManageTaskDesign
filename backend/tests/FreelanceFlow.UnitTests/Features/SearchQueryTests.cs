@@ -39,4 +39,79 @@ public class SearchQueryTests
         SearchQuery.HasNumberChars("- -").Should().BeFalse();
         SearchQuery.HasNumberChars("BG").Should().BeTrue();
     }
+
+    // ---------- Excerpt (P14 DF-26: request search) ----------
+
+    [Fact]
+    public void Excerpt_keeps_short_content_whole() =>
+        SearchQuery.Excerpt("Đổi màu logo", "mau").Should().Be("Đổi màu logo");
+
+    [Fact]
+    public void Excerpt_of_an_early_match_is_the_start_with_a_trailing_ellipsis()
+    {
+        var content = "Đổi màu logo " + new string('x', 300);
+        SearchQuery.Excerpt(content, "doi mau").Should().Be(content[..119] + "…");
+    }
+
+    [Fact]
+    public void Excerpt_centers_a_late_match_ignoring_case_and_accents()
+    {
+        var content = new string('a', 300) + " Đổi MÀU logo " + new string('b', 300);
+
+        var excerpt = SearchQuery.Excerpt(content, "doi mau");
+
+        excerpt.Should().HaveLength(120).And.StartWith("…").And.EndWith("…").And.Contain("Đổi MÀU");
+        var at = excerpt.IndexOf("Đổi", StringComparison.Ordinal);
+        at.Should().BeInRange(45, 60);   // roughly centered
+    }
+
+    [Fact]
+    public void Excerpt_of_a_match_near_the_end_ends_with_the_content()
+    {
+        var content = new string('a', 300) + " cuối";
+        var excerpt = SearchQuery.Excerpt(content, "cuoi");
+        excerpt.Should().HaveLength(120).And.StartWith("…").And.EndWith(" cuối");
+    }
+
+    [Fact]
+    public void Excerpt_without_a_findable_match_falls_back_to_the_start()
+    {
+        var content = new string('x', 300);
+        SearchQuery.Excerpt(content, "zz").Should().Be(content[..119] + "…");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(3)]
+    public void Excerpt_never_cuts_a_surrogate_pair(int pad)
+    {
+        var emojis = string.Concat(Enumerable.Repeat("😀", 150));
+        foreach (var content in new[]
+                 {
+                     new string('x', pad) + emojis,                               // cut at the end
+                     new string('x', pad) + emojis + " tìm " + emojis,            // cut on both sides
+                     emojis + new string('x', pad) + " tìm",                      // cut at the start
+                 })
+        {
+            var excerpt = SearchQuery.Excerpt(content, "tim");
+            excerpt.Length.Should().BeLessThanOrEqualTo(120);
+            WellFormed(excerpt).Should().BeTrue(excerpt);
+        }
+    }
+
+    private static bool WellFormed(string s)
+    {
+        for (var i = 0; i < s.Length; i++)
+        {
+            if (char.IsHighSurrogate(s[i]))
+            {
+                if (i + 1 >= s.Length || !char.IsLowSurrogate(s[i + 1])) return false;
+                i++;
+            }
+            else if (char.IsLowSurrogate(s[i])) return false;
+        }
+        return true;
+    }
 }

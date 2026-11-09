@@ -100,8 +100,7 @@ public static class SearchEndpoints
             .ToListAsync();
         var requests = requestRows
             .Select(r => new SearchRequestDto(r.Id, r.ProjectId, r.ProjectName, r.ClientName,
-                r.Content.Length > SearchRequestDto.ExcerptLength ? r.Content[..SearchRequestDto.ExcerptLength] : r.Content,
-                r.Status))
+                SearchQuery.Excerpt(r.Content, term, SearchRequestDto.ExcerptLength), r.Status))
             .ToList();
 
         return Results.Ok(new SearchResultDto(clients, projects, quotations, tasks, requests));

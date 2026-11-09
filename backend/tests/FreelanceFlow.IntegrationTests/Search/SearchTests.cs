@@ -86,7 +86,49 @@ public class SearchTests(AppFactory factory) : IntegrationTestBase(factory)
         hit.GetProperty("projectName").GetString().Should().Be($"Dự án yêu cầu {tok}");
         hit.GetProperty("clientName").GetString().Should().Be($"Khách yêu cầu {tok}");
         hit.GetProperty("status").GetString().Should().Be("NEW");
-        hit.GetProperty("excerpt").GetString().Should().Be(content[..120]).And.Contain(tok);
+        hit.GetProperty("excerpt").GetString().Should().Be(content[..119] + "…").And.Contain(tok);
+    }
+
+    [Fact]
+    public async Task Request_excerpt_shows_a_match_found_far_into_the_content()
+    {
+        await LoginAsync();
+        var tok = Token();
+        var projectId = await CreateProjectAsync(await CreateClientAsync($"Khách {tok}"), $"Dự án {tok}");
+        var content = new string('x', 400) + $" chữ ký {tok} " + new string('y', 400);
+        (await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/requests", new { content, source = "ZALO" }))
+            .EnsureSuccessStatusCode();
+
+        var excerpt = (await SearchAsync($"chu ky {tok}")).GetProperty("requests").EnumerateArray().Single()
+            .GetProperty("excerpt").GetString();
+
+        excerpt.Should().HaveLength(120).And.StartWith("…").And.EndWith("…").And.Contain($"chữ ký {tok}");
+    }
+
+    [Theory]
+    [InlineData("50%", "50x")]
+    [InlineData("a_b", "axb")]
+    public async Task Like_wildcards_are_literal_in_the_task_and_request_groups(string literal, string lookalike)
+    {
+        await LoginAsync();
+        var tok = Token();
+        var projectId = await CreateProjectAsync(await CreateClientAsync($"Khách {tok}"), $"Dự án {tok}");
+        var ids = new Dictionary<string, (Guid Task, Guid Request)>();
+        foreach (var word in new[] { literal, lookalike })
+        {
+            var task = await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/tasks", new { title = $"Giảm {word} {tok}" });
+            task.EnsureSuccessStatusCode();
+            var request = await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/requests",
+                new { content = $"Giảm {word} {tok}", source = "ZALO" });
+            request.EnsureSuccessStatusCode();
+            ids[word] = ((await task.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid(),
+                (await request.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("request").GetProperty("id").GetGuid());
+        }
+
+        var res = await SearchAsync($"{literal} {tok}");
+
+        Ids(res, "tasks").Should().Equal(ids[literal].Task);
+        Ids(res, "requests").Should().Equal(ids[literal].Request);
     }
 
     [Fact]

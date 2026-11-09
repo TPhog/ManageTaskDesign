@@ -20,7 +20,7 @@ public sealed record SearchQuotationDto(
 
 public sealed record SearchTaskDto(Guid Id, Guid ProjectId, string Title, string ProjectName, string Status);
 
-/// <summary>Excerpt: the first <see cref="ExcerptLength"/> characters of the request content.</summary>
+/// <summary>Excerpt: at most <see cref="ExcerptLength"/> characters of the content around the match (SearchQuery.Excerpt).</summary>
 public sealed record SearchRequestDto(Guid Id, Guid ProjectId, string ProjectName, string ClientName, string Excerpt, string Status)
 {
     public const int ExcerptLength = 120;
