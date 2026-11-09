@@ -92,6 +92,7 @@ URL        = {PublicBaseUrl}/p/{token}
   - trần **30 hồ sơ lưu/ngày VN cho cả studio** (đếm lại dưới `pg_advisory_xact_lock` trong transaction ghi) và **5 hồ sơ lưu/ngày VN/IP** (`PublicIntake:MaxSubmissionsPerIpPerDay`, đếm trong bộ nhớ) → `429 RATE_LIMITED`;
   - body ≤ `App:MaxUploadMb × 3 + 1` MB (`ImageLimits.PublicIntakeBodyBytes`, mặc định 61 MB) → `413`; ≤ 3 ảnh, kiểm magic bytes như §5 → `415`;
   - kho ≥ **80 %** → từ chối ảnh `507 STORAGE_FULL`, vẫn nhận phần chữ; câu ảnh bắt buộc thành tuỳ chọn (BR-131, BR-135).
+  - **CGNAT:** nhà mạng di động Việt Nam đặt nhiều thuê bao sau một IP công khai, nên "theo IP" có thể là nhiều khách thật. Limiter `POST` 5/giờ đếm **mọi** lần gửi (cả lỗi validation và `FORM_EXPIRED` gửi lại), còn giới hạn 5 hồ sơ/ngày/IP chỉ đếm hồ sơ **đã lưu** (`IntakeIpDailyCounter`). Khi chạy thật và link được chia sẻ rộng (Facebook/Zalo), nên nâng `RateLimit__PublicIntakeSubmitPerHour` (vd 20–30) và giữ `PublicIntake__MaxSubmissionsPerIpPerDay` làm chốt chính; trần 30/ngày của studio vẫn chặn spam tổng.
 - Chống bot (BR-138): honeypot `website` + thời gian điền tối thiểu `PublicIntake:MinFillSeconds` (3 s) đo bằng `formToken` = Data Protection `Protect("{slug}|{issuedAtUnixMs}|{id}")`, purpose `FreelanceFlow.PublicIntake.FormToken.v1`, hiệu lực 24 h, **dùng một lần** cho một hồ sơ được lưu (id đã dùng nằm trong bộ nhớ, trả lại khi hồ sơ không được lưu). Bot nhận `204` giống người thật và không có dòng nào được ghi.
 - **Data Protection keys phải được lưu bền:** `DataProtection:KeysPath` (production `/data/keys`, volume `keys`; Development `./data/keys`). API **từ chối khởi động** ngoài Development/Testing nếu thiếu cấu hình này, hoặc thư mục không tồn tại (không tự tạo — phải là volume đã mount) hay không ghi được. Nếu key ring mất, mọi cookie đăng nhập/portal và biểu mẫu đang mở mất hiệu lực (khách nhận `FORM_EXPIRED` và biểu mẫu tự tải lại token).
 - Không echo: POST thành công `204` rỗng; lỗi validation chỉ có thông điệp theo trường. GET chỉ trả `displayName`, `contactPhone`, `contactEmail` của studio + mẫu đang bật (không `serviceId`, `designType`, ngân hàng, dữ liệu khách); `Cache-Control: no-store`.
@@ -152,6 +153,13 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 - Tin digest không chứa webhook URL, token portal, thông tin tài khoản ngân hàng hay nội dung brief; chỉ tiêu đề task, tên dự án, số báo giá, hạn và tổng công nợ.
 - `GET /api/admin/settings/digest` chỉ trả `channelConfigured` (boolean), không bao giờ trả webhook URL; webhook không được log.
 - `client-activity` dựng `href` ở server từ id nội bộ, frontend không ghép đường dẫn từ dữ liệu khách nhập.
+
+### 7.2 Nội dung gửi Discord (quy tắc chung)
+
+- **Nguồn ẩn danh (`/api/public/*`) → không gửi chữ tự do.** Form khách mới chỉ gửi tên khách + tên mẫu (§4.5); câu trả lời, ghi chú, SĐT, email không bao giờ rời hệ thống qua webhook.
+- **Khách portal đã xác thực (magic link) → được gửi trích đoạn chữ tự do, tối đa 200 ký tự, gộp một dòng:** nội dung yêu cầu (`PortalRequestsEndpoints`, đã render câu trả lời mẫu — có thể chứa SĐT/email khách tự gõ) và ghi chú "Tôi đã chuyển khoản" (`PortalQuotationsEndpoints`). Designer cần thấy ngay để phản hồi; đây là kênh riêng của designer.
+- Không bao giờ gửi: token/link portal, slug form, webhook URL, mật khẩu, số tài khoản ngân hàng, nội dung brief.
+- Endpoint mới gửi Discord phải theo đúng hai mức trên; muốn gửi thêm loại dữ liệu khác thì cập nhật mục này trước.
 
 ## 8. Dữ liệu cá nhân
 
