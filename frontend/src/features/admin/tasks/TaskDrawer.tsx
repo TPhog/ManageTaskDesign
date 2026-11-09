@@ -268,6 +268,7 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
               setValue('blockedReason', b.reason, { shouldDirty: true })
               setValue('blockedByTaskId', b.byTaskId ?? NO_BLOCKER, { shouldDirty: true })
             }}
+            saved={task.blocked}
           />
           {extraErrors.blocked && <p role="alert" className="text-sm text-destructive">{extraErrors.blocked}</p>}
         </div>
