@@ -55,7 +55,7 @@ export default function IntakePage() {
               icon={UserPlus}
               title="Chưa có khách mới"
               description="Bật form khách mới trong Cài đặt rồi chia sẻ link lên Facebook/Zalo."
-              action={<Button asChild variant="outline"><Link to="/admin/settings">Mở Cài đặt</Link></Button>}
+              action={<Button asChild variant="outline"><Link to="/admin/settings?tab=portal">Mở Cài đặt</Link></Button>}
             />
           ) : (
             <EmptyState icon={UserPlus} title="Chưa có hồ sơ nào" />
