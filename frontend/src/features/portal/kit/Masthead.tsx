@@ -23,7 +23,7 @@ export function Masthead({ studioName, logoUrl, subline, homeHref, actions }: Ma
   const { head, tail } = splitWordmark(studioName)
   return (
     <header className="mx-auto max-w-2xl px-5 pt-5">
-      <Link to={homeHref} className="flex flex-col items-center gap-2 text-center">
+      <Link to={homeHref} className="flex min-h-11 flex-col items-center justify-center gap-2 text-center">
         {logoUrl && <img src={logoUrl} alt="" className="h-8 w-auto" />}
         <span className="font-display text-[1.625rem] font-medium leading-tight tracking-[-0.01em] text-foreground">
           {head}{tail && <i className="text-highlight-text">{tail}</i>}

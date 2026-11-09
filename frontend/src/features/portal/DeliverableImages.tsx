@@ -22,10 +22,13 @@ export function DeliverableImages({ projectId, deliverableId, deliverableName }:
       </p>
     )
   }
+  const shown = images.slice(0, 4)
+  // Odd count: the first image leads full-width (editorial figure), the rest pair up below it
+  const hero = shown.length % 2 === 1 ? '[&>li:first-child]:col-span-2 [&>li:first-child]:aspect-[16/10]' : ''
   return (
     <div className="space-y-2">
       <Figure caption={`Bản cần duyệt · ${images.length} ảnh — chạm để xem lớn`}>
-        <ImageGrid images={images.slice(0, 4)} onOpen={setOpen} className="grid-cols-2 gap-1.5 sm:grid-cols-2" />
+        <ImageGrid images={shown} onOpen={setOpen} className={`grid-cols-2 gap-1.5 sm:grid-cols-2 ${hero}`} />
       </Figure>
       {images.length > 4 && (
         <Button type="button" variant="outline" className="h-11 w-full" onClick={() => setOpen(0)}>Xem cả {images.length} ảnh</Button>

@@ -80,7 +80,9 @@ export default function PortalQuotationPage() {
       <header className="-mt-2">
         <Kicker tone="highlight">{portalQuotationKind[s.kind] ?? s.kind} · {versionText(s)}</Kicker>
         <h1 className="mt-2 font-display text-[2rem] font-medium leading-[1.1] tracking-[-0.02em] text-foreground">{s.title}</h1>
-        <p className="mt-1 font-serif text-base italic text-muted-foreground">{s.project.name}</p>
+        {s.project.name.trim() !== s.title.trim() && (
+          <p className="mt-1 font-serif text-base italic text-muted-foreground">{s.project.name}</p>
+        )}
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
           <StatusBadge status={q.effectiveStatus} label={quotationBadgeLabel(q)} />
           {showsPaymentStatus(q) && <StatusBadge status={q.paymentStatus} label={portalPaymentStatus[q.paymentStatus]} />}

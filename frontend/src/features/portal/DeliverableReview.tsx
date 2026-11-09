@@ -112,7 +112,9 @@ function RequestChangeDialog({ projectId, deliverable, open, onOpenChange }: Req
       <DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{`Yêu cầu sửa ${deliverable.name}`}</DialogTitle>
-          <DialogDescription>Mô tả điều bạn muốn chỉnh — nhà thiết kế sẽ xem và phản hồi.</DialogDescription>
+          <DialogDescription>
+            {sent ? 'Yêu cầu đã đến nhà thiết kế.' : 'Mô tả điều bạn muốn chỉnh — nhà thiết kế sẽ xem và phản hồi.'}
+          </DialogDescription>
         </DialogHeader>
         {sent ? (
           <RequestSentSummary
