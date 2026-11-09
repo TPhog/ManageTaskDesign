@@ -31,7 +31,7 @@ describe('stageLabel', () => {
 
 describe('actionHref', () => {
   it('opens the matching tab of the project', () => {
-    expect(actionHref('ADD_DELIVERABLE', 'p1', none)).toBe('/admin/projects/p1?tab=deliverables')
+    expect(actionHref('ADD_DELIVERABLE', 'p1', none)).toBe('/admin/projects/p1?tab=deliverables&new=1')
     expect(actionHref('CONFIRM_BRIEF', 'p1', none)).toBe('/admin/projects/p1?tab=brief')
     expect(actionHref('CREATE_QUOTATION', 'p1', none)).toBe('/admin/projects/p1?tab=quotations')
     expect(actionHref('CREATE_ADDITIONAL_QUOTATION', 'p1', none)).toBe('/admin/projects/p1?tab=revisions')

@@ -14,10 +14,12 @@ const cancel: ProjectTransition = { to: 'CANCELLED', label: 'Huỷ dự án', re
 /** Shared by the status menu and the COMPLETE_PROJECT flow action so both show the same warnings dialog. */
 export const completeTransition: ProjectTransition = { to: 'COMPLETED', label: 'Hoàn thành', reason: 'none' }
 
+export const quotedTransition: ProjectTransition = { to: 'QUOTED', label: 'Đã báo giá', reason: 'none' }
+
 /** docs/02 §3 — mirrors Project.ValidateTransition; CANCELLED is final. */
 export const projectTransitions: Record<ProjectStatus, ProjectTransition[]> = {
   DRAFT: [
-    { to: 'QUOTED', label: 'Chuyển sang Đã báo giá', reason: 'none' },
+    quotedTransition,
     { to: 'IN_PROGRESS', label: 'Bắt đầu làm', reason: 'none' },
     cancel,
   ],

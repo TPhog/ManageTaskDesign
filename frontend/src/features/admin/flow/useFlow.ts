@@ -80,13 +80,46 @@ export function useConfirmApproval() {
 export function useDeliverableStatus() {
   const refresh = useRefreshProjectData()
   return useMutation({
-    mutationFn: ({ deliverableId, to }: { deliverableId: string; to: DeliverableStatus }) =>
-      api.post<unknown>(`/admin/deliverables/${deliverableId}/status`, { to }),
+    mutationFn: ({ deliverableId, to, deliveryUrl, clientMessage }: {
+      deliverableId: string
+      to: DeliverableStatus
+      deliveryUrl?: string | null
+      clientMessage?: string | null
+    }) =>
+      api.post<unknown>(
+        `/admin/deliverables/${deliverableId}/status`,
+        // the backend ignores both for any other target; do not send them
+        to === 'DELIVERED' ? { to, deliveryUrl: deliveryUrl ?? null, clientMessage: clientMessage ?? null } : { to },
+      ),
     onSuccess: () => {
       toast.success('Đã cập nhật trạng thái')
       return refresh()
     },
     onError: (err: ApiError) => toast.error(flowErrorText(err, 'Không thể cập nhật trạng thái')),
+  })
+}
+
+/** RECORD_DEPOSIT: mark the accepted quotation's deposit (or the full amount when there is no deposit) as received. */
+export function useMarkDeposit() {
+  const qc = useQueryClient()
+  const refresh = useRefreshProjectData()
+  return useMutation({
+    mutationFn: async (quotationId: string) => {
+      // fresh rowVersion: the quotation may have changed since the flow was loaded
+      const q = await qc.fetchQuery({
+        queryKey: qk.quotations.detail(quotationId),
+        queryFn: () => api.get<QuotationDetail>(`/admin/quotations/${quotationId}`),
+        staleTime: 0,
+      })
+      const to = q.depositPercent > 0 ? 'DEPOSIT_PAID' : 'PAID'
+      await api.post<unknown>(`/admin/quotations/${quotationId}/payment-status`, { to, rowVersion: q.rowVersion })
+      return to
+    },
+    onSuccess: async to => {
+      toast.success(to === 'DEPOSIT_PAID' ? 'Đã ghi nhận đã nhận cọc' : 'Đã ghi nhận đã nhận thanh toán')
+      await Promise.all([refresh(), qc.invalidateQueries({ queryKey: qk.quotations.all })])
+    },
+    onError: (err: ApiError) => toast.error(flowErrorText(err, 'Không thể ghi nhận thanh toán')),
   })
 }
 

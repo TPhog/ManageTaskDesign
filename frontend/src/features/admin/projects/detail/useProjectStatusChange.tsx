@@ -1,4 +1,5 @@
 import { useState, type FormEvent, type ReactNode } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
@@ -135,6 +136,11 @@ export function useProjectStatusChange(project: ProjectDetail): { request: (t: P
             ))}
           </ul>
           <DialogFooter className="gap-2">
+            {pending?.warnings.some(w => w.includes('công việc chưa xong')) && (
+              <Button asChild variant="outline">
+                <Link to={`/admin/projects/${project.id}?tab=tasks`} onClick={() => setPending(null)}>Xem công việc</Link>
+              </Button>
+            )}
             <Button type="button" variant="outline" onClick={() => setPending(null)}>Để sau</Button>
             <Button
               type="button"

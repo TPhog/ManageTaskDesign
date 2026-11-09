@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/StatusBadge'
 import { EmptyState } from '@/components/EmptyState'
 import { formatDate } from '@/lib/format'
+import { projectDateRange, statusBadgeOverride } from '@/features/admin/flow/flowUtils'
 import { api } from '@/lib/api'
 import { BriefTab } from './BriefTab'
 import { QuotationsTab } from './QuotationsTab'
@@ -80,6 +81,8 @@ export default function ProjectDetailPage() {
   }
 
   const designType = designTypeLabel[project.designType] ?? project.designType
+  const badge = statusBadgeOverride(project, flow.data)
+  const range = projectDateRange(project.startDate, project.dueDate)
 
   return (
     <div className="space-y-6">
@@ -98,16 +101,16 @@ export default function ProjectDetailPage() {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground">{project.name}</h1>
-              <StatusBadge status={project.status} />
+              <StatusBadge status={badge.status} label={badge.label} />
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
               <span>{project.client.name}</span>
               <span aria-hidden="true">·</span>
               <span>{designType}</span>
-              {(project.startDate || project.dueDate) && (
+              {range && (
                 <>
                   <span aria-hidden="true">·</span>
-                  <span className="tabular-nums">{formatDate(project.startDate)} → {formatDate(project.dueDate)}</span>
+                  <span className="tabular-nums">{range}</span>
                 </>
               )}
             </div>

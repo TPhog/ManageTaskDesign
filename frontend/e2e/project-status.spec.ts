@@ -34,9 +34,7 @@ test.describe('Project detail (QA D-01, D-08, D-27)', () => {
     await expect(reason.getByRole('button', { name: 'Mở lại dự án' })).toBeDisabled()
     await reason.getByLabel('Lý do mở lại').fill('Khách cần thêm một bản in')
     await reason.getByRole('button', { name: 'Mở lại dự án' }).click()
-    // still no accepted initial quotation → the server warns again; the reason travels with the confirmation
-    await expect(warn).toContainText('Chưa có báo giá gốc được khách chấp nhận.')
-    await warn.getByRole('button', { name: 'Vẫn tiếp tục' }).click()
+    // reopening a completed project no longer warns: it goes straight through with the reason
     await expect.poll(() => projectStatus(page, projectId)).toBe('IN_PROGRESS')
   })
 

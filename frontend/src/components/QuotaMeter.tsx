@@ -15,6 +15,14 @@ const textColor: Record<QuotaTone, string> = {
 
 /** docs/08 §1: "2/3 vòng" + bar; amber with one free round left, red when none is left */
 export function QuotaMeter({ used, total, label }: QuotaMeterProps) {
+  // no free rounds included (e.g. a service without revisions): a full red bar would read as an error
+  if (total === 0) {
+    return (
+      <span className="text-xs text-muted-foreground">
+        Không có vòng sửa miễn phí{used > 0 ? ` · đã sửa ${used} vòng` : ''}
+      </span>
+    )
+  }
   const pct = total === 0 ? 100 : Math.min(100, Math.round((used / total) * 100))
   const tone = quotaTone(used, total)
 

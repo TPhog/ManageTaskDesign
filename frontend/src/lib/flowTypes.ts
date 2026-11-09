@@ -22,6 +22,9 @@ export type FlowActionKind =
   | 'COPY_PAYMENT_REMINDER'
   | 'CONFIRM_CLIENT_ACCEPTANCE'
   | 'CONFIRM_CLIENT_PAYMENT'
+  | 'MARK_QUOTED'
+  | 'RECORD_DEPOSIT'
+  | 'VIEW_TASKS'
 
 export type FlowWarningKind =
   | 'BRIEF_NOT_CONFIRMED'
@@ -33,6 +36,7 @@ export type FlowWarningKind =
   | 'BALANCE_DUE'
   | 'DELIVERED_WITH_OPEN_REVISIONS'
   | 'REVIEW_WITH_OPEN_REVISIONS'
+  | 'COMPLETED_WITH_OPEN_ITEMS'
 
 export interface FlowTarget {
   deliverableId: string | null

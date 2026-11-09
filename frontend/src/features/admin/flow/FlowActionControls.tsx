@@ -3,17 +3,17 @@ import { AlertTriangle, Copy, Info, QrCode } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { FlowAction, FlowWarning } from '@/lib/flowTypes'
-import { actionHref, isCopyAction, isDialogAction, stepHref } from './flowUtils'
+import { actionHref, isCopyAction, isDeliverableConfirmKind, isDialogAction, stepHref } from './flowUtils'
 
 /** In-place commands the runner implements (besides dialog and copy actions). */
-const RUNNABLE_KINDS = new Set<string>(['SUBMIT_REVIEW', 'CONFIRM_APPROVAL', 'DELIVER'])
+const RUNNABLE_KINDS = new Set<string>(['SUBMIT_REVIEW', 'CONFIRM_APPROVAL', 'DELIVER', 'RECORD_DEPOSIT'])
 
 interface ActionProps {
   action: FlowAction
   projectId: string
   busy: boolean
   onRun: (action: FlowAction) => void
-  /** Outside the project page: START_PROJECT / COMPLETE_PROJECT become links to it (?step=…) */
+  /** Outside the project page: dialog steps become links to it (?step=…); review / approve / deliver link to the deliverables tab */
   dialogsAsLinks?: boolean
   /** Small buttons everywhere (dashboard rows) */
   compact?: boolean
@@ -25,6 +25,7 @@ export function FlowActionButton({ action, projectId, busy, onRun, dialogsAsLink
   const size = action.primary && !compact ? 'default' : 'sm'
   const href = actionHref(action.kind, projectId, action.target)
     ?? (dialogsAsLinks && isDialogAction(action.kind) ? stepHref(projectId, action.kind) : null)
+    ?? (dialogsAsLinks && isDeliverableConfirmKind(action.kind) ? `/admin/projects/${projectId}?tab=deliverables` : null)
 
   if (href) {
     return (

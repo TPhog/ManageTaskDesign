@@ -72,6 +72,7 @@ test.describe('Project flow', () => {
     await page.reload()
     await expect(nextStep.getByRole('button', { name: 'Gửi duyệt: Logo E2E' })).toBeVisible()
     await panel.getByRole('button', { name: 'Gửi duyệt Logo E2E' }).click()
+    await page.getByRole('dialog', { name: 'Gửi hạng mục cho khách duyệt?' }).getByRole('button', { name: 'Gửi duyệt', exact: true }).click()
     await expectToast(page, 'Đã gửi khách duyệt')
     await expect(panel).toContainText('Chờ khách duyệt')
 

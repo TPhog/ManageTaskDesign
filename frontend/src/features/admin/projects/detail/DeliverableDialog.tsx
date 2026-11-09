@@ -133,10 +133,10 @@ export function DeliverableDialog({ projectId, open, onClose, editing }: Props) 
       qc.invalidateQueries({ queryKey: ['revisions'] })
       // BR-44: lowering the quota below used rounds is allowed but the API warns
       for (const w of (res as { warnings?: string[] } | undefined)?.warnings ?? []) toast.warning(w)
-      toast.success(editing ? 'Đã cập nhật deliverable' : 'Đã thêm deliverable')
+      toast.success(editing ? 'Đã cập nhật hạng mục' : 'Đã thêm hạng mục')
       onClose()
     },
-    onError: (err: ApiError) => toast.error(err.detail ?? 'Không thể lưu deliverable'),
+    onError: (err: ApiError) => toast.error(err.detail ?? 'Không thể lưu hạng mục'),
   })
 
   const fieldError = (name: keyof FormValues) =>
@@ -150,7 +150,7 @@ export function DeliverableDialog({ projectId, open, onClose, editing }: Props) 
     <Dialog open={open} onOpenChange={v => { if (!v) onClose() }}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{editing ? 'Sửa deliverable' : 'Thêm deliverable'}</DialogTitle>
+          <DialogTitle>{editing ? 'Sửa hạng mục' : 'Thêm hạng mục'}</DialogTitle>
           <DialogDescription>Hạng mục bàn giao và số vòng sửa miễn phí của nó.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(v => mutation.mutate(v))} className="space-y-5 py-2" noValidate>
@@ -179,7 +179,7 @@ export function DeliverableDialog({ projectId, open, onClose, editing }: Props) 
 
           <div className="grid gap-4 sm:grid-cols-[1fr_7rem]">
             <div className="space-y-2">
-              <Label htmlFor="deliverable-name">Tên deliverable</Label>
+              <Label htmlFor="deliverable-name">Tên hạng mục</Label>
               <Input id="deliverable-name" {...a11y('name')} {...register('name')} />
               {fieldError('name')}
             </div>
@@ -197,7 +197,7 @@ export function DeliverableDialog({ projectId, open, onClose, editing }: Props) 
               {fieldError('includedRounds')}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="deliverable-extraRoundPrice">Giá vòng thêm (₫)</Label>
+              <Label htmlFor="deliverable-extraRoundPrice">Giá vòng sửa thêm (₫)</Label>
               <Input id="deliverable-extraRoundPrice" type="number" min={0} step={1000} {...a11y('extraRoundPrice')} {...register('extraRoundPrice')} />
               {fieldError('extraRoundPrice')}
             </div>

@@ -7,10 +7,11 @@ import { cn } from '@/lib/utils'
 import type { ProjectDetail } from '@/lib/types'
 import type { FlowState } from '@/lib/flowTypes'
 import { FlowActionButton } from '@/features/admin/flow/FlowActionControls'
-import { flowActionKey, stepFromParam, type FlowDialogKind } from '@/features/admin/flow/flowUtils'
+import { flowActionKey, isDeliverableConfirmKind, stepFromParam, type FlowDialogKind } from '@/features/admin/flow/flowUtils'
 import { useFlowActionRunner } from '@/features/admin/flow/useFlowActionRunner'
+import { useDeliverableDialogs } from '@/features/admin/flow/useDeliverableDialogs'
 import { StartProjectDialog } from './StartProjectDialog'
-import { completeTransition } from './projectStatus'
+import { completeTransition, quotedTransition } from './projectStatus'
 import { useProjectStatusChange } from './useProjectStatusChange'
 
 const panelClass = 'rounded-xl border bg-card p-5 shadow-card'
@@ -31,9 +32,13 @@ export function NextStepCard({ project, flow, isLoading, isError, isFetching }: 
   const [completeOpen, setCompleteOpen] = useState(false)
   // COMPLETE_PROJECT shares the status menu's flow: server warnings are shown in the same confirmation dialog
   const statusChange = useProjectStatusChange(project)
-  const openDialog = (kind: FlowDialogKind) => (kind === 'START_PROJECT' ? setStartOpen(true) : statusChange.request(completeTransition))
-  const runner = useFlowActionRunner(openDialog)
-  const busy = runner.busy || statusChange.pending
+  const openDialog = (kind: FlowDialogKind) => {
+    if (kind === 'START_PROJECT') setStartOpen(true)
+    else statusChange.request(kind === 'MARK_QUOTED' ? quotedTransition : completeTransition)
+  }
+  const deliverableDialogs = useDeliverableDialogs(project)
+  const runner = useFlowActionRunner(openDialog, deliverableDialogs.open)
+  const busy = runner.busy || statusChange.pending || deliverableDialogs.pending
   const [searchParams, setSearchParams] = useSearchParams()
   const step = stepFromParam(searchParams.get('step'))
 
@@ -42,6 +47,7 @@ export function NextStepCard({ project, flow, isLoading, isError, isFetching }: 
     if (!step || !flow || isFetching) return
     if (flow.actions.some(a => a.kind === step)) {
       if (step === 'START_PROJECT') setStartOpen(true)
+      else if (step === 'MARK_QUOTED') statusChange.request(quotedTransition)
       else setCompleteOpen(true)
     }
     setSearchParams(prev => {
@@ -49,6 +55,7 @@ export function NextStepCard({ project, flow, isLoading, isError, isFetching }: 
       next.delete('step')
       return next
     }, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- statusChange.request is recreated every render; the param is dropped right after, so this runs once per link
   }, [step, flow, isFetching, setSearchParams])
 
   if (isLoading) {
@@ -67,7 +74,9 @@ export function NextStepCard({ project, flow, isLoading, isError, isFetching }: 
     )
   }
 
-  const [primary, ...others] = flow.actions
+  // a completed project is closed: review / approve / deliver would reopen work by the back door
+  const actions = project.status === 'COMPLETED' ? flow.actions.filter(a => !isDeliverableConfirmKind(a.kind)) : flow.actions
+  const [primary, ...others] = actions
 
   return (
     <section aria-labelledby="next-step-heading" className={panelClass}>
@@ -126,6 +135,7 @@ export function NextStepCard({ project, flow, isLoading, isError, isFetching }: 
         }}
       />
       {statusChange.dialogs}
+      {deliverableDialogs.dialogs}
     </section>
   )
 }

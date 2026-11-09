@@ -55,6 +55,7 @@ test.describe('Project flow end to end', () => {
       await apiPost(page.request, page, `/api/admin/tasks/${t.id}/move`, { status: 'DONE', sortOrder: 1024 * (i + 1) })
     await page.reload()
     await nextStep.getByRole('button', { name: 'Gửi duyệt: Logo E2E' }).click()
+    await page.getByRole('dialog', { name: 'Gửi hạng mục cho khách duyệt?' }).getByRole('button', { name: 'Gửi duyệt', exact: true }).click()
     await expectToast(page, 'Đã gửi khách duyệt')
     await expect(stepper.locator('[aria-current="step"]')).toContainText('Duyệt & bàn giao')
 
@@ -77,8 +78,10 @@ test.describe('Project flow end to end', () => {
     await page.goto(`/admin/projects/${projectId}?tab=deliverables`)
     await expect(page.getByRole('tabpanel')).toContainText('Khách đã duyệt trên portal')
     await nextStep.getByRole('button', { name: 'Xác nhận khách đã duyệt: Logo E2E' }).click()
+    await page.getByRole('dialog', { name: 'Xác nhận hạng mục đã được duyệt?' }).getByRole('button', { name: 'Xác nhận đã duyệt' }).click()
     await expectToast(page, 'Đã xác nhận khách duyệt')
     await nextStep.getByRole('button', { name: 'Bàn giao: Logo E2E' }).click()
+    await page.getByRole('dialog', { name: 'Bàn giao hạng mục?' }).getByRole('button', { name: 'Bàn giao', exact: true }).click()
     await expectToast(page, 'Đã cập nhật trạng thái')
     await expect(stepper.locator('[aria-current="step"]')).toContainText('Hoàn tất')
     await expect(nextStep).toContainText('Khách còn nợ 3.000.000 ₫')
@@ -90,7 +93,7 @@ test.describe('Project flow end to end', () => {
     await expectToast(page, 'Đã chuyển dự án: Hoàn thành')
     await expect(stepper.getByRole('listitem').filter({ hasText: 'Hoàn tất' })).toContainText('đã xong')
     await expect(nextStep).toContainText('Khách còn nợ 3.000.000 ₫')
-    await expect(nextStep.getByRole('button', { name: 'Sao chép tin nhắc thanh toán' })).toBeVisible()
+    await expect(nextStep.getByRole('button', { name: 'Sao chép tin nhắn nhắc thanh toán' })).toBeVisible()
   })
 
   test('client asks for a change on a deliverable under review and the designer is pointed to it', async ({ page, browser }) => {

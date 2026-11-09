@@ -10,31 +10,31 @@ test.describe('Deliverables', () => {
   })
 
   test('can add a deliverable to a project', async ({ page }) => {
-    await page.getByRole('button', { name: 'Thêm deliverable' }).first().click()
-    const dialog = page.getByRole('dialog', { name: 'Thêm deliverable' })
-    await dialog.getByLabel('Tên deliverable').fill('Logo chính E2E')
+    await page.getByRole('button', { name: 'Thêm hạng mục' }).first().click()
+    const dialog = page.getByRole('dialog', { name: 'Thêm hạng mục' })
+    await dialog.getByLabel('Tên hạng mục').fill('Logo chính E2E')
     await dialog.getByLabel('Số vòng sửa miễn phí').fill('3')
-    await dialog.getByLabel('Giá vòng thêm (₫)').fill('200000')
+    await dialog.getByLabel('Giá vòng sửa thêm (₫)').fill('200000')
     await dialog.getByRole('button', { name: 'Thêm', exact: true }).click()
 
-    await expectToast(page, 'Đã thêm deliverable')
+    await expectToast(page, 'Đã thêm hạng mục')
     await expect(page.getByText('Logo chính E2E')).toBeVisible()
     await expect(page.getByText('0/3 vòng')).toBeVisible()
   })
 
   test('can edit a deliverable and move it through statuses', async ({ page }) => {
-    await page.getByRole('button', { name: 'Thêm deliverable' }).first().click()
-    let dialog = page.getByRole('dialog', { name: 'Thêm deliverable' })
-    await dialog.getByLabel('Tên deliverable').fill('Banner E2E')
+    await page.getByRole('button', { name: 'Thêm hạng mục' }).first().click()
+    let dialog = page.getByRole('dialog', { name: 'Thêm hạng mục' })
+    await dialog.getByLabel('Tên hạng mục').fill('Banner E2E')
     await dialog.getByLabel('Số vòng sửa miễn phí').fill('1')
     await dialog.getByRole('button', { name: 'Thêm', exact: true }).click()
-    await expectToast(page, 'Đã thêm deliverable')
+    await expectToast(page, 'Đã thêm hạng mục')
 
     await page.getByRole('button', { name: 'Sửa Banner E2E' }).click()
-    dialog = page.getByRole('dialog', { name: 'Sửa deliverable' })
-    await dialog.getByLabel('Tên deliverable').fill('Banner E2E v2')
+    dialog = page.getByRole('dialog', { name: 'Sửa hạng mục' })
+    await dialog.getByLabel('Tên hạng mục').fill('Banner E2E v2')
     await dialog.getByRole('button', { name: 'Lưu', exact: true }).click()
-    await expectToast(page, 'Đã cập nhật deliverable')
+    await expectToast(page, 'Đã cập nhật hạng mục')
 
     await page.getByRole('button', { name: 'Đổi trạng thái Banner E2E v2' }).click()
     await page.getByRole('menuitem', { name: 'Bắt đầu làm' }).click()
