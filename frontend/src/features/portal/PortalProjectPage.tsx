@@ -1,31 +1,28 @@
 import { Link, useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowLeft, MessageSquarePlus, SearchX } from 'lucide-react'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { StatusBadge } from '@/components/StatusBadge'
 import { EmptyState } from '@/components/EmptyState'
-import { LinkifiedText } from '@/components/LinkifiedText'
-import { MarkdownView } from '@/components/MarkdownView'
 import { api } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 import { qk } from '@/lib/queryKeys'
 import type { PagedResult } from '@/lib/types'
 import type { PortalProjectDetail, PortalTimelineItem } from '@/lib/portalTypes'
-import { designTypeLabel, portalDeliverableStatus, portalProjectStatus } from './labels'
+import { EditorialSection, Kicker } from './kit/editorial'
+import { designTypeLabel, portalProjectStatus } from './labels'
 import { ProgressBar } from './ProgressBar'
 import { DeliverableReview } from './DeliverableReview'
-import { deliveredText, progressOf, remainingRoundsText } from './progress'
-import { groupTimeline, timeOfDay } from './timeline'
-import { cn } from '@/lib/utils'
+import { deliveredText, remainingRoundsText } from './progress'
+import { deliverableBadge } from './review'
 import { PortalQuotationList } from './PortalQuotationList'
 import { PortalRequestList } from './PortalRequestList'
 import { acceptsRequests } from './requests'
 import { usePortalQuotations, usePortalRequests, usePortalRevisions } from './usePortal'
 import { PortalRevisionsView } from './PortalRevisionsView'
-import { PortalImageStrip, PortalImagesSection } from './PortalImagesSection'
-
-const panelClass = 'rounded-xl border bg-card p-4 shadow-card sm:p-5'
+import { PortalImagesSection } from './PortalImagesSection'
+import { PortalTimeline } from './PortalTimeline'
 
 export default function PortalProjectPage() {
   const { id = '' } = useParams<{ id: string }>()
@@ -50,21 +47,21 @@ export default function PortalProjectPage() {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <Skeleton className="h-40 w-full rounded-xl" />
-        <Skeleton className="h-48 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-48 w-full" />
       </div>
     )
   }
 
   if (error || !project) {
     return (
-      <div className="rounded-xl border bg-card shadow-card">
+      <div className="border-t-[3px] border-rule">
         <EmptyState
           icon={SearchX}
           title="Không tìm thấy dự án"
           description="Dự án không tồn tại hoặc không thuộc tài khoản của bạn."
           action={
-            <Button asChild variant="outline">
+            <Button asChild variant="outline" className="h-11">
               <Link to="/portal">Về danh sách dự án</Link>
             </Button>
           }
@@ -73,212 +70,172 @@ export default function PortalProjectPage() {
     )
   }
 
-  const { pct } = progressOf(project.deliverableSummary)
-
+  const summary = project.deliverableSummary
   const canRequest = acceptsRequests(project.status)
+  const dates = [
+    project.startDate ? { label: 'Bắt đầu', value: formatDate(project.startDate) } : null,
+    project.dueDate ? { label: 'Hạn hoàn thành', value: formatDate(project.dueDate) } : null,
+  ].filter((x): x is { label: string; value: string } => !!x)
 
   return (
-    <div className={cn('space-y-4', canRequest && 'pb-20')}>
+    <div className="space-y-6">
       <Link to="/portal" className="-ml-1 inline-flex min-h-11 items-center gap-1 px-1 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         Tất cả dự án
       </Link>
 
-      <div className={panelClass}>
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">{project.name}</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">{designTypeLabel[project.designType] ?? project.designType}</p>
-          </div>
+      <header className="-mt-2">
+        <Kicker tone="highlight">Dự án</Kicker>
+        <h1 className="mt-2 break-words font-display text-[2rem] font-medium leading-[1.1] tracking-[-0.02em] text-foreground">{project.name}</h1>
+        <div className="mt-1.5 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+          <p className="font-serif text-base italic text-muted-foreground">Loại thiết kế: {designTypeLabel[project.designType] ?? project.designType}</p>
           <StatusBadge status={project.status} label={portalProjectStatus[project.status]} />
         </div>
 
         {project.statusReason && (
-          <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <p className="mt-3 whitespace-pre-wrap break-words border-l-4 border-warning py-1 pl-4 font-serif text-base italic text-foreground">
             {project.status === 'ON_HOLD' ? 'Tạm dừng: ' : ''}
             {project.statusReason}
           </p>
         )}
 
-        <dl className="mt-4 grid grid-cols-2 gap-3">
-          <div>
-            <dt className="text-xs font-medium text-muted-foreground">Bắt đầu</dt>
-            <dd className="mt-0.5 text-sm font-medium text-foreground">{formatDate(project.startDate)}</dd>
-          </div>
-          <div>
-            <dt className="text-xs font-medium text-muted-foreground">Hạn hoàn thành</dt>
-            <dd className="mt-0.5 text-sm font-medium text-foreground">{formatDate(project.dueDate)}</dd>
-          </div>
-        </dl>
+        {dates.length > 0 && (
+          <dl className={`mt-4 grid border-y border-border ${dates.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+            {dates.map((d, i) => (
+              <div key={d.label} className={i > 0 ? 'border-l border-border py-3 pl-4' : 'py-3 pr-4'}>
+                <dt className="text-xs text-muted-foreground">{d.label}</dt>
+                <dd className="m-0 mt-0.5 font-display text-lg font-medium text-foreground">{d.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
 
-        <div className="mt-4 space-y-1.5">
-          <div className="flex items-center justify-between gap-2 text-xs">
-            <span className="font-medium text-foreground">Tiến độ {pct}%</span>
-            <span className="text-muted-foreground">{deliveredText(project.deliverableSummary)}</span>
-          </div>
-          <ProgressBar summary={project.deliverableSummary} />
+        <div className="mt-4 space-y-2">
+          <p className="font-display text-[1.25rem] font-medium text-foreground">{deliveredText(summary)}</p>
+          <ProgressBar summary={summary} />
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-            {project.deliverableSummary.delivered > 0 && (
+            {summary.delivered > 0 && (
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-600" aria-hidden="true" />
-                {project.deliverableSummary.delivered} đã bàn giao
+                <span className="h-2 w-2 bg-foreground" aria-hidden="true" />
+                {summary.delivered} đã bàn giao
               </span>
             )}
-            {project.deliverableSummary.approved > 0 && (
+            {summary.approved > 0 && (
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-sky-400" aria-hidden="true" />
-                {project.deliverableSummary.approved} bạn đã duyệt
+                <span className="h-2 w-2 bg-success" aria-hidden="true" />
+                {summary.approved} đã duyệt
               </span>
             )}
-            {project.deliverableSummary.inReview > 0 && (
-              <span className="inline-flex items-center gap-1.5 font-medium text-amber-800">
-                <span className="h-2 w-2 rounded-full border-2 border-amber-500" aria-hidden="true" />
-                {project.deliverableSummary.inReview} chờ bạn duyệt
+            {summary.awaitingClient > 0 && (
+              <span className="inline-flex items-center gap-1.5 font-medium text-highlight-text">
+                <span className="h-2 w-2 border-2 border-highlight" aria-hidden="true" />
+                {summary.awaitingClient} chờ bạn duyệt
               </span>
             )}
           </div>
+          <p className="text-xs text-muted-foreground">Sản phẩm được tính là xong khi nhà thiết kế đã xác nhận bạn duyệt hoặc đã bàn giao.</p>
         </div>
-      </div>
+      </header>
 
-      <section aria-labelledby="portal-deliverables" className={panelClass}>
-        <h2 id="portal-deliverables" className="text-sm font-semibold text-foreground">Hạng mục</h2>
+      <EditorialSection id="portal-deliverables" number="I." title="Sản phẩm">
         {project.deliverables.length === 0 ? (
-          <p className="mt-2 text-sm text-muted-foreground">Chưa có hạng mục nào.</p>
+          <p className="mt-2 font-serif text-base italic text-muted-foreground">Chưa có sản phẩm nào.</p>
         ) : (
-          <ul className="mt-3 divide-y">
-            {project.deliverables.map(d => (
-              <li key={d.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
-                <div className="min-w-0">
-                  <p className="font-medium text-foreground">
-                    {d.name}
-                    {d.quantity > 1 && <span className="font-normal text-muted-foreground"> · Số lượng {d.quantity}</span>}
-                  </p>
+          <ul className="m-0 list-none border-b border-border p-0 [&>li+li]:border-t [&>li+li]:border-border">
+            {project.deliverables.map(d => {
+              const badge = deliverableBadge(d)
+              return (
+                <li key={d.id} className="py-4">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                    <p className="min-w-0 break-words font-display text-[1.375rem] font-medium leading-snug text-foreground">
+                      {d.name}
+                      {d.quantity > 1 && <span className="font-sans text-sm font-normal text-muted-foreground"> · Số lượng {d.quantity}</span>}
+                    </p>
+                    <StatusBadge status={badge.status} label={badge.label} />
+                  </div>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     {remainingRoundsText(d)}
                     {d.dueDate && ` · Hạn ${formatDate(d.dueDate)}`}
                   </p>
                   <DeliverableReview projectId={project.id} projectStatus={project.status} deliverable={d} />
-                </div>
-                <StatusBadge status={d.status} label={portalDeliverableStatus[d.status]} />
-              </li>
-            ))}
+                </li>
+              )
+            })}
           </ul>
         )}
         {project.deliverables.some(d => d.includedRounds > 0) && (
-          <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-            Mỗi lần bạn gửi góp ý cho một hạng mục được tính là 1 lần sửa (dù có nhiều ý). Lỗi do nhà thiết kế thì không tính.
-            Hết lần sửa miễn phí, nhà thiết kế sẽ báo giá trước khi sửa tiếp.
+          <p className="mt-3 max-w-[60ch] text-xs leading-relaxed text-muted-foreground">
+            Mỗi lần bạn góp ý cho một sản phẩm dùng 1 lượt chỉnh sửa miễn phí (dù nhiều ý). Lỗi do nhà thiết kế không tính.
+            Hết lượt miễn phí, nhà thiết kế sẽ báo giá trước khi sửa tiếp.
           </p>
         )}
-      </section>
+      </EditorialSection>
 
-      <PortalImagesSection projectId={project.id} />
+      <PortalImagesSection projectId={project.id} number="II." />
 
-      <section aria-labelledby="portal-quotations" className={panelClass}>
-        <h2 id="portal-quotations" className="text-sm font-semibold text-foreground">Báo giá</h2>
+      <EditorialSection id="portal-quotations" number="III." title="Báo giá">
         {!quotations ? (
           <Skeleton className="mt-3 h-16 w-full" />
         ) : quotations.length === 0 ? (
-          <p className="mt-2 text-sm text-muted-foreground">Chưa có báo giá nào cho dự án này.</p>
+          <p className="mt-2 font-serif text-base italic text-muted-foreground">Chưa có báo giá nào cho dự án này.</p>
         ) : (
-          <div className="mt-3">
-            <PortalQuotationList items={quotations} />
-          </div>
+          <PortalQuotationList items={quotations} />
         )}
-      </section>
+      </EditorialSection>
 
-      <section aria-labelledby="portal-requests" className={panelClass}>
-        <div className="flex items-center justify-between gap-3">
-          <h2 id="portal-requests" className="text-sm font-semibold text-foreground">Yêu cầu chỉnh sửa của bạn</h2>
-          <Link to="/portal/requests" className="text-xs font-medium text-primary hover:underline">Xem tất cả</Link>
-        </div>
+      <EditorialSection
+        id="portal-requests"
+        number="IV."
+        title="Yêu cầu chỉnh sửa của bạn"
+        aside={<Link to="/portal/requests" className="link-inline inline-flex min-h-11 items-center whitespace-nowrap">Xem tất cả</Link>}
+      >
+        {canRequest && (
+          <Button asChild variant="outline" className="mb-2 mt-1 h-11 w-full sm:w-auto">
+            <Link to={`/portal/requests/new?projectId=${project.id}`}>
+              <MessageSquarePlus aria-hidden="true" />
+              Gửi yêu cầu mới
+            </Link>
+          </Button>
+        )}
         {!requests ? (
           <Skeleton className="mt-3 h-16 w-full" />
         ) : requests.length === 0 ? (
-          <p className="mt-2 text-sm text-muted-foreground">Bạn chưa gửi yêu cầu nào cho dự án này.</p>
+          <p className="mt-2 font-serif text-base italic text-muted-foreground">Bạn chưa gửi yêu cầu nào cho dự án này.</p>
         ) : (
-          <div className="mt-3">
-            <PortalRequestList items={requests} />
-          </div>
+          <PortalRequestList items={requests} />
         )}
-        {!canRequest && (
-          <p className="mt-3 text-xs text-muted-foreground">Dự án đã kết thúc nên không nhận yêu cầu mới.</p>
-        )}
-      </section>
+        {!canRequest && <p className="mt-3 text-xs text-muted-foreground">Dự án đã kết thúc nên không nhận yêu cầu mới.</p>}
+      </EditorialSection>
 
-      <section aria-labelledby="portal-revisions" className={panelClass}>
-        <h2 id="portal-revisions" className="text-sm font-semibold text-foreground">Lần sửa</h2>
+      <EditorialSection id="portal-revisions" number="V." title="Lượt chỉnh sửa">
         {!revisions ? <Skeleton className="mt-3 h-16 w-full" /> : <PortalRevisionsView data={revisions} />}
-      </section>
+      </EditorialSection>
 
-      <section aria-labelledby="portal-brief" className={panelClass}>
-        <h2 id="portal-brief" className="text-sm font-semibold text-foreground">Yêu cầu thiết kế (brief)</h2>
+      <EditorialSection id="portal-brief" number="VI." title="Yêu cầu thiết kế đã thống nhất">
         {project.brief ? (
           <details className="mt-1" open>
-            <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-primary">
-              Nội dung đã thống nhất · phiên bản {project.brief.version} · xác nhận {formatDate(project.brief.confirmedAt)}
+            <summary className="flex min-h-11 cursor-pointer items-center font-serif text-sm italic text-muted-foreground">
+              Lần chốt {project.brief.version}{project.brief.confirmedAt ? ` · ${formatDate(project.brief.confirmedAt)}` : ''}
             </summary>
-            <div className="mt-2">
-              <MarkdownView source={project.brief.content || 'Chưa có nội dung'} />
+            <div className="mt-1 max-w-[60ch] whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">
+              {project.brief.content || 'Chưa có nội dung'}
             </div>
-            {canRequest && (
-              <p className="mt-3 text-xs text-slate-600">Muốn đổi yêu cầu thiết kế? Bấm “Gửi yêu cầu chỉnh sửa”.</p>
-            )}
+            {canRequest && <p className="mt-3 text-xs text-muted-foreground">Muốn đổi yêu cầu? Bấm “Gửi yêu cầu mới”.</p>}
           </details>
         ) : (
-          <p className="mt-2 text-sm text-muted-foreground">Nhà thiết kế chưa chốt yêu cầu thiết kế.</p>
+          <p className="mt-2 font-serif text-base italic text-muted-foreground">Nhà thiết kế chưa chốt yêu cầu thiết kế.</p>
         )}
-      </section>
+      </EditorialSection>
 
-      <section aria-labelledby="portal-timeline" className={panelClass}>
-        <h2 id="portal-timeline" className="text-sm font-semibold text-foreground">Tiến trình</h2>
+      <EditorialSection id="portal-timeline" number="VII." title="Hoạt động gần đây">
         {!timeline ? (
           <Skeleton className="mt-3 h-16 w-full" />
         ) : timeline.items.length === 0 ? (
-          <p className="mt-2 text-sm text-muted-foreground">Chưa có cập nhật nào.</p>
+          <p className="mt-2 font-serif text-base italic text-muted-foreground">Chưa có cập nhật nào.</p>
         ) : (
-          <div className="mt-4 space-y-5">
-            {groupTimeline(timeline.items).map(day => (
-              <div key={day.day}>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-600">{day.label}</h3>
-                <ol className="mt-2 space-y-3 border-l border-slate-200 pl-5">
-                  {day.items.map((t, i) => (
-                    <li key={`${t.occurredAt}-${i}`} className="relative">
-                      <span
-                        className={cn(
-                          'absolute -left-[25.5px] top-1.5 h-2.5 w-2.5 rounded-full ring-4 ring-white',
-                          t.kind === 'MESSAGE' ? 'bg-amber-500' : 'bg-primary',
-                        )}
-                        aria-hidden="true"
-                      />
-                      {t.kind === 'MESSAGE' ? (
-                        <div className="rounded-lg bg-amber-50 px-3 py-2">
-                          <p className="text-xs font-medium text-amber-800">Nhà thiết kế nhắn</p>
-                          <LinkifiedText text={t.message} className="mt-0.5 block text-sm text-foreground" />
-                        </div>
-                      ) : (
-                        <LinkifiedText text={t.message} className="block text-sm text-foreground" />
-                      )}
-                      <PortalImageStrip images={t.images ?? []} />
-                      <time dateTime={t.occurredAt} className="text-xs text-muted-foreground">{timeOfDay(t.occurredAt)}</time>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-            ))}
-          </div>
+          <PortalTimeline items={timeline.items} />
         )}
-      </section>
-
-      {canRequest && (
-        <Link
-          to={`/portal/requests/new?projectId=${project.id}`}
-          className={cn(buttonVariants(), 'fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-4 z-20 shadow-lg sm:right-[max(1rem,calc(50%-20rem))]')}
-        >
-          <MessageSquarePlus aria-hidden="true" />
-          Gửi yêu cầu chỉnh sửa
-        </Link>
-      )}
+      </EditorialSection>
     </div>
   )
 }

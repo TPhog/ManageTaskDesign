@@ -41,7 +41,7 @@ export function StudioContact({ phone, email, className }: Props) {
   )
 }
 
-/** QA C-14/C-15: contact on pages without a portal session (signed out, expired, bad link) — /api/portal/studio is public. */
+/** QA C-14/C-15, CF-16: the studio's name and contact on pages without a portal session (signed out, expired, bad link) — /api/portal/studio is public. */
 export function PublicStudioContact({ className }: { className?: string }) {
   const { data } = useQuery({
     queryKey: qk.portal.studio,
@@ -49,5 +49,11 @@ export function PublicStudioContact({ className }: { className?: string }) {
     retry: false,
     staleTime: 5 * 60_000,
   })
-  return data ? <StudioContact phone={data.contactPhone} email={data.contactEmail} className={className} /> : null
+  if (!data || (!data.contactPhone && !data.contactEmail)) return null
+  return (
+    <div className={className}>
+      {data.displayName && <p className="mb-2 text-sm font-medium text-foreground">Liên hệ {data.displayName}</p>}
+      <StudioContact phone={data.contactPhone} email={data.contactEmail} />
+    </div>
+  )
 }

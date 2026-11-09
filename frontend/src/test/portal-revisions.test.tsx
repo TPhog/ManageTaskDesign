@@ -43,19 +43,19 @@ describe('PortalRevisionsView', () => {
   it('shows quota, rounds and client wording for billing and status', () => {
     render(<PortalRevisionsView data={withRounds} />)
 
-    expect(screen.getByText('1/3 lần sửa miễn phí')).toBeInTheDocument()
+    expect(screen.getByText('1/3 lượt chỉnh sửa miễn phí')).toBeInTheDocument()
     expect(screen.getAllByText(/^Lượt chỉnh sửa 1 · /)).toHaveLength(2)
     expect(screen.getByText('Dùng lượt miễn phí')).toBeInTheDocument()
     expect(screen.getByText('Tính phí')).toBeInTheDocument()
     expect(screen.getByText('Miễn phí (lỗi của nhà thiết kế)')).toBeInTheDocument()
     expect(screen.getByText('Đang sửa')).toBeInTheDocument()
-    expect(screen.getByText('Chung cho dự án')).toBeInTheDocument()
+    expect(screen.getByText('Chung cho cả dự án')).toBeInTheDocument()
     expect(screen.queryByText('IN_QUOTA')).not.toBeInTheDocument()
   })
 
   it('says so when there is no round yet', () => {
     render(<PortalRevisionsView data={empty} />)
 
-    expect(screen.getByText('Chưa có lần sửa nào.')).toBeInTheDocument()
+    expect(screen.getByText('Chưa có lượt chỉnh sửa nào.')).toBeInTheDocument()
   })
 })

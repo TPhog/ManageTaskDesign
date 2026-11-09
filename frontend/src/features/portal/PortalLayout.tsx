@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { FileText, FolderOpen, Link2Off, Loader2, LogOut, MessagesSquare, WifiOff, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { cn } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { qk } from '@/lib/queryKeys'
@@ -30,6 +31,8 @@ export default function PortalLayout() {
   const qc = useQueryClient()
   const { pathname } = useLocation()
   const [loggedOut, setLoggedOut] = useState(false)
+  const [confirmLogout, setConfirmLogout] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
 
   const { data: me, isLoading, error, refetch } = useQuery({
     queryKey: qk.portal.me,
@@ -39,15 +42,19 @@ export default function PortalLayout() {
   })
 
   async function logout() {
+    setLoggingOut(true)
     try {
       await api.post('/portal/logout', {})
     } catch (err) {
       if (!logoutCompleted(err)) {
         toast.error('Không thoát được, vui lòng thử lại.')
+        setLoggingOut(false)
         return
       }
     }
     qc.removeQueries({ queryKey: ['portal'] })
+    setConfirmLogout(false)
+    setLoggingOut(false)
     setLoggedOut(true)
   }
 
@@ -90,7 +97,7 @@ export default function PortalLayout() {
         homeHref="/portal"
         subline={`Xin chào, ${me.clientName}`}
         actions={
-          <Button variant="ghost" onClick={logout} className="h-11 gap-1.5 px-3">
+          <Button variant="ghost" onClick={() => setConfirmLogout(true)} className="h-11 gap-1.5 px-3">
             <LogOut aria-hidden="true" />
             Thoát
           </Button>
@@ -107,6 +114,16 @@ export default function PortalLayout() {
           </EditorialSection>
         )}
       </main>
+      {/* CF-16: the link is the only way back in, so leaving asks first */}
+      <ConfirmDialog
+        open={confirmLogout}
+        onOpenChange={setConfirmLogout}
+        title="Thoát khỏi trang theo dõi?"
+        description="Lần sau bạn mở lại bằng link nhà thiết kế đã gửi qua Zalo hoặc tin nhắn."
+        confirmLabel="Thoát"
+        pending={loggingOut}
+        onConfirm={() => void logout()}
+      />
       <nav
         aria-label="Điều hướng portal"
         className="fixed inset-x-0 bottom-0 z-10 border-t border-rule bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
