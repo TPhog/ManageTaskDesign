@@ -131,6 +131,10 @@ export default function PublicIntakePage() {
       const e = err as Partial<ApiError>
       if (isFormExpired(err)) {
         await refetch()   // a fresh single-use token; everything typed stays
+      } else if (e.errors?.templateId) {
+        // the studio hid or deleted the chosen template meanwhile: reload the list in place, keep contact and note
+        const fresh = await refetch()
+        if (!fresh.data?.templates.some(t => t.id === templateId)) setTemplateId('')
       } else {
         if (isStorageFull(err)) setPhotosRefused(true)
         setAnswerErrors(answerErrorsFromApi(e.errors))
@@ -300,11 +304,14 @@ export default function PublicIntakePage() {
                 </div>
               </EditorialSection>
 
-              {/* BR-138 honeypot: invisible to people and screen readers; bots that fill it get a silent 204 */}
+              {/* BR-138 honeypot: invisible to people and screen readers; bots that fill it get a silent 204. It is sent as
+                  "website", but the input has an unusual name and opts out of autofill and password managers, so a real
+                  visitor's browser never fills it and loses the request behind a fake success screen. */}
               <div aria-hidden="true" className="absolute -left-[10000px] h-px w-px overflow-hidden">
                 <label>
-                  Website
-                  <input name="website" tabIndex={-1} autoComplete="off" value={honeypot} onChange={e => setHoneypot(e.target.value)} />
+                  Để trống ô này
+                  <input name="ff_hp_confirm_url" tabIndex={-1} autoComplete="off" data-1p-ignore="true" data-lpignore="true"
+                    data-form-type="other" value={honeypot} onChange={e => setHoneypot(e.target.value)} />
                 </label>
               </div>
 

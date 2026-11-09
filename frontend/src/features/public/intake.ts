@@ -48,6 +48,7 @@ export function intakeErrorMessage(err: unknown): string {
   if (isStorageFull(err)) return 'Hiện chưa nhận thêm ảnh được — bạn bỏ ảnh ra rồi gửi lại, hoặc gửi ảnh qua Zalo cho studio.'
   if (e.status === 413 || e.status === 415) return imageErrorMessage(err, 'client')
   if (e.status === 404) return 'Link này không còn hoạt động. Vui lòng liên hệ trực tiếp studio.'
+  if (e.errors?.templateId) return 'Mẫu yêu cầu vừa được studio thay đổi — bạn chọn lại loại yêu cầu rồi gửi nhé.'
   const first = e.errors ? Object.values(e.errors)[0]?.[0] : undefined
   return first ?? 'Chưa gửi được. Bạn kiểm tra kết nối mạng rồi thử lại nhé.'
 }

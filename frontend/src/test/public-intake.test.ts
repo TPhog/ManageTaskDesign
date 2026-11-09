@@ -47,6 +47,8 @@ describe('intakeErrorMessage', () => {
     expect(intakeErrorMessage({ status: 429 })).toBe('Bạn đã gửi nhiều lần — vui lòng thử lại sau ít phút (chậm nhất 1 giờ).')
     expect(intakeErrorMessage({ status: 507, code: 'STORAGE_FULL' })).toBe('Hiện chưa nhận thêm ảnh được — bạn bỏ ảnh ra rồi gửi lại, hoặc gửi ảnh qua Zalo cho studio.')
     expect(intakeErrorMessage({ status: 404 })).toBe('Link này không còn hoạt động. Vui lòng liên hệ trực tiếp studio.')
+    expect(intakeErrorMessage({ status: 400, errors: { templateId: ['Mẫu yêu cầu không còn dùng được — vui lòng tải lại trang'] } }))
+      .toBe('Mẫu yêu cầu vừa được studio thay đổi — bạn chọn lại loại yêu cầu rồi gửi nhé.')
     expect(intakeErrorMessage({ status: 400, errors: { contactPhone: ['Nhập số điện thoại / Zalo hợp lệ'] } })).toBe('Nhập số điện thoại / Zalo hợp lệ')
   })
 })

@@ -20,6 +20,9 @@ async function deleteSubmissions(page: Page, contactName: string) {
 }
 
 test.describe('Public intake form /f/:slug', () => {
+  // both tests flip the shared settings/intake.enabled (as does intake.spec): never interleave them
+  test.describe.configure({ mode: 'serial' })
+
   test('a new client fills the Poster template, survives FORM_EXPIRED without retyping and sees the thank-you', async ({ page, browser }) => {
     const before = await intakeLink(page)
     const { slug } = await apiPut(page, '/api/admin/settings/intake', { enabled: true }) as { slug: string }
@@ -47,8 +50,10 @@ test.describe('Public intake form /f/:slug', () => {
       await expect(visitor.getByRole('heading', { level: 1 })).toBeVisible()
       await expect(visitor.getByRole('region', { name: 'Bạn cần thiết kế gì?' })).toBeVisible()
       // honeypot: outside the accessibility tree and the tab order
-      await expect(visitor.getByRole('textbox', { name: 'Website' })).toHaveCount(0)
-      await expect(visitor.locator('input[name="website"]')).toHaveAttribute('tabindex', '-1')
+      const honeypot = visitor.locator('input[name="ff_hp_confirm_url"]')
+      await expect(honeypot).toHaveAttribute('tabindex', '-1')
+      await expect(honeypot).toHaveAttribute('autocomplete', 'off')
+      await expect(visitor.getByRole('textbox', { name: 'Để trống ô này' })).toHaveCount(0)
 
       await visitor.getByRole('radio', { name: /^Poster/ }).check()
       await visitor.getByRole('textbox', { name: 'Mục đích poster' }).fill('Giới thiệu món mới')
