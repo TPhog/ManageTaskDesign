@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import { CircleCheck } from 'lucide-react'
 import type { SentRequestSummary } from './PortalRequestForm'
 import { usePortalMe } from './usePortal'
@@ -13,15 +13,18 @@ interface Props {
 export function RequestSentSummary({ summary, deliverableName, actions }: Props) {
   const { data: me } = usePortalMe()
   const { remainingRounds } = summary
+  // the summary replaces the form already filled, so a live region would stay silent: move focus to its heading instead
+  const headingRef = useRef<HTMLHeadingElement>(null)
+  useEffect(() => headingRef.current?.focus(), [])
   const meta = [deliverableName ?? 'Cả dự án', summary.imageCount > 0 ? `${summary.imageCount} ảnh đính kèm` : null]
     .filter(Boolean)
     .join(' · ')
 
   return (
-    <div role="status" className="border-t-[3px] border-rule pt-4">
+    <div className="border-t-[3px] border-rule pt-4">
       <div className="flex items-center gap-2.5">
         <CircleCheck className="h-6 w-6 shrink-0 text-success" aria-hidden="true" />
-        <p className="font-display text-[1.5rem] font-medium leading-tight text-foreground">Đã gửi yêu cầu</p>
+        <h2 ref={headingRef} tabIndex={-1} className="font-display text-[1.5rem] font-medium leading-tight text-foreground focus:outline-none">Đã gửi yêu cầu</h2>
       </div>
       <blockquote className="m-0 mt-4 line-clamp-4 whitespace-pre-wrap break-words border-l-2 border-border pl-3.5 font-serif text-base italic leading-relaxed text-foreground">
         {summary.request.content}
