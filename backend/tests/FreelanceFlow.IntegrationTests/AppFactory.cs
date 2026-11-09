@@ -1,4 +1,3 @@
-using DotNet.Testcontainers.Builders;
 using System.Collections.Concurrent;
 using FreelanceFlow.Api.Infrastructure.Notifications;
 using FreelanceFlow.Api.Infrastructure.Storage;
@@ -63,8 +62,7 @@ public sealed class AppFactory : WebApplicationFactory<Program>, IAsyncLifetime
         .WithDatabase(TestDatabaseName)
         .WithUsername("ff")
         .WithPassword("changeme")
-        .WithWaitStrategy(Wait.ForUnixContainer().UntilPortIsAvailable(5432))
-        .Build();
+        .Build();   // the builder's own wait: `pg_isready --host localhost` inside the container (the final server, not initdb's)
 
     /// <summary>Connection string of the Testcontainers database (valid after InitializeAsync).</summary>
     public string DatabaseConnectionString => _db.GetConnectionString();
@@ -110,7 +108,34 @@ public sealed class AppFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     public BeforeSaveHook BeforeSave { get; } = new();
 
-    public async Task InitializeAsync() => await _db.StartAsync();
+    public async Task InitializeAsync()
+    {
+        await _db.StartAsync();
+        await WaitUntilReachableFromHostAsync();
+    }
+
+    /// <summary>
+    /// pg_isready runs inside the container; under load (one container per test class, started in parallel) the host's
+    /// mapped port can still refuse or drop the first connections. Retry a real connection before the app migrates.
+    /// </summary>
+    private async Task WaitUntilReachableFromHostAsync()
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await using var conn = new Npgsql.NpgsqlConnection(_db.GetConnectionString());
+                await conn.OpenAsync();
+                await using var cmd = new Npgsql.NpgsqlCommand("SELECT 1", conn);
+                await cmd.ExecuteScalarAsync();
+                return;
+            }
+            catch (Exception ex) when (attempt < 30 && ex is Npgsql.NpgsqlException or IOException or TimeoutException)
+            {
+                await Task.Delay(500);
+            }
+        }
+    }
 
     public new async Task DisposeAsync()
     {
