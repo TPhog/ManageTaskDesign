@@ -52,7 +52,8 @@ function AcceptedChart({ data }: { data: MonthTotal[] }) {
         ))}
       </div>
       <div className="flex gap-2 text-xs text-muted-foreground" aria-hidden="true">
-        {data.map(d => <span key={d.month} className="flex-1 text-center tabular-nums">{monthLabel(d.month)}</span>)}
+        {/* min-w-0 + a break after "/": six "T11/2026" labels do not fit on one line at 390px */}
+        {data.map(d => <span key={d.month} className="min-w-0 flex-1 text-center tabular-nums">{monthLabel(d.month).replace('/', '/​')}</span>)}
       </div>
       <table className="sr-only">
         <caption>Giá trị đã chốt theo tháng</caption>
