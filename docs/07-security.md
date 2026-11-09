@@ -120,14 +120,25 @@ Phase 2: quét virus (ClamAV) cho file khách upload.
 
 ## 6. HTTP security headers (áp dụng toàn site)
 
+Đặt ở Caddy (`deploy/Caddyfile`, khối `header` cấp site), nên phủ cả SPA, file tĩnh và `/api/*`:
+
 ```text
 Strict-Transport-Security: max-age=31536000; includeSubDomains
-Content-Security-Policy: default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline';
-                         script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
+                         img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self';
+                         frame-ancestors 'none'; base-uri 'self'; form-action 'self'
 X-Content-Type-Options: nosniff
-Referrer-Policy: strict-origin-when-cross-origin      (/p/* : no-referrer)
+X-Frame-Options: DENY
+Referrer-Policy: strict-origin-when-cross-origin      (/p/*, /f/* : no-referrer — Caddy dùng `?Referrer-Policy` làm mặc định)
 Permissions-Policy: camera=(), microphone=(), geolocation=()
 ```
+
+- `script-src 'self'`: bản build Vite không có script inline; frontend gọi `z.config({ jitless: true })` để zod không thử
+  `new Function` (CSP không có `'unsafe-eval'`).
+- `style-src 'unsafe-inline'`: Radix/sonner đặt thuộc tính `style` inline.
+- `img-src https:`: mô tả task (Markdown) được hiện ảnh ngoài; `MarkdownView` gửi ảnh với `referrerPolicy="no-referrer"`.
+- `font-src data:`: font tự host (`@fontsource`), Vite có thể inline file nhỏ thành `data:`.
+- Thêm thư viện cần nguồn ngoài (CDN, analytics, iframe) → phải sửa CSP ở Caddyfile và mục này.
 
 ## 7. Bí mật & cấu hình
 
@@ -153,6 +164,8 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 ## 9. Checklist bảo mật trước go-live
 
 - [ ] HTTPS + HSTS hoạt động, HTTP redirect.
+- [ ] `curl -sI https://$DOMAIN/` có đủ header §6 (HSTS, CSP, nosniff, X-Frame-Options, Referrer-Policy, Permissions-Policy); `/p/x` và `/f/x` có `Referrer-Policy: no-referrer`; mở app không có lỗi CSP trong console.
+- [ ] `.env` có `ASPNETCORE_ENVIRONMENT=Production` và `DOMAIN` (Caddy nhận qua `docker-compose.yml`); `docker compose config` hiện đúng `DOMAIN` cho service `web`.
 - [ ] Đã xóa `Seed__DesignerPassword` khỏi `.env` sau lần chạy đầu.
 - [ ] Test isolation Portal pass 100%.
 - [ ] Rate limit login & portal session hoạt động (thử thủ công).

@@ -7,6 +7,18 @@
 }
 
 https://{$DOMAIN} {
+  # Site-wide security headers (07-security s6). Set before the handlers run, so they cover the SPA, the files and the API.
+  # CSP: the Vite build has no inline script; 'unsafe-inline' styles are needed by Radix/sonner inline style attributes;
+  # img-src https: lets task Markdown show external images (MarkdownView sends them with no Referer).
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    X-Content-Type-Options nosniff
+    X-Frame-Options DENY
+    Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+  }
+  # Default only ("?" = keep a value already set): /p/* and /f/* below set no-referrer and must win
+  header ?Referrer-Policy strict-origin-when-cross-origin
   # Public intake API: the path carries the form slug, keep it out of the access log (07-security s4.5)
   handle /api/public/* {
     log_skip
