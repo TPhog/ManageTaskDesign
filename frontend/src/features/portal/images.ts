@@ -1,3 +1,4 @@
+import { formatDate } from '@/lib/format'
 import type { LightboxImage, PortalImage } from '@/lib/imageTypes'
 
 /** The client always opens the watermarked preview (spec §4); the grid uses the thumb. */
@@ -7,8 +8,13 @@ export function toLightbox(images: PortalImage[]): LightboxImage[] {
     src: i.previewUrl,
     thumbSrc: i.thumbUrl,
     alt: i.deliverableName ? `Ảnh ${i.deliverableName}` : 'Ảnh tiến độ',
-    caption: i.deliverableName ?? undefined,
+    caption: `${i.deliverableName ?? 'Cập nhật tiến độ'} · ${formatDate(i.createdAt)}`,
   }))
+}
+
+/** CF-07: the images of one product, for its review card. */
+export function imagesOfDeliverable(images: PortalImage[], deliverableId: string): LightboxImage[] {
+  return toLightbox(images.filter(i => i.deliverableId === deliverableId))
 }
 
 /** "Hình ảnh" section: one group per deliverable (first-seen order), then progress photos, then the rest. */

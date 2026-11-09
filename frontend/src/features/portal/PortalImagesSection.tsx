@@ -1,45 +1,46 @@
 import { useState } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ImageGrid } from '@/components/ImageGrid'
-import { ImageLightbox } from '@/components/ImageLightbox'
 import type { LightboxImage, PortalImage } from '@/lib/imageTypes'
 import { groupPortalImages, toLightbox } from './images'
+import { EditorialSection, Figure } from './kit/editorial'
+import { PortalLightbox } from './PortalLightbox'
 import { usePortalImages } from './usePortal'
 
-const panelClass = 'rounded-xl border bg-card p-4 shadow-card sm:p-5'
-
-/** Spec §7: "Hình ảnh" — watermarked previews of the project, grouped by deliverable. */
-export function PortalImagesSection({ projectId }: { projectId: string }) {
+/** Spec §7: "Hình ảnh" — watermarked previews of the project, grouped by product (CF-06/07: larger tiles, full-screen viewer). */
+export function PortalImagesSection({ projectId, number }: { projectId: string; number?: string }) {
   const { data, isLoading, isError } = usePortalImages(projectId)
   const [viewer, setViewer] = useState<{ images: LightboxImage[]; index: number } | null>(null)
   const groups = groupPortalImages(data ?? [])
 
   return (
-    <section aria-labelledby="portal-images" className={panelClass}>
-      <h2 id="portal-images" className="text-sm font-semibold text-foreground">Hình ảnh</h2>
+    <EditorialSection id="portal-images" number={number} title="Hình ảnh">
       {isLoading ? (
         <Skeleton className="mt-3 h-24 w-full" />
       ) : isError ? (
         <p className="mt-2 text-sm text-muted-foreground">Không tải được hình ảnh.</p>
       ) : groups.length === 0 ? (
-        <p className="mt-2 text-sm text-muted-foreground">Designer chưa chia sẻ hình ảnh nào.</p>
+        <p className="mt-2 font-serif text-sm italic text-muted-foreground">Nhà thiết kế chưa chia sẻ hình ảnh nào.</p>
       ) : (
-        <div className="mt-3 space-y-4">
+        <div className="mt-3 space-y-5">
           {groups.map(g => (
-            <div key={g.key}>
-              <h3 className="mb-2 text-xs font-medium text-muted-foreground">{g.title}</h3>
-              <ImageGrid images={g.images} onOpen={index => setViewer({ images: g.images, index })} />
-            </div>
+            <Figure key={g.key} caption={`${g.title} · ${g.images.length} ảnh`}>
+              <ImageGrid
+                images={g.images}
+                onOpen={index => setViewer({ images: g.images, index })}
+                className="grid-cols-2 gap-1.5 sm:grid-cols-3"
+              />
+            </Figure>
           ))}
           <p className="text-xs text-muted-foreground">Đây là ảnh xem trước. Bản gốc được gửi khi bàn giao.</p>
         </div>
       )}
-      <ImageLightbox
+      <PortalLightbox
         images={viewer?.images ?? []}
         index={viewer?.index ?? null}
         onIndexChange={index => setViewer(index === null || !viewer ? null : { ...viewer, index })}
       />
-    </section>
+    </EditorialSection>
   )
 }
 
@@ -50,8 +51,8 @@ export function PortalImageStrip({ images }: { images: PortalImage[] }) {
   const items = toLightbox(images)
   return (
     <div className="mt-2">
-      <ImageGrid images={items} onOpen={setOpen} className="grid-cols-4 sm:grid-cols-5" />
-      <ImageLightbox images={items} index={open} onIndexChange={setOpen} />
+      <ImageGrid images={items} onOpen={setOpen} className="grid-cols-3 gap-1.5 sm:grid-cols-4" />
+      <PortalLightbox images={items} index={open} onIndexChange={setOpen} />
     </div>
   )
 }
