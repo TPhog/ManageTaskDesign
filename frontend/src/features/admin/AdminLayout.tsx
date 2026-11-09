@@ -6,7 +6,8 @@ import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { cn } from '@/lib/utils'
-import { Inbox, Search } from 'lucide-react'
+import { Inbox, Search, UserPlus } from 'lucide-react'
+import { useNewIntakeCount } from '@/features/admin/intake/useIntake'
 import { useNewRequestCount } from '@/features/admin/revisions/useRevisions'
 import { QuickSearch, QuickSearchTrigger } from '@/features/admin/search/QuickSearch'
 import { StorageBanner } from './settings/StorageBanner'
@@ -14,6 +15,7 @@ import { StorageBanner } from './settings/StorageBanner'
 const navItems: { to: string; label: string; icon: typeof LayoutDashboard; end?: boolean; group?: 'studio' }[] = [
   { to: '/admin', label: 'Tổng quan', icon: LayoutDashboard, end: true },
   { to: '/admin/requests', label: 'Yêu cầu', icon: Inbox },
+  { to: '/admin/intake', label: 'Khách mới', icon: UserPlus },
   { to: '/admin/projects', label: 'Dự án', icon: FolderKanban },
   { to: '/admin/tasks', label: 'Công việc', icon: ListChecks },
   { to: '/admin/quotations', label: 'Báo giá', icon: FileText },
@@ -42,6 +44,20 @@ function NewRequestsBadge() {
     <span
       className="ml-auto rounded-full bg-highlight px-2 py-0.5 text-xs font-semibold tabular-nums text-highlight-foreground"
       aria-label={`${data.count} yêu cầu mới`}
+    >
+      {data.count}
+    </span>
+  )
+}
+
+/** Plan 13: number of NEW public-form submissions next to "Khách mới" */
+function NewIntakeBadge() {
+  const { data } = useNewIntakeCount()
+  if (!data?.count) return null
+  return (
+    <span
+      className="ml-auto rounded-full bg-highlight px-2 py-0.5 text-xs font-semibold tabular-nums text-highlight-foreground"
+      aria-label={`${data.count} khách mới`}
     >
       {data.count}
     </span>
@@ -83,6 +99,7 @@ function SidebarContent({ onNavigate, onLogout, onOpenSearch, loggingOut, userna
               <item.icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
               {item.label}
               {item.to === '/admin/requests' && <NewRequestsBadge />}
+              {item.to === '/admin/intake' && <NewIntakeBadge />}
             </NavLink>
           </Fragment>
         ))}

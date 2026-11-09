@@ -1,5 +1,6 @@
 // docs/05 §3.7–3.8 — admin requests & revisions API. Dates 'YYYY-MM-DD'; instants ISO-8601 UTC.
 import type { EffectiveStatus, QuotationStatus } from './quotationTypes'
+import type { TemplateAnswer } from './requestTemplateTypes'
 import type { DeliverableStatus, TaskPriority, TaskStatus } from './types'
 
 export type RequestStatus = 'NEW' | 'TRIAGED' | 'DECLINED'
@@ -37,6 +38,10 @@ export interface ClientRequest {
   createdAt: string
   rowVersion: number
   attachments: RequestAttachment[]
+  /** plan 13: request sent with a template (null / [] for free text) */
+  templateId: string | null
+  templateName: string | null
+  answers: TemplateAnswer[]
 }
 
 export interface LinkedQuotation {

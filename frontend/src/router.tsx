@@ -27,6 +27,7 @@ import QuotationPage from './features/admin/quotations/QuotationPage'
 import QuotationsPage from './features/admin/quotations/QuotationsPage'
 import TasksPage from './features/admin/tasks/TasksPage'
 import RequestsPage from './features/admin/requests/RequestsPage'
+import IntakePage from './features/admin/intake/IntakePage'
 
 export const router = createBrowserRouter([
   {
@@ -41,6 +42,8 @@ export const router = createBrowserRouter([
       { index: true, element: <DashboardPage /> },
       { path: 'requests', element: <RequestsPage /> },
       { path: 'requests/:id', element: <RequestsPage /> },
+      { path: 'intake', element: <IntakePage /> },
+      { path: 'intake/:id', element: <IntakePage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'settings/storage', element: <StoragePage /> },
       { path: 'settings/request-templates', element: <RequestTemplatesPage /> },

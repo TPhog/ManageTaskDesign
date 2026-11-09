@@ -56,6 +56,13 @@ export const qk = {
     detail:   (id: string)     => ['requests', 'detail', id]    as const,
   },
 
+  intake: {
+    all:      ['intake']                                                          as const,
+    list:     (status: string, page: number) => ['intake', 'list', status, page]  as const,
+    newCount: ['intake', 'new-count']                                             as const,
+    detail:   (id: string) => ['intake', 'detail', id]                            as const,
+  },
+
   revisions: {
     all:      ['revisions']                                            as const,
     project:  (projectId: string) => ['revisions', projectId]   as const,

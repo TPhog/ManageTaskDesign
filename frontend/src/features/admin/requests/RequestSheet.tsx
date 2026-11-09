@@ -10,6 +10,7 @@ import { BillingChip } from '@/components/BillingChip'
 import { ReasonDialog } from '@/components/ReasonDialog'
 import { StatusBadge } from '@/components/StatusBadge'
 import { ImageGrid } from '@/components/ImageGrid'
+import { TemplateAnswersView } from '@/components/TemplateAnswersView'
 import { ImageLightbox } from '@/components/ImageLightbox'
 import type { LightboxImage } from '@/lib/imageTypes'
 import { api, type ApiError } from '@/lib/api'
@@ -18,6 +19,7 @@ import { qk } from '@/lib/queryKeys'
 import { itemTypeLabel, requestSourceLabel, requestStatusLabel } from '@/lib/revisionLabels'
 import type { RequestDetail, RoundInput } from '@/lib/revisionTypes'
 import type { ProjectDetail } from '@/lib/types'
+import { templateNote } from '@/features/admin/intake/intakeUtils'
 import { todayVn } from '@/features/admin/tasks/taskUtils'
 import { AdditionalQuotationDialog } from '@/features/admin/revisions/AdditionalQuotationDialog'
 import { RoundEditor } from '@/features/admin/revisions/RoundEditor'
@@ -74,7 +76,17 @@ function RequestSheetBody({ requestId }: { requestId: string }) {
         <StatusBadge status={r.status} label={requestStatusLabel[r.status]} />
         {r.deliverableName && <span className="text-xs text-muted-foreground">Hạng mục khách chọn: {r.deliverableName}</span>}
       </div>
-      <p className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm text-foreground">{r.content}</p>
+      {r.answers.length > 0 ? (
+        <>
+          <TemplateAnswersView title={r.templateName} answers={r.answers} note={templateNote(r.content)} />
+          <details className="text-sm">
+            <summary className="cursor-pointer text-muted-foreground">Xem dạng văn bản</summary>
+            <p className="mt-2 whitespace-pre-wrap rounded-lg bg-muted p-3 text-foreground">{r.content}</p>
+          </details>
+        </>
+      ) : (
+        <p className="whitespace-pre-wrap rounded-lg bg-muted p-3 text-sm text-foreground">{r.content}</p>
+      )}
       <RequestAttachments attachments={r.attachments} />
       {r.status === 'NEW' && <TriagePanel detail={data} />}
       {r.status === 'DECLINED' && (

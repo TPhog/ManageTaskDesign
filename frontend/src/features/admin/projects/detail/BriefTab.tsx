@@ -7,7 +7,11 @@ import { EmptyState } from '@/components/EmptyState'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { StatusBadge } from '@/components/StatusBadge'
 import { MarkdownView } from '@/components/MarkdownView'
+import { ImageGrid } from '@/components/ImageGrid'
+import { ImageLightbox } from '@/components/ImageLightbox'
+import { useProjectImages } from '@/features/admin/images/useImages'
 import { MarkdownField } from '@/features/admin/tasks/MarkdownField'
+import type { LightboxImage } from '@/lib/imageTypes'
 import { api, type ApiError } from '@/lib/api'
 import { formatDate } from '@/lib/format'
 import type { Brief } from '@/lib/types'
@@ -15,6 +19,21 @@ import type { Brief } from '@/lib/types'
 interface Props {
   projectId: string
   brief: Brief | null
+}
+
+/** Plan 13: photos the client sent with the first public-form request (they moved to the project on convert). */
+function IntakeImages({ projectId }: { projectId: string }) {
+  const { data } = useProjectImages(projectId, 'INTAKE_SUBMISSION')
+  const [open, setOpen] = useState<number | null>(null)
+  if (!data || data.length === 0) return null
+  const images: LightboxImage[] = data.map(i => ({ id: i.id, src: i.originalUrl, thumbSrc: i.thumbUrl, alt: 'Ảnh khách gửi' }))
+  return (
+    <section aria-label="Ảnh khách gửi kèm yêu cầu ban đầu" className="space-y-2 rounded-xl border bg-card p-5 shadow-card">
+      <h3 className="text-sm font-semibold text-foreground">Ảnh khách gửi kèm yêu cầu ban đầu</h3>
+      <ImageGrid images={images} onOpen={setOpen} />
+      <ImageLightbox images={images} index={open} onIndexChange={setOpen} />
+    </section>
+  )
 }
 
 /** Parent renders this with key={brief.id + brief.updatedAt} so local draft state resets after each save. */
@@ -76,6 +95,7 @@ export function BriefTab({ projectId, brief }: Props) {
   const busy = saveMutation.isPending || confirmMutation.isPending
 
   return (
+    <div className="space-y-4">
     <div className="space-y-4 rounded-xl border bg-card p-5 shadow-card">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
@@ -139,6 +159,8 @@ export function BriefTab({ projectId, brief }: Props) {
           />
         </>
       )}
+    </div>
+    <IntakeImages projectId={projectId} />
     </div>
   )
 }
