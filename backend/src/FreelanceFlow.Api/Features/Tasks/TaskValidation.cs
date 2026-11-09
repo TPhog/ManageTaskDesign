@@ -1,3 +1,4 @@
+using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Tasks;
 
 namespace FreelanceFlow.Api.Features.Tasks;
@@ -60,6 +61,45 @@ public static class TaskValidation
             errors["body"] = ["Vui lòng nhập nội dung ghi chú"];
         else if (body.Trim().Length > TaskNote.MaxBody)
             errors["body"] = [$"Tối đa {TaskNote.MaxBody} ký tự"];
+        return errors;
+    }
+
+    // ---- P15 ----
+
+    public const string NoRecurrence = "NONE";
+
+    public static bool ClearsRecurrence(RecurrenceDto dto) => dto.Kind is null or NoRecurrence;
+
+    /// <summary>The domain rule for a non-NONE recurrence (call after <see cref="Recurrence"/> passed).</summary>
+    public static RecurrenceRule ToRule(RecurrenceDto dto) =>
+        RecurrenceRule.Create(dto.Kind!, dto.Weekdays, dto.MonthDay, dto.Until);
+
+    public static IEnumerable<ExternalLink> ToLinks(IEnumerable<ExternalLinkDto> links) =>
+        links.Select(l => new ExternalLink(l.Title ?? "", l.Url ?? "", l.VisibleToClient));
+
+    public static Dictionary<string, string[]> Recurrence(RecurrenceDto? dto)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (dto == null || ClearsRecurrence(dto)) return errors;
+        try { ToRule(dto); }
+        catch (DomainException ex) { errors["recurrence"] = [ex.Detail ?? ex.Code]; }
+        return errors;
+    }
+
+    public static Dictionary<string, string[]> Links(IEnumerable<ExternalLinkDto>? links)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (links == null) return errors;
+        try { ExternalLinks.Normalize(ToLinks(links), allowClientVisible: true); }
+        catch (DomainException ex) { errors["links"] = [ex.Detail ?? ex.Code]; }
+        return errors;
+    }
+
+    public static Dictionary<string, string[]> Blocked(BlockedDto? dto)
+    {
+        var errors = new Dictionary<string, string[]>();
+        if (dto?.Reason?.Trim() is { Length: > ProjectTask.MaxBlockedReason })
+            errors["blocked.reason"] = [$"Lý do bị chặn tối đa {ProjectTask.MaxBlockedReason} ký tự"];
         return errors;
     }
 

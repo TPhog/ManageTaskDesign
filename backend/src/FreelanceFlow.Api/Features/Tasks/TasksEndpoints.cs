@@ -82,14 +82,14 @@ public static class TasksEndpoints
         };
 
         var total = await query.CountAsync();
-        var items = await query
+        var rows = await query
             .OrderBy(x => x.Task.DueDate == null)
             .ThenBy(x => x.Task.DueDate)
             .ThenBy(x => x.Task.SortOrder)
             .ThenBy(x => x.Task.CreatedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(x => new TaskListItemDto(
+            .Select(x => new { x.Task.LinksJson, Dto = new TaskListItemDto(
                 x.Task.Id,
                 x.Task.ProjectId,
                 x.Project.Name,
@@ -110,8 +110,17 @@ public static class TasksEndpoints
                 x.Task.CreatedAt,
                 x.Task.UpdatedAt,
                 x.Task.Description != "",
-                db.TaskNotes.Count(n => n.TaskId == x.Task.Id)))
+                db.TaskNotes.Count(n => n.TaskId == x.Task.Id),
+                x.Task.RecurrenceKind != null,
+                0,
+                x.Task.BlockedReason,
+                x.Task.BlockedByTaskId,
+                db.Tasks.Where(b => b.Id == x.Task.BlockedByTaskId).Select(b => b.Title).FirstOrDefault(),
+                db.Tasks.Any(b => b.Id == x.Task.BlockedByTaskId && b.Status == "DONE"),
+                null) })
             .ToListAsync();
+        // links is jsonb: counted here from the (≤ 100) rows of the page
+        var items = rows.Select(r => r.Dto with { LinksCount = ExternalLinks.Parse(r.LinksJson).Count }).ToList();
 
         return Results.Ok(new { items, page, pageSize, total });
     }
@@ -134,6 +143,8 @@ public static class TasksEndpoints
 
         var errors = TaskValidation.TaskFields(body.Title, body.Status, body.Priority, body.Description, body.StartDate, body.DueDate);
         await CheckDeliverableAsync(db, projectId, body.DeliverableId, errors);
+        AddAll(errors, TaskValidation.Recurrence(body.Recurrence));
+        AddAll(errors, TaskValidation.Links(body.Links));
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
         var status = body.Status ?? "TODO";
@@ -148,11 +159,15 @@ public static class TasksEndpoints
             body.DeliverableId,
             await NextSortOrderAsync(db, projectId, status),
             clock);
+        if (body.Links != null) task.SetLinks(TaskValidation.ToLinks(body.Links));
+        if (body.Recurrence != null && !TaskValidation.ClearsRecurrence(body.Recurrence))
+            task.SetRecurrence(TaskValidation.ToRule(body.Recurrence));
         db.Tasks.Add(task);
 
         activity.Write("task", task.Id, "task.created",
             clientId: project.ClientId, projectId: projectId,
             data: new { title = task.Title, status = task.Status });
+        await SpawnIfRecurringAsync(db, activity, clock, task, project.ClientId);
 
         await db.SaveChangesAsync();
 
@@ -171,6 +186,12 @@ public static class TasksEndpoints
 
         var errors = TaskValidation.TaskFields(body.Title, body.Status, body.Priority, body.Description, body.StartDate, body.DueDate);
         await CheckDeliverableAsync(db, task.ProjectId, body.DeliverableId, errors);
+        AddAll(errors, TaskValidation.Recurrence(body.Recurrence));
+        AddAll(errors, TaskValidation.Links(body.Links));
+        AddAll(errors, TaskValidation.Blocked(body.Blocked));
+        // blocked only applies when the resulting status is BLOCKED (otherwise it is ignored and cleared)
+        var blockedApplies = (body.Status ?? task.Status) == "BLOCKED" && body.Blocked != null;
+        if (blockedApplies) await TaskBlocking.CheckAsync(db, task, body.Blocked!.ByTaskId, errors);
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
         var fromStatus = task.Status;
@@ -184,10 +205,35 @@ public static class TasksEndpoints
         activity.Write("task", task.Id, "task.updated",
             clientId: clientId, projectId: task.ProjectId,
             data: new { title = task.Title });
+
+        // P15: links / recurrence are logged only when they really change; the URLs never go into the log
+        if (body.Links != null)
+        {
+            var before = task.LinksJson;
+            task.SetLinks(TaskValidation.ToLinks(body.Links));
+            if (task.LinksJson != before)
+                activity.Write("task", task.Id, "task.links_updated",
+                    clientId: clientId, projectId: task.ProjectId,
+                    data: new { count = task.Links().Count });
+        }
+        if (body.Recurrence != null)
+        {
+            var rule = TaskValidation.ClearsRecurrence(body.Recurrence) ? null : TaskValidation.ToRule(body.Recurrence);
+            if (rule != task.Recurrence())
+            {
+                task.SetRecurrence(rule);
+                activity.Write("task", task.Id, "task.recurrence_changed",
+                    clientId: clientId, projectId: task.ProjectId,
+                    data: new { kind = rule?.Kind ?? TaskValidation.NoRecurrence });
+            }
+        }
+        if (blockedApplies) task.SetBlocked(body.Blocked!.Reason, body.Blocked.ByTaskId);
+
         if (task.Status != fromStatus)
-            activity.Write("task", task.Id, "task.status_changed",
-                clientId: clientId, projectId: task.ProjectId,
-                data: new { from = fromStatus, to = task.Status, title = task.Title });
+        {
+            WriteStatusChanged(activity, task, fromStatus, clientId);
+            if (task.Status == "DONE") await SpawnIfRecurringAsync(db, activity, clock, task, clientId);
+        }
 
         await db.SaveChangesAsync();
 
@@ -206,13 +252,21 @@ public static class TasksEndpoints
         if (task == null) return Results.NotFound();
 
         var errors = TaskValidation.Move(body.Status, body.SortOrder);
+        AddAll(errors, TaskValidation.Blocked(body.Blocked));
+        // BR-80: dragging into BLOCKED needs no reason; one sent along is stored (P15 D7)
+        var blockedApplies = body.Status == "BLOCKED" && body.Blocked != null;
+        if (blockedApplies) await TaskBlocking.CheckAsync(db, task, body.Blocked!.ByTaskId, errors);
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
         var fromStatus = task.Status;
-        if (task.Move(body.Status!, body.SortOrder!.Value, clock))
-            activity.Write("task", task.Id, "task.status_changed",
-                clientId: await ClientIdOfAsync(db, task.ProjectId), projectId: task.ProjectId,
-                data: new { from = fromStatus, to = task.Status, title = task.Title });
+        var changed = task.Move(body.Status!, body.SortOrder!.Value, clock);
+        if (blockedApplies) task.SetBlocked(body.Blocked!.Reason, body.Blocked.ByTaskId);
+        if (changed)
+        {
+            var clientId = await ClientIdOfAsync(db, task.ProjectId);
+            WriteStatusChanged(activity, task, fromStatus, clientId);
+            if (task.Status == "DONE") await SpawnIfRecurringAsync(db, activity, clock, task, clientId);
+        }
 
         await db.SaveChangesAsync();
 
@@ -381,6 +435,24 @@ public static class TasksEndpoints
                 .FirstOrDefaultAsync();
         var notesCount = await db.TaskNotes.CountAsync(n => n.TaskId == id);
 
+        // P15
+        BlockedInfoDto? blocked = null;
+        if (task.Status == "BLOCKED")
+        {
+            var blocker = task.BlockedByTaskId == null
+                ? null
+                : await db.Tasks.Where(t => t.Id == task.BlockedByTaskId)
+                    .Select(t => new { t.Title, t.Status })
+                    .FirstOrDefaultAsync();
+            blocked = new BlockedInfoDto(task.BlockedReason, task.BlockedByTaskId, blocker?.Title, blocker?.Status == "DONE");
+        }
+        var nextOccurrence = await db.Tasks
+            .Where(t => t.RecurrenceSourceId == id)
+            .OrderBy(t => t.CreatedAt).ThenBy(t => t.Id)
+            .Select(t => new NextOccurrenceDto(t.Id, t.DueDate))
+            .FirstOrDefaultAsync();
+        var rule = task.Recurrence();
+
         return new TaskDetailDto(
             task.Id,
             task.ProjectId,
@@ -403,7 +475,47 @@ public static class TasksEndpoints
             task.CreatedAt,
             task.UpdatedAt,
             task.RevisionItemId,
-            notesCount);
+            notesCount,
+            rule == null ? null : new RecurrenceDto(rule.Kind, rule.Weekdays, rule.MonthDay, rule.Until),
+            task.RecurrenceSourceId,
+            task.Links().Select(l => new ExternalLinkDto(l.Title, l.Url, l.VisibleToClient)).ToList(),
+            blocked,
+            nextOccurrence);
+    }
+
+    /// <summary>
+    /// P15 D4: a recurring task that just went DONE gets its next TODO occurrence in the same transaction (the caller
+    /// saves). Once per task; never for a CANCELLED/COMPLETED project. BR-01: a consequence of the designer's command.
+    /// </summary>
+    internal static async Task<ProjectTask?> SpawnIfRecurringAsync(
+        AppDbContext db, ActivityWriter activity, IClock clock, ProjectTask done, Guid clientId)
+    {
+        if (done.Status != "DONE" || done.RecurrenceSpawned || done.RecurrenceKind == null) return null;
+        var projectStatus = await db.Projects.Where(p => p.Id == done.ProjectId).Select(p => p.Status).FirstAsync();
+        if (projectStatus is "CANCELLED" or "COMPLETED") return null;
+
+        if (db.Entry(done).State != EntityState.Added)
+            await db.Entry(done).Collection(t => t.ChecklistItems).LoadAsync();
+        var next = done.TrySpawnNext(clock, await NextSortOrderAsync(db, done.ProjectId, "TODO"));
+        if (next == null) return null;
+
+        db.Tasks.Add(next);   // the whole graph: the copied checklist rows are inserted too
+        activity.Write("task", next.Id, "task.created",
+            clientId: clientId, projectId: next.ProjectId,
+            data: new { title = next.Title, status = next.Status, recurredFrom = done.Id });
+        return next;
+    }
+
+    private static void WriteStatusChanged(ActivityWriter activity, ProjectTask task, string fromStatus, Guid clientId) =>
+        activity.Write("task", task.Id, "task.status_changed",
+            clientId: clientId, projectId: task.ProjectId,
+            data: task.Status == "BLOCKED"
+                ? (object)new { from = fromStatus, to = task.Status, title = task.Title, blockedReason = task.BlockedReason }
+                : new { from = fromStatus, to = task.Status, title = task.Title });
+
+    private static void AddAll(Dictionary<string, string[]> errors, Dictionary<string, string[]> more)
+    {
+        foreach (var (key, value) in more) errors[key] = value;
     }
 
     // Appends to the bottom of the column
