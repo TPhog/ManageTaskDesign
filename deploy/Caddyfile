@@ -7,6 +7,11 @@
 }
 
 https://{$DOMAIN} {
+  # Public intake API: the path carries the form slug, keep it out of the access log (07-security s4.5)
+  handle /api/public/* {
+    log_skip
+    reverse_proxy api:8080
+  }
   handle /api/* {
     reverse_proxy api:8080
   }
