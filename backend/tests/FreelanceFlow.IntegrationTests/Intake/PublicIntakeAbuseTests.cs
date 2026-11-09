@@ -1,0 +1,120 @@
+using System.Net;
+using System.Text.Json;
+using FreelanceFlow.Api.Data;
+using FreelanceFlow.Api.Domain.Common;
+using FreelanceFlow.Api.Domain.Files;
+using FreelanceFlow.Api.Infrastructure.Storage;
+using FreelanceFlow.IntegrationTests.Images;
+using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace FreelanceFlow.IntegrationTests.Intake;
+
+public class PublicIntakeAbuseTests(AppFactory factory) : IntakeTestBase(factory)
+{
+    [Fact]
+    public async Task Honeypot_is_answered_like_success_but_nothing_is_stored()   // AC-INT5, BR-138
+    {
+        var slug = await EnableIntakeAsync();
+        var anon = Anonymous();
+        var token = (await GetFormAsync(anon, slug)).GetProperty("formToken").GetString()!;
+        var before = await SubmissionCountAsync();
+
+        var resp = await anon.PostAsync($"/api/public/intake/{slug}", IntakeForm(token, note: "spam", honeypot: "http://spam.example"));
+
+        resp.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        (await SubmissionCountAsync()).Should().Be(before);
+    }
+
+    [Fact]
+    public async Task Filling_faster_than_the_minimum_is_dropped_silently()   // AC-INT5
+    {
+        var slug = await EnableIntakeAsync();
+        await using var host = Factory.WithWebHostBuilder(b => b.UseSetting("PublicIntake:MinFillSeconds", "30"));
+        var anon = Anonymous(host);
+        var token = (await GetFormAsync(anon, slug)).GetProperty("formToken").GetString()!;
+        var before = await SubmissionCountAsync();
+
+        (await anon.PostAsync($"/api/public/intake/{slug}", IntakeForm(token, note: "quá nhanh"))).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        (await SubmissionCountAsync()).Should().Be(before);
+    }
+
+    [Fact]
+    public async Task Bad_foreign_or_expired_tokens_ask_to_reload()   // AC-INT5
+    {
+        var slug = await EnableIntakeAsync();
+        var clock = new MutableClock();
+        await using var host = Factory.WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddSingleton<IClock>(clock)));
+        var anon = Anonymous(host);
+        var token = (await GetFormAsync(anon, slug)).GetProperty("formToken").GetString()!;
+
+        async Task ExpectExpired(string url, string formToken)
+        {
+            var resp = await anon.PostAsync(url, IntakeForm(formToken, note: "x"));
+            resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+            (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("FORM_EXPIRED");
+        }
+
+        await ExpectExpired($"/api/public/intake/{slug}", "not-a-token");
+        clock.UtcNow = clock.UtcNow.AddHours(25);
+        await ExpectExpired($"/api/public/intake/{slug}", token);
+
+        clock.UtcNow = DateTimeOffset.UtcNow;
+        var fresh = (await (await Client.PostAsync("/api/admin/settings/intake/regenerate", null))
+            .Content.ReadFromJsonAsync<JsonElement>()).GetProperty("slug").GetString()!;
+        await ExpectExpired($"/api/public/intake/{fresh}", token);   // a token of the old link
+    }
+
+    [Fact]
+    public async Task Requests_per_ip_are_rate_limited()   // AC-INT6
+    {
+        var slug = await EnableIntakeAsync();
+        await using var host = Factory.WithWebHostBuilder(b => b.UseSetting("RateLimit:PublicIntakePerMinute", "2"));
+        var anon = Anonymous(host);
+
+        (await anon.GetAsync($"/api/public/intake/{slug}")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await anon.GetAsync($"/api/public/intake/{slug}")).StatusCode.Should().Be(HttpStatusCode.OK);
+        (await anon.GetAsync($"/api/public/intake/{slug}")).StatusCode.Should().Be(HttpStatusCode.TooManyRequests);
+    }
+
+    [Fact]
+    public async Task Full_storage_refuses_photos_but_still_takes_text()   // AC-INT6, decision 2b
+    {
+        var slug = await EnableIntakeAsync();
+        await using var host = Factory.WithWebHostBuilder(b => b.ConfigureTestServices(s =>
+            s.PostConfigure<StorageOptions>(o => o.QuotaBytes = 10)));
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var filler = FreelanceFlow.Api.Domain.Intake.IntakeSubmission.Create("Filler", "0909000000", null, null, null, [], "filler");
+            db.IntakeSubmissions.Add(filler);
+            db.Files.Add(ProjectFile.CreateImage(null, ImageOwnerTypes.IntakeSubmission, filler.Id, null, "CLIENT", false, "f.webp",
+                1, 1, 3, 3, 3, [1], DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync();
+        }
+        var anon = Anonymous(host);
+        var token = (await GetFormAsync(anon, slug)).GetProperty("formToken").GetString()!;
+
+        var withPhoto = IntakeForm(token, note: "có ảnh", images: 1);
+        withPhoto.Headers.ContentLength = 1_000_000;   // declared: more than a text-only body
+        var blocked = await anon.PostAsync($"/api/public/intake/{slug}", withPhoto);
+        blocked.StatusCode.Should().Be(HttpStatusCode.InsufficientStorage);
+        (await blocked.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("STORAGE_FULL");
+
+        (await anon.PostAsync($"/api/public/intake/{slug}", IntakeForm(token, note: "chỉ chữ"))).StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
+    public async Task Oversized_body_is_413()
+    {
+        var slug = await EnableIntakeAsync();
+        var anon = Anonymous();
+        var token = (await GetFormAsync(anon, slug)).GetProperty("formToken").GetString()!;
+        var form = IntakeForm(token, note: "lớn", images: 1);
+        form.Headers.ContentLength = FreelanceFlow.Api.Features.Images.ImageLimits.MaxPublicIntakeBodyBytes + 1;   // declared, not allocated
+
+        (await anon.PostAsync($"/api/public/intake/{slug}", form)).StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge);
+    }
+}

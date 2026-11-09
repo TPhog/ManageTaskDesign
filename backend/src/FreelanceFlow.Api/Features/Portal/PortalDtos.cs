@@ -7,8 +7,12 @@ namespace FreelanceFlow.Api.Features.Portal;
 
 public sealed record PortalSessionRequest(string? Token);
 
-/// <summary>ResponseTime (Plan 12 CF-13): "Nhà thiết kế thường phản hồi {ResponseTime}".</summary>
-public sealed record PortalDesignerDto(string DisplayName, string? LogoUrl, string? ContactPhone, string? ContactEmail, string ResponseTime);
+/// <summary>
+/// ResponseTime (Plan 12 CF-13): "Nhà thiết kế thường phản hồi {ResponseTime}".
+/// IntakeUrl (Plan 13): the studio's public "Đặt thiết kế mới" form while it is enabled, else null (studio data, same for every client).
+/// </summary>
+public sealed record PortalDesignerDto(
+    string DisplayName, string? LogoUrl, string? ContactPhone, string? ContactEmail, string ResponseTime, string? IntakeUrl);
 
 public sealed record PortalMeDto(string ClientName, PortalDesignerDto Designer);
 

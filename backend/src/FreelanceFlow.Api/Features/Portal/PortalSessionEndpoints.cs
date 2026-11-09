@@ -1,10 +1,13 @@
 using System.Globalization;
 using System.Security.Claims;
+using FreelanceFlow.Api.Common;
 using FreelanceFlow.Api.Data;
+using FreelanceFlow.Api.Features.Settings;
 using FreelanceFlow.Api.Infrastructure.Security;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace FreelanceFlow.Api.Features.Portal;
 
@@ -69,7 +72,8 @@ public static class PortalSessionEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> Me([FromServices] PortalPrincipal principal, AppDbContext db, HttpContext ctx)
+    private static async Task<IResult> Me([FromServices] PortalPrincipal principal, AppDbContext db, HttpContext ctx,
+        IOptions<AppSettings> app)
     {
         // ff_csrf is a session cookie but ff_portal outlives the browser: re-issue it when missing
         // so portal POSTs (logout) keep working after a restart.
@@ -87,7 +91,8 @@ public static class PortalSessionEndpoints
             null, // logo file serving arrives with M3
             settings?.ContactPhone,
             settings?.ContactEmail,
-            settings?.PortalResponseTime ?? FreelanceFlow.Api.Domain.Settings.Settings.DefaultPortalResponseTime)));
+            settings?.PortalResponseTime ?? FreelanceFlow.Api.Domain.Settings.Settings.DefaultPortalResponseTime,
+            settings is { IntakeEnabled: true, IntakeSlug: { } slug } ? IntakeLinkEndpoints.PublicUrl(slug, app.Value) : null)));
     }
 
     private static async Task<IResult> Studio(AppDbContext db)

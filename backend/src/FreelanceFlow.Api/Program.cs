@@ -7,6 +7,7 @@ using FreelanceFlow.Api.Features.Auth;
 using FreelanceFlow.Api.Features.Clients;
 using FreelanceFlow.Api.Features.Dashboard;
 using FreelanceFlow.Api.Features.Images;
+using FreelanceFlow.Api.Features.Intake;
 using FreelanceFlow.Api.Features.Portal;
 using FreelanceFlow.Api.Features.Projects;
 using FreelanceFlow.Api.Features.Quotations;
@@ -65,6 +66,10 @@ builder.Services.AddHostedService<NotificationDispatcher>();
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddScoped<StorageAlertService>();
 builder.Services.AddScoped<ImageUploader>();
+// Public intake form (plan 13): signed form token + minimum fill time
+builder.Services.AddDataProtection();
+builder.Services.Configure<IntakeOptions>(builder.Configuration.GetSection("PublicIntake"));
+builder.Services.AddSingleton<IntakeFormToken>();
 builder.Services.AddScoped<StorageSweeper>();
 builder.Services.AddSingleton(new FreelanceFlow.Api.Infrastructure.Images.ImageProcessingGate(
     builder.Configuration.GetValue("Storage:MaxConcurrentImageProcessing",
@@ -156,6 +161,7 @@ builder.Services.AddAuthorization(opt =>
 var loginPermitLimit = builder.Configuration.GetValue("RateLimit:LoginPerMinute", 5);
 var portalSessionPermitLimit = builder.Configuration.GetValue("RateLimit:PortalSessionPerMinute", 10);
 var portalStudioPermitLimit = builder.Configuration.GetValue("RateLimit:PortalStudioPerMinute", 60);
+var publicIntakePermitLimit = builder.Configuration.GetValue("RateLimit:PublicIntakePerMinute", 10);
 builder.Services.AddRateLimiter(opt =>
 {
     opt.AddPolicy("login", ctx => RateLimitPartition.GetFixedWindowLimiter(
@@ -179,6 +185,15 @@ builder.Services.AddRateLimiter(opt =>
         factory: _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = portalStudioPermitLimit,
+            Window = TimeSpan.FromMinutes(1),
+            QueueLimit = 0,
+        }));
+    // Plan 13 public intake form /api/public/intake/* (07-security §4.5)
+    opt.AddPolicy(PublicIntakeEndpoints.RateLimitPolicy, ctx => RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = publicIntakePermitLimit,
             Window = TimeSpan.FromMinutes(1),
             QueueLimit = 0,
         }));
@@ -266,6 +281,8 @@ app.MapImagesEndpoints();
 app.MapStorageEndpoints();
 app.MapWatermarkEndpoints();
 app.MapRequestTemplatesEndpoints();
+app.MapIntakeLinkEndpoints();
+app.MapPublicIntakeEndpoints();
 app.MapDigestSettingsEndpoints();
 app.MapProjectFlowEndpoints();
 app.MapPortalSessionEndpoints();
