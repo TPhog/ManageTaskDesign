@@ -28,12 +28,12 @@ test.describe('Client portal — quotations and requests', () => {
     await expect(portal.getByTestId('vietqr')).toBeVisible()
     await expect(portal.getByTestId('qr-amount')).toContainText('1.000.000')
     await expect(portal.getByTestId('qr-memo')).toHaveText(`${number.replace(/-/g, '')} COC`)
-    await portal.getByRole('radio', { name: 'Thanh toán toàn bộ' }).click()
+    await portal.getByRole('radio', { name: /Chuyển toàn bộ một lần/ }).click()
     await expect(portal.getByTestId('qr-amount')).toContainText('2.000.000')
-    await expect(portal.getByRole('link', { name: 'Tải ảnh QR' }))
+    await expect(portal.getByRole('link', { name: 'Lưu ảnh QR' }))
       .toHaveAttribute('href', `/api/portal/quotations/${id}/qr/full.png`)
     await expect(portal.locator('body')).not.toContainText('E2E-INTERNAL-NOTE')
-    await expect(portal.getByRole('button', { name: /chấp nhận|từ chối/i })).toHaveCount(0)   // ADR-004
+    await expect(portal.getByRole('button', { name: 'Đồng ý báo giá' })).toBeVisible()   // ADR-012
 
     await portal.getByRole('navigation', { name: 'Điều hướng portal' }).getByRole('link', { name: 'Báo giá' }).click()
     await expect(portal).toHaveURL(/\/portal\/quotations$/)
@@ -54,19 +54,19 @@ test.describe('Client portal — quotations and requests', () => {
     const { context, page: portal } = await openAsClient(browser, link)
     await expect(portal).toHaveURL(/\/portal$/)
     await portal.getByRole('link', { name: new RegExp(projectName) }).click()
-    await portal.getByRole('link', { name: 'Gửi yêu cầu chỉnh sửa' }).click()
+    await portal.getByRole('link', { name: 'Gửi yêu cầu mới' }).click()
 
     await expect(portal).toHaveURL(new RegExp(`/portal/requests/new\\?projectId=${projectId}$`))
-    await expect(portal.getByLabel('Dự án', { exact: true })).toHaveValue(projectId)
-    await portal.getByLabel('Hạng mục (tuỳ chọn)').selectOption({ label: 'Logo chính' })
-    await portal.getByLabel('Nội dung yêu cầu').fill(content)
+    await expect(portal.getByLabel('Dự án', { exact: true })).toHaveCount(0)
+    await portal.getByLabel('Sản phẩm cần sửa (tuỳ chọn)').selectOption({ label: 'Logo chính' })
+    await portal.getByLabel('Nội dung cần sửa').fill(content)
     await portal.getByRole('button', { name: 'Gửi yêu cầu', exact: true }).click()
     await expect(portal.getByText('Đã gửi yêu cầu', { exact: true })).toBeVisible()
 
     await portal.getByRole('link', { name: 'Xem yêu cầu của tôi' }).click()
     await expect(portal).toHaveURL(/\/portal\/requests$/)
     const item = portal.getByRole('listitem').filter({ hasText: content })
-    await expect(item).toContainText('Mới')
+    await expect(item).toContainText('Đã gửi — chờ nhà thiết kế xem')
     await expect(item).toContainText('Logo chính')
     await context.close()
 
@@ -78,7 +78,7 @@ test.describe('Client portal — quotations and requests', () => {
     await page.goto('/admin')
     const stamp = Date.now()
     const clientId = await createClient(page, `Portal Revisions E2E ${stamp}`)
-    const projectName = `Dự án lần sửa ${stamp}`
+    const projectName = `Dự án lượt sửa ${stamp}`
     const projectId = await createProjectForClient(page, clientId, projectName)
     const logo = await createDeliverable(page, projectId, 'Logo chính', 3)
     await apiPost(page.request, page, `/api/admin/projects/${projectId}/rounds`, {
@@ -95,13 +95,13 @@ test.describe('Client portal — quotations and requests', () => {
     await expect(portal).toHaveURL(/\/portal$/)
     await portal.getByRole('link', { name: new RegExp(projectName) }).click()
 
-    const revisions = portal.getByRole('region', { name: 'Lần sửa', exact: true })
+    const revisions = portal.getByRole('region', { name: 'Lượt chỉnh sửa', exact: true })
     await expect(revisions).toContainText('Logo chính')
-    await expect(revisions).toContainText('1/3 lần sửa miễn phí')
-    await expect(revisions).toContainText('Lần sửa 1')
+    await expect(revisions).toContainText('1/3 lượt chỉnh sửa miễn phí')
+    await expect(revisions).toContainText('Lượt chỉnh sửa 1')
     const inQuota = revisions.getByRole('listitem').filter({ hasText: 'Đổi màu chữ sang xanh navy' }).last()
-    await expect(inQuota).toContainText('Trong số lần sửa')
-    await expect(inQuota).toContainText('Chờ làm')
+    await expect(inQuota).toContainText('Dùng lượt miễn phí')
+    await expect(inQuota).toContainText('Chưa bắt đầu')
     await expect(revisions.getByRole('listitem').filter({ hasText: 'Thêm tagline dưới logo' }).last()).toContainText('Tính phí')
     await context.close()
   })

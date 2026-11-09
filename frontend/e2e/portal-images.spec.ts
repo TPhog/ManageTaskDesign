@@ -35,7 +35,7 @@ test.describe('Client portal — images', () => {
 
     await gallery.getByRole('button', { name: 'Xem ảnh Ảnh Logo chính' }).click()
     const viewer = portal.getByRole('dialog', { name: 'Ảnh Logo chính' })
-    const previewSrc = await viewer.locator('img').getAttribute('src')
+    const previewSrc = await viewer.getByRole('img', { name: 'Ảnh Logo chính' }).getAttribute('src')   // the blurred thumb under it is aria-hidden
     expect(previewSrc).toMatch(/\/preview$/)
     const preview = await portal.request.get(previewSrc!)
     expect(preview.status()).toBe(200)
@@ -44,14 +44,14 @@ test.describe('Client portal — images', () => {
     expect((await portal.request.get(previewSrc!.replace(/\/preview$/, '/original'))).status()).toBe(404)
     await portal.keyboard.press('Escape')
 
-    const timeline = portal.getByRole('region', { name: 'Tiến trình' })
+    const timeline = portal.getByRole('region', { name: 'Hoạt động gần đây' })
     const entry = timeline.getByRole('listitem').filter({ hasText: message }).first()
     await expect(entry.locator('img')).toHaveCount(1)
 
     await portal.goto(`/portal/requests/new?projectId=${projectId}`)
-    await portal.getByLabel('Nội dung yêu cầu').fill('Đổi màu theo ảnh mẫu')
+    await portal.getByLabel('Nội dung cần sửa').fill('Đổi màu theo ảnh mẫu')
     await portal.locator('#request-images').setInputFiles([pngFile('mau-mau.png')])
-    await expect(portal.getByRole('list', { name: 'Ảnh đính kèm' })).toContainText('mau-mau.png')
+    await expect(portal.getByRole('list', { name: 'Ảnh đính kèm' }).getByRole('img', { name: 'mau-mau.png' })).toBeVisible()
     await portal.getByRole('button', { name: 'Gửi yêu cầu' }).click()
     await expect(portal.getByText('Đã gửi yêu cầu')).toBeVisible()
     await portal.goto(`/portal/projects/${projectId}`)
