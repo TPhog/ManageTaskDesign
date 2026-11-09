@@ -1,6 +1,7 @@
 using System.Net;
 using FreelanceFlow.IntegrationTests.Intake;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace FreelanceFlow.IntegrationTests.Security;
 
@@ -30,6 +31,30 @@ public class DataProtectionKeysTests(AppFactory factory) : IntakeTestBase(factor
         finally
         {
             if (Directory.Exists(keys)) Directory.Delete(keys, recursive: true);
+        }
+    }
+
+    [Fact]
+    public async Task A_relative_keys_path_is_under_the_content_root_not_the_working_directory()
+    {
+        var slug = await EnableIntakeAsync();
+        var relative = Path.Combine("data", "it-keys-" + Guid.NewGuid().ToString("N"));
+        await using var host = Factory.WithWebHostBuilder(b => b.UseSetting("DataProtection:KeysPath", relative));
+        var contentRoot = host.Services.GetRequiredService<IWebHostEnvironment>().ContentRootPath;
+        var expected = Path.Combine(contentRoot, relative);
+        try
+        {
+            await GetFormAsync(Anonymous(host), slug);   // issuing a token creates the first key
+
+            Directory.GetFiles(expected, "key-*.xml").Should().NotBeEmpty();
+            Path.GetFullPath(contentRoot).Should().NotBe(Path.GetFullPath(Directory.GetCurrentDirectory()),
+                "otherwise this test proves nothing");
+        }
+        finally
+        {
+            if (Directory.Exists(expected)) Directory.Delete(expected, recursive: true);
+            var wrong = Path.GetFullPath(relative);
+            if (Directory.Exists(wrong)) Directory.Delete(wrong, recursive: true);
         }
     }
 }

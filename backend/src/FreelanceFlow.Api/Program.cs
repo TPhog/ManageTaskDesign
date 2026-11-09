@@ -71,8 +71,9 @@ builder.Services.AddScoped<ImageUploader>();
 // redeploy keeps them valid (docker-compose mounts the `keys` volume at /data/keys). Tests leave the path empty.
 var dataProtection = builder.Services.AddDataProtection().SetApplicationName("FreelanceFlow");
 var keysPath = builder.Configuration["DataProtection:KeysPath"];
-if (!string.IsNullOrWhiteSpace(keysPath))
-    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keysPath));
+if (!string.IsNullOrWhiteSpace(keysPath))   // relative = under the content root (like Storage:Local:RootPath), never the cwd
+    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(
+        Path.IsPathRooted(keysPath) ? keysPath : Path.Combine(builder.Environment.ContentRootPath, keysPath)));
 else if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing"))
     throw new InvalidOperationException("DataProtection:KeysPath must be set outside Development (docker-compose mounts /data/keys).");
 
