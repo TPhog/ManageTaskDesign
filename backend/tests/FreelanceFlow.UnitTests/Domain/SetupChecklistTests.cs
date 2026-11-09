@@ -10,7 +10,7 @@ public class SetupChecklistTests
     {
         var items = SetupChecklist.Build(new SetupFacts(true, false, false, false, false, false));
         items.Select(i => i.Key).Should().Equal("STUDIO", "BANK", "SERVICE", "TASK_TEMPLATE", "WATERMARK", "CLIENT");
-        items.Select(i => i.Href).Should().Equal("/admin/settings", "/admin/settings", "/admin/services", "/admin/services", "/admin/settings", "/admin/clients");
+        items.Select(i => i.Href).Should().Equal("/admin/settings?tab=studio", "/admin/settings?tab=payment", "/admin/services", "/admin/services", "/admin/settings?tab=images", "/admin/clients");
         items.Select(i => i.Done).Should().Equal(true, false, false, false, false, false);
     }
 

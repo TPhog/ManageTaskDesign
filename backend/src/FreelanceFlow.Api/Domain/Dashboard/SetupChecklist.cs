@@ -13,11 +13,11 @@ public static class SetupChecklist
 
     public static IReadOnlyList<SetupItem> Build(SetupFacts f) =>
     [
-        new("STUDIO", "Điền thông tin studio", "Tên studio và SĐT hoặc email để khách liên hệ (hiện trên báo giá và portal)", f.HasStudioName, "/admin/settings"),
-        new("BANK", "Nhập tài khoản ngân hàng", "Để báo giá có mã VietQR cho khách quét", f.HasBank, "/admin/settings"),
+        new("STUDIO", "Điền thông tin studio", "Tên studio và SĐT hoặc email để khách liên hệ (hiện trên báo giá và portal)", f.HasStudioName, "/admin/settings?tab=studio"),
+        new("BANK", "Nhập tài khoản ngân hàng", "Để báo giá có mã VietQR cho khách quét", f.HasBank, "/admin/settings?tab=payment"),
         new("SERVICE", "Xem lại bảng giá dịch vụ", "Giá mẫu chỉ để tham khảo — sửa theo giá của bạn", f.HasPricedService, "/admin/services"),
         new("TASK_TEMPLATE", "Thêm các bước công việc mẫu cho dịch vụ", "Task tự sinh khi bắt đầu dự án", f.HasTaskTemplate, "/admin/services"),
-        new("WATERMARK", "Xem lại watermark ảnh", "Chữ chìm trên ảnh khách xem; lưu lại để xác nhận", f.WatermarkReviewed, "/admin/settings"),
+        new("WATERMARK", "Xem lại watermark ảnh", "Chữ chìm trên ảnh khách xem; lưu lại để xác nhận", f.WatermarkReviewed, "/admin/settings?tab=images"),
         new("CLIENT", "Thêm khách hàng đầu tiên", "Rồi tạo dự án cho khách đó", f.HasClient, "/admin/clients"),
     ];
 }
