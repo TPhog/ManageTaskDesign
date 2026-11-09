@@ -73,13 +73,14 @@ export interface PaymentSummary {
 
 /** CF-05 (same BR-75 table as the backend): what to pay now and what is left after handover; null = nothing to pay. */
 export function paymentSummary(
-  q: Pick<PortalQuotationDetail, 'status' | 'effectiveStatus' | 'paymentStatus' | 'snapshot'>,
+  q: Pick<PortalQuotationDetail, 'status' | 'effectiveStatus' | 'paymentStatus' | 'remainingAmount' | 'snapshot'>,
 ): PaymentSummary | null {
   const { total, depositAmount, depositPercent } = q.snapshot
+  const remaining = q.remainingAmount   // backend-computed: the portal never does money arithmetic
   const awaiting = q.effectiveStatus === 'SENT' || q.effectiveStatus === 'EXPIRED'
     || (q.effectiveStatus === 'ACCEPTED' && q.paymentStatus === 'UNPAID')
-  if (awaiting) return depositPercent > 0 ? { now: depositAmount, later: total - depositAmount } : { now: total, later: 0 }
-  if (q.effectiveStatus === 'ACCEPTED' && q.paymentStatus === 'DEPOSIT_PAID') return { now: total - depositAmount, later: 0 }
+  if (awaiting) return depositPercent > 0 ? { now: depositAmount, later: remaining } : { now: total, later: 0 }
+  if (q.effectiveStatus === 'ACCEPTED' && q.paymentStatus === 'DEPOSIT_PAID') return { now: remaining, later: 0 }
   return null
 }
 

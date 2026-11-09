@@ -214,7 +214,8 @@ public static class PortalQuotationsEndpoints
         return new PortalQuotationListItemDto(
             q.Id, q.ProjectId, s.Project.Name, s.Number, s.Version, s.Kind, s.Title,
             q.Status, q.EffectiveStatus(today), q.PaymentStatus,
-            s.Total, s.DepositAmount, s.IssueDate, s.ExpiryDate,
+            s.Total, s.DepositAmount, ClientStatements.Amount(QrPurposes.Remaining, s.Total, s.DepositAmount),
+            s.IssueDate, s.ExpiryDate,
             q.ClientAcceptedAt, ToNotice(q.PaymentNotice()));
     }
 
@@ -228,7 +229,8 @@ public static class PortalQuotationsEndpoints
             .Select(x => new PortalQuotationVersionDto(x.Version, x.Status, x.EffectiveStatus(today)))
             .ToList();
         return new PortalQuotationDetailDto(
-            q.Id, q.ProjectId, q.Status, q.EffectiveStatus(today), q.PaymentStatus, snapshot, qr, versions,
+            q.Id, q.ProjectId, q.Status, q.EffectiveStatus(today), q.PaymentStatus,
+            ClientStatements.Amount(QrPurposes.Remaining, snapshot.Total, snapshot.DepositAmount), snapshot, qr, versions,
             q.ClientAcceptedAt, ToNotice(q.PaymentNotice()));
     }
 

@@ -7,7 +7,7 @@ import type { PortalQuotationDetail } from '@/lib/portalTypes'
 vi.mock('@/lib/api', () => ({ api: { get: vi.fn(), post: vi.fn(), postForm: vi.fn() } }))
 
 const q = {
-  id: 'q1', projectId: 'p1', status: 'SENT', effectiveStatus: 'SENT', paymentStatus: 'UNPAID', clientAcceptedAt: null,
+  id: 'q1', projectId: 'p1', status: 'SENT', effectiveStatus: 'SENT', paymentStatus: 'UNPAID', remainingAmount: 3_510_000, clientAcceptedAt: null,
   clientPaymentNotice: null, versions: [],
   snapshot: { number: 'BG-2026-0001', total: 7_020_000, depositAmount: 3_510_000, depositPercent: 50,
     bank: { bin: '970436', shortName: 'Vietcombank', accountNo: '0123456789', accountName: 'NGUYEN MINH ANH' } },

@@ -102,6 +102,7 @@ public sealed record PortalQuotationListItemDto(
     string PaymentStatus,
     long Total,
     long DepositAmount,
+    long RemainingAmount,
     DateOnly IssueDate,
     DateOnly ExpiryDate,
     DateTimeOffset? ClientAcceptedAt,
@@ -119,6 +120,7 @@ public sealed record PortalQuotationVersionDto(int Version, string Status, strin
 
 /// <summary>
 /// The snapshot is portal-safe by construction: it carries no internal notes (Domain/Quotations/QuotationSnapshot).
+/// RemainingAmount: what is left after the deposit (BR-75 "remaining"), from the snapshot — the portal never computes money.
 /// </summary>
 public sealed record PortalQuotationDetailDto(
     Guid Id,
@@ -126,6 +128,7 @@ public sealed record PortalQuotationDetailDto(
     string Status,
     string EffectiveStatus,
     string PaymentStatus,
+    long RemainingAmount,
     QuotationSnapshot Snapshot,
     IReadOnlyList<PortalQrOptionDto> QrOptions,
     IReadOnlyList<PortalQuotationVersionDto> Versions,

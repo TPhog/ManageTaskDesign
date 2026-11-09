@@ -134,6 +134,8 @@ export interface PortalQuotationListItem {
   paymentStatus: PaymentStatus
   total: number
   depositAmount: number
+  /** total − deposit, computed by the backend (BR-75 "remaining") */
+  remainingAmount: number
   issueDate: string
   expiryDate: string
   /** Plan 12: the client pressed "Đồng ý báo giá" (status stays SENT until the designer confirms) */
@@ -154,6 +156,8 @@ export interface PortalQuotationDetail {
   status: QuotationStatus
   effectiveStatus: EffectiveStatus
   paymentStatus: PaymentStatus
+  /** total − deposit of the snapshot, computed by the backend (BR-75 "remaining") */
+  remainingAmount: number
   snapshot: QuotationSnapshot
   /** BR-75 options with a ready-to-render VietQR payload; empty when nothing is payable */
   qrOptions: QrOption[]

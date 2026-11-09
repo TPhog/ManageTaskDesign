@@ -48,6 +48,7 @@ public class PortalQuotationsTests(AppFactory factory) : PortalTestBase(factory)
         item.GetProperty("title").GetString().Should().Be(QuoteTitle);
         item.GetProperty("total").GetInt64().Should().Be(2_000_000);
         item.GetProperty("depositAmount").GetInt64().Should().Be(1_000_000);
+        item.GetProperty("remainingAmount").GetInt64().Should().Be(1_000_000);   // R2 M5: computed in the backend
         item.GetProperty("status").GetString().Should().Be("SENT");
         item.GetProperty("effectiveStatus").GetString().Should().Be("SENT");
         item.GetProperty("paymentStatus").GetString().Should().Be("UNPAID");
@@ -78,6 +79,7 @@ public class PortalQuotationsTests(AppFactory factory) : PortalTestBase(factory)
         snapshot.GetProperty("items")[0].GetProperty("description").GetString().Should().Be("Thiết kế logo");
         snapshot.GetProperty("items")[0].GetProperty("details").GetString().Should().Be("3 phương án");
         snapshot.GetProperty("total").GetInt64().Should().Be(2_000_000);
+        detail.GetProperty("remainingAmount").GetInt64().Should().Be(1_000_000);   // R2 M5: total − deposit, from the snapshot
         snapshot.GetProperty("notesToClient").GetString().Should().Be("Cảm ơn anh/chị");
         snapshot.GetProperty("bank").GetProperty("accountNo").GetString().Should().Be("0123456789");
 

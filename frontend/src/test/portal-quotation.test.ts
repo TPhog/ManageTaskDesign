@@ -63,11 +63,16 @@ describe('qrPngUrl', () => {
 
 describe('paymentSummary (CF-05)', () => {
   const snap = { total: 7_020_000, depositAmount: 3_510_000, depositPercent: 50 } as PortalQuotationDetail['snapshot']
+  const remainingAmount = 3_510_000
   it('splits now and after handover', () => {
-    expect(paymentSummary({ status: 'SENT', effectiveStatus: 'SENT', paymentStatus: 'UNPAID', snapshot: snap })).toEqual({ now: 3_510_000, later: 3_510_000 })
-    expect(paymentSummary({ status: 'ACCEPTED', effectiveStatus: 'ACCEPTED', paymentStatus: 'DEPOSIT_PAID', snapshot: snap })).toEqual({ now: 3_510_000, later: 0 })
-    expect(paymentSummary({ status: 'SENT', effectiveStatus: 'SENT', paymentStatus: 'UNPAID', snapshot: { ...snap, depositPercent: 0, depositAmount: 0 } })).toEqual({ now: 7_020_000, later: 0 })
-    expect(paymentSummary({ status: 'ACCEPTED', effectiveStatus: 'ACCEPTED', paymentStatus: 'PAID', snapshot: snap })).toBeNull()
+    expect(paymentSummary({ status: 'SENT', effectiveStatus: 'SENT', paymentStatus: 'UNPAID', remainingAmount, snapshot: snap })).toEqual({ now: 3_510_000, later: 3_510_000 })
+    expect(paymentSummary({ status: 'ACCEPTED', effectiveStatus: 'ACCEPTED', paymentStatus: 'DEPOSIT_PAID', remainingAmount, snapshot: snap })).toEqual({ now: 3_510_000, later: 0 })
+    expect(paymentSummary({ status: 'SENT', effectiveStatus: 'SENT', paymentStatus: 'UNPAID', remainingAmount: 7_020_000, snapshot: { ...snap, depositPercent: 0, depositAmount: 0 } })).toEqual({ now: 7_020_000, later: 0 })
+    expect(paymentSummary({ status: 'ACCEPTED', effectiveStatus: 'ACCEPTED', paymentStatus: 'PAID', remainingAmount, snapshot: snap })).toBeNull()
+  })
+
+  it('takes the remaining amount from the backend, never total − deposit (R2 M5)', () => {
+    expect(paymentSummary({ status: 'ACCEPTED', effectiveStatus: 'ACCEPTED', paymentStatus: 'DEPOSIT_PAID', remainingAmount: 1, snapshot: snap })).toEqual({ now: 1, later: 0 })
   })
 })
 

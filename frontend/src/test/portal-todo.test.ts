@@ -10,7 +10,7 @@ const project = (over: Partial<PortalProjectListItem> = {}): PortalProjectListIt
 const quote = (over: Partial<PortalQuotationListItem> = {}): PortalQuotationListItem => ({
   id: 'q1', projectId: 'p1', projectName: 'Tiệm bánh Mây', number: 'BG-2026-0001', version: 1, kind: 'INITIAL',
   title: 'Báo giá', status: 'SENT', effectiveStatus: 'SENT', paymentStatus: 'UNPAID', total: 7_020_000,
-  depositAmount: 3_510_000, issueDate: '2026-11-08', expiryDate: '2026-11-15', clientAcceptedAt: null,
+  depositAmount: 3_510_000, remainingAmount: 3_510_000, issueDate: '2026-11-08', expiryDate: '2026-11-15', clientAcceptedAt: null,
   clientPaymentNotice: null, ...over,
 })
 
@@ -36,10 +36,11 @@ describe('buildTodoList (CF-14)', () => {
   })
 
   it('asks for the remaining amount only once something was delivered', () => {
-    const half = quote({ status: 'ACCEPTED', effectiveStatus: 'ACCEPTED', paymentStatus: 'DEPOSIT_PAID' })
+    // the backend's remainingAmount is shown as is (R2 M5: no total − deposit in the portal)
+    const half = quote({ status: 'ACCEPTED', effectiveStatus: 'ACCEPTED', paymentStatus: 'DEPOSIT_PAID', remainingAmount: 3_000_000 })
     const summary = { total: 1, delivered: 0, approved: 0, inReview: 0, awaitingClient: 0 }
     expect(buildTodoList([project({ deliverableSummary: summary })], [half])).toEqual([])
     expect(buildTodoList([project({ deliverableSummary: { ...summary, delivered: 1 } })], [half])[0].label)
-      .toBe(`Chuyển phần còn lại ${formatVnd(3_510_000)} (BG-2026-0001)`)
+      .toBe(`Chuyển phần còn lại ${formatVnd(3_000_000)} (BG-2026-0001)`)
   })
 })

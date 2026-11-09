@@ -401,7 +401,7 @@ Mọi endpoint lấy `clientId` **từ session**, không nhận `clientId` từ 
 | GET | `/api/portal/files/{id}/content` | Kiểm tra thuộc khách + visible (hoặc khách tự upload) |
 | GET | `/api/portal/projects/{id}/timeline?page=` | Activity `visible_to_client = true`: `{ occurredAt, message }` |
 | GET | `/api/portal/quotations?projectId=` | Status ≠ DRAFT, ≠ SUPERSEDED |
-| GET | `/api/portal/quotations/{id}` | `snapshot` + `effectiveStatus` + `paymentStatus` + `qrOptions` + `versions: [{version, status}]` + `clientAcceptedAt` + `clientPaymentNotice: { purpose, amount, at, note, pending }` hoặc `null` (list item cũng có hai trường này) |
+| GET | `/api/portal/quotations/{id}` | `snapshot` + `effectiveStatus` + `paymentStatus` + `qrOptions` + `versions: [{version, status}]` + `clientAcceptedAt` + `clientPaymentNotice: { purpose, amount, at, note, pending }` hoặc `null` + `remainingAmount` (= tổng − cọc của snapshot, tính ở backend; portal không tự trừ tiền) (list item cũng có ba trường này, cạnh `total`, `depositAmount`) |
 | GET | `/api/portal/quotations/{id}/versions/{version}` | Xem bản SUPERSEDED (lịch sử) |
 | GET | `/api/portal/quotations/{id}/qr/{purpose}.png` | Tải ảnh QR |
 | POST | `/api/portal/quotations/{id}/accept` | **"Đồng ý báo giá"** (BR-76). Không body. `200` = chi tiết báo giá (như GET) với `clientAcceptedAt` đã có; idempotent. `409 INVALID_TRANSITION` (không còn `SENT`), `409 QUOTATION_EXPIRED`, `409 CONCURRENCY_CONFLICT`; ngoài phạm vi khách → `404`. Ghi `quotation.client_accepted`, Discord sau commit; **không** đổi `status` |

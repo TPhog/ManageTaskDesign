@@ -23,7 +23,7 @@ function paymentDue(q: PortalQuotationListItem, delivered: boolean): string | nu
       : `Thanh toán ${formatVnd(q.total)} (${q.number})`
   }
   if (q.effectiveStatus === 'ACCEPTED' && q.paymentStatus === 'DEPOSIT_PAID' && delivered) {
-    return `Chuyển phần còn lại ${formatVnd(q.total - q.depositAmount)} (${q.number})`
+    return `Chuyển phần còn lại ${formatVnd(q.remainingAmount)} (${q.number})`
   }
   return null
 }
