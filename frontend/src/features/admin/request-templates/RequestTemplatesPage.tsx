@@ -22,6 +22,8 @@ export default function RequestTemplatesPage() {
   const items = list.data ?? []
 
   function move(index: number, delta: -1 | 1) {
+    // one full-list POST at a time: overlapping ones may land out of order
+    if (reorder.isPending) return
     const next = moveItem(items, index, delta)
     if (next === items) return
     qc.setQueryData(qk.requestTemplates.all, next) // optimistic; onSettled refetches the truth
@@ -56,14 +58,16 @@ export default function RequestTemplatesPage() {
           action={<Button asChild><Link to="/admin/settings/request-templates/new">Thêm mẫu</Link></Button>} />
       ) : (
         <ul className="space-y-3">
-          {items.map((t, i) => <TemplateRow key={t.id} t={t} index={i} count={items.length} onMove={d => move(i, d)} />)}
+          {items.map((t, i) => <TemplateRow key={t.id} t={t} index={i} count={items.length} saving={reorder.isPending} onMove={d => move(i, d)} />)}
         </ul>
       )}
     </div>
   )
 }
 
-function TemplateRow({ t, index, count, onMove }: { t: AdminRequestTemplate; index: number; count: number; onMove: (d: -1 | 1) => void }) {
+function TemplateRow({ t, index, count, saving, onMove }: {
+  t: AdminRequestTemplate; index: number; count: number; saving: boolean; onMove: (d: -1 | 1) => void
+}) {
   return (
     <li className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-xl border bg-card p-4 shadow-card">
       <div className="min-w-0 flex-1 basis-60">
@@ -80,11 +84,11 @@ function TemplateRow({ t, index, count, onMove }: { t: AdminRequestTemplate; ind
       </div>
       <div className="flex items-center gap-1">
         <Button type="button" variant="ghost" size="icon" className="h-9 w-9" aria-label={`Đưa mẫu ${t.name} lên`}
-          disabled={index === 0} onClick={() => onMove(-1)}>
+          disabled={saving || index === 0} onClick={() => onMove(-1)}>
           <ArrowUp aria-hidden="true" />
         </Button>
         <Button type="button" variant="ghost" size="icon" className="h-9 w-9" aria-label={`Đưa mẫu ${t.name} xuống`}
-          disabled={index === count - 1} onClick={() => onMove(1)}>
+          disabled={saving || index === count - 1} onClick={() => onMove(1)}>
           <ArrowDown aria-hidden="true" />
         </Button>
         <Button asChild variant="outline" size="sm">
