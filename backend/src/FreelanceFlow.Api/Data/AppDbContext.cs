@@ -34,6 +34,8 @@ public class AppDbContext : DbContext
     public DbSet<ProjectTask> Tasks => Set<ProjectTask>();
     public DbSet<TaskChecklistItem> TaskChecklistItems => Set<TaskChecklistItem>();
     public DbSet<TaskNote> TaskNotes => Set<TaskNote>();
+    public DbSet<TaskView> TaskViews => Set<TaskView>();
+    public DbSet<TaskViewState> TaskViewStates => Set<TaskViewState>();
     public DbSet<QuotationSequence> QuotationSequences => Set<QuotationSequence>();
     public DbSet<Quotation> Quotations => Set<Quotation>();
     public DbSet<QuotationItem> QuotationItems => Set<QuotationItem>();

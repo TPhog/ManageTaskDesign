@@ -27,6 +27,14 @@ public class Deliverable : IAuditable
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
 
+    /// <summary>P15 D6: deliverables.links — jsonb array of <see cref="ExternalLink"/>; only VisibleToClient ones reach the portal.</summary>
+    public string LinksJson { get; private set; } = "[]";
+
+    public IReadOnlyList<ExternalLink> Links() => ExternalLinks.Parse(LinksJson);
+
+    public void SetLinks(IEnumerable<ExternalLink>? links) =>
+        LinksJson = ExternalLinks.Serialize(ExternalLinks.Normalize(links, allowClientVisible: true));
+
     /// <summary>Same limit as the deliverable form (zod max 200).</summary>
     public const int MaxName = 200;
 

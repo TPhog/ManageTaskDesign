@@ -34,6 +34,22 @@ public class ProjectTask : IAuditable
 
     public List<TaskChecklistItem> ChecklistItems { get; set; } = [];
 
+    // ---- P15 (Lark-style upgrades) ----
+    public const int MaxBlockedReason = 500;
+
+    /// <summary>tasks.links — jsonb array of <see cref="ExternalLink"/>; task links are never client-visible (TSK-05).</summary>
+    public string LinksJson { get; private set; } = "[]";
+    public string? RecurrenceKind { get; private set; }
+    public int? RecurrenceWeekdays { get; private set; }
+    public int? RecurrenceMonthDay { get; private set; }
+    public DateOnly? RecurrenceUntil { get; private set; }
+    /// <summary>Set once the next occurrence was created (or the chain ended): DONE → TODO → DONE never spawns twice.</summary>
+    public bool RecurrenceSpawned { get; private set; }
+    public Guid? RecurrenceSourceId { get; private set; }
+    /// <summary>P15 D7: only kept while BLOCKED; cleared by <see cref="Move"/> when the task leaves BLOCKED.</summary>
+    public string? BlockedReason { get; private set; }
+    public Guid? BlockedByTaskId { get; private set; }
+
     public static ProjectTask Create(
         Guid projectId,
         string title,
@@ -85,6 +101,11 @@ public class ProjectTask : IAuditable
 
         Status = status;
         CompletedAt = status == "DONE" ? clock.UtcNow : null;
+        if (status != "BLOCKED")
+        {
+            BlockedReason = null;
+            BlockedByTaskId = null;
+        }
         return true;
     }
 
@@ -141,4 +162,73 @@ public class ProjectTask : IAuditable
     private TaskChecklistItem FindChecklistItem(Guid itemId) =>
         ChecklistItems.FirstOrDefault(i => i.Id == itemId)
         ?? throw new DomainException("NOT_FOUND", "Không tìm thấy mục checklist");
+
+    // ---------- P15: links, recurrence, blocked-by, reschedule ----------
+
+    public IReadOnlyList<ExternalLink> Links() => ExternalLinks.Parse(LinksJson);
+
+    public void SetLinks(IEnumerable<ExternalLink>? links) =>
+        LinksJson = ExternalLinks.Serialize(ExternalLinks.Normalize(links, allowClientVisible: false));
+
+    public RecurrenceRule? Recurrence() => RecurrenceKind == null
+        ? null
+        : new RecurrenceRule(RecurrenceKind, RecurrenceWeekdays ?? 0, RecurrenceMonthDay, RecurrenceUntil);
+
+    /// <summary>null clears the rule; <see cref="RecurrenceSpawned"/> is kept.</summary>
+    public void SetRecurrence(RecurrenceRule? rule)
+    {
+        RecurrenceKind = rule?.Kind;
+        RecurrenceWeekdays = rule?.Weekdays;
+        RecurrenceMonthDay = rule?.MonthDay;
+        RecurrenceUntil = rule?.Until;
+    }
+
+    public void SetBlocked(string? reason, Guid? byTaskId)
+    {
+        if (Status != "BLOCKED")
+            throw new DomainException("VALIDATION_FAILED", "Chỉ ghi lý do khi công việc đang bị chặn");
+        var trimmed = reason?.Trim();
+        if (trimmed is { Length: > MaxBlockedReason })
+            throw new DomainException("VALIDATION_FAILED", $"Lý do bị chặn tối đa {MaxBlockedReason} ký tự");
+        BlockedReason = string.IsNullOrEmpty(trimmed) ? null : trimmed;
+        BlockedByTaskId = byTaskId;
+    }
+
+    /// <summary>
+    /// P15 D4 (BR-01: a consequence of the designer's DONE command). Once per task: base = max(due, today VN); the new
+    /// TODO task is due on the rule's next date after base and keeps the start→due gap. Copies title, description,
+    /// priority, deliverable, links, rule and the checklist (unchecked); never notes, images, revision item or blocked data.
+    /// Returns null (and ends the chain) when the next date is past Until.
+    /// </summary>
+    public ProjectTask? TrySpawnNext(IClock clock, double sortOrder)
+    {
+        if (Status != "DONE" || RecurrenceSpawned || RecurrenceKind == null) return null;
+
+        var today = clock.TodayVn;
+        var baseDate = DueDate is { } d && d > today ? d : today;
+        var next = Recurrence()!.NextAfter(baseDate);
+        RecurrenceSpawned = true;
+        if (next is not { } due) return null;
+
+        DateOnly? start = StartDate != null && DueDate != null
+            ? due.AddDays(-(DueDate.Value.DayNumber - StartDate.Value.DayNumber))
+            : null;
+        var spawned = Create(ProjectId, Title, Description, "TODO", Priority, start, due, DeliverableId, sortOrder, clock);
+        spawned.SetRecurrence(Recurrence());
+        spawned.LinksJson = LinksJson;
+        spawned.RecurrenceSourceId = Id;
+        foreach (var item in ChecklistItems.OrderBy(i => i.SortOrder))
+            spawned.AddChecklistItem(item.Text, item.Description);
+        return spawned;
+    }
+
+    /// <summary>Calendar drag: moves the due date; a start date moves with it (same gap), or is clamped when there was no due.</summary>
+    public void Reschedule(DateOnly newDue)
+    {
+        if (DueDate is { } due && StartDate is { } start)
+            StartDate = start.AddDays(newDue.DayNumber - due.DayNumber);
+        else if (StartDate is { } onlyStart && newDue < onlyStart)
+            StartDate = newDue;
+        DueDate = newDue;
+    }
 }

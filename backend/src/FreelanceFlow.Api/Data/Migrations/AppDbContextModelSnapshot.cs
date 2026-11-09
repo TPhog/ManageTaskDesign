@@ -655,6 +655,13 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("included_rounds");
 
+                    b.Property<string>("LinksJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("links")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("text")
@@ -703,6 +710,8 @@ namespace FreelanceFlow.Api.Data.Migrations
                             t.HasCheckConstraint("ck_deliverables_client_decision", "client_decision IN ('APPROVED')");
 
                             t.HasCheckConstraint("ck_deliverables_extra_price", "extra_round_price >= 0");
+
+                            t.HasCheckConstraint("ck_deliverables_links", "jsonb_typeof(links) = 'array' AND jsonb_array_length(links) <= 10");
 
                             t.HasCheckConstraint("ck_deliverables_quantity", "quantity >= 1");
 
@@ -1741,6 +1750,15 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("id");
 
+                    b.Property<Guid?>("BlockedByTaskId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("blocked_by_task_id");
+
+                    b.Property<string>("BlockedReason")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("blocked_reason");
+
                     b.Property<DateTimeOffset?>("CompletedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("completed_at");
@@ -1764,6 +1782,13 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasColumnType("date")
                         .HasColumnName("due_date");
 
+                    b.Property<string>("LinksJson")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("links")
+                        .HasDefaultValueSql("'[]'::jsonb");
+
                     b.Property<string>("Priority")
                         .IsRequired()
                         .ValueGeneratedOnAdd()
@@ -1774,6 +1799,31 @@ namespace FreelanceFlow.Api.Data.Migrations
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uuid")
                         .HasColumnName("project_id");
+
+                    b.Property<string>("RecurrenceKind")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("recurrence_kind");
+
+                    b.Property<int?>("RecurrenceMonthDay")
+                        .HasColumnType("integer")
+                        .HasColumnName("recurrence_month_day");
+
+                    b.Property<Guid?>("RecurrenceSourceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("recurrence_source_id");
+
+                    b.Property<bool>("RecurrenceSpawned")
+                        .HasColumnType("boolean")
+                        .HasColumnName("recurrence_spawned");
+
+                    b.Property<DateOnly?>("RecurrenceUntil")
+                        .HasColumnType("date")
+                        .HasColumnName("recurrence_until");
+
+                    b.Property<int?>("RecurrenceWeekdays")
+                        .HasColumnType("integer")
+                        .HasColumnName("recurrence_weekdays");
 
                     b.Property<Guid?>("RevisionItemId")
                         .HasColumnType("uuid")
@@ -1807,7 +1857,15 @@ namespace FreelanceFlow.Api.Data.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BlockedByTaskId")
+                        .HasDatabaseName("ix_tasks_blocked_by")
+                        .HasFilter("blocked_by_task_id IS NOT NULL");
+
                     b.HasIndex("DeliverableId");
+
+                    b.HasIndex("RecurrenceSourceId")
+                        .HasDatabaseName("ix_tasks_recurrence_source")
+                        .HasFilter("recurrence_source_id IS NOT NULL");
 
                     b.HasIndex("RevisionItemId");
 
@@ -1816,7 +1874,13 @@ namespace FreelanceFlow.Api.Data.Migrations
 
                     b.ToTable("tasks", null, t =>
                         {
+                            t.HasCheckConstraint("ck_tasks_blocked_status", "(blocked_reason IS NULL AND blocked_by_task_id IS NULL) OR status = 'BLOCKED'");
+
+                            t.HasCheckConstraint("ck_tasks_links", "jsonb_typeof(links) = 'array' AND jsonb_array_length(links) <= 10");
+
                             t.HasCheckConstraint("ck_tasks_priority", "priority IN ('LOW','MEDIUM','HIGH','URGENT')");
+
+                            t.HasCheckConstraint("ck_tasks_recurrence_kind", "recurrence_kind IS NULL OR recurrence_kind IN ('DAILY','WEEKLY','MONTHLY')");
 
                             t.HasCheckConstraint("ck_tasks_status", "status IN ('TODO','IN_PROGRESS','REVIEW','DONE','BLOCKED')");
                         });
@@ -1900,6 +1964,70 @@ namespace FreelanceFlow.Api.Data.Migrations
                     b.ToTable("task_notes", null, t =>
                         {
                             t.HasCheckConstraint("ck_task_notes_body", "char_length(body) BETWEEN 1 AND 5000");
+                        });
+                });
+
+            modelBuilder.Entity("FreelanceFlow.Api.Domain.Tasks.TaskView", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ConfigJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("config");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer")
+                        .HasColumnName("sort_order");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("task_views", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_task_views_config", "jsonb_typeof(config) = 'object'");
+
+                            t.HasCheckConstraint("ck_task_views_name", "char_length(name) BETWEEN 1 AND 60");
+                        });
+                });
+
+            modelBuilder.Entity("FreelanceFlow.Api.Domain.Tasks.TaskViewState", b =>
+                {
+                    b.Property<short>("Id")
+                        .HasColumnType("smallint")
+                        .HasColumnName("id");
+
+                    b.Property<string>("ConfigJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("config");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("task_view_state", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_task_view_state_config", "jsonb_typeof(config) = 'object'");
+
+                            t.HasCheckConstraint("ck_task_view_state_singleton", "id = 1");
                         });
                 });
 
@@ -2083,6 +2211,11 @@ namespace FreelanceFlow.Api.Data.Migrations
 
             modelBuilder.Entity("FreelanceFlow.Api.Domain.Tasks.ProjectTask", b =>
                 {
+                    b.HasOne("FreelanceFlow.Api.Domain.Tasks.ProjectTask", null)
+                        .WithMany()
+                        .HasForeignKey("BlockedByTaskId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("FreelanceFlow.Api.Domain.Projects.Deliverable", null)
                         .WithMany()
                         .HasForeignKey("DeliverableId");
@@ -2092,6 +2225,11 @@ namespace FreelanceFlow.Api.Data.Migrations
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("FreelanceFlow.Api.Domain.Tasks.ProjectTask", null)
+                        .WithMany()
+                        .HasForeignKey("RecurrenceSourceId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("FreelanceFlow.Api.Domain.Requests.RevisionItem", null)
                         .WithMany()
