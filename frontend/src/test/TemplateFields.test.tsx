@@ -50,4 +50,22 @@ describe('TemplateFields', () => {
     expect(input).toHaveAttribute('aria-invalid', 'true')
     expect(input).toHaveAccessibleDescription(expect.stringContaining('Bắt buộc'))
   })
+
+  it('keeps the photo remove button a 44px target and tints radios and checkboxes with the theme token', async () => {
+    const extra: TemplateField[] = [
+      { key: 'tags', label: 'Gam màu', type: 'MULTI_CHOICE', required: false, help: null, options: ['Ấm', 'Lạnh'] },
+      { key: 'refs', label: 'Ảnh mẫu', type: 'IMAGES', required: false, help: null, options: [] },
+    ]
+    const photo = new File(['x'], 'mau.png', { type: 'image/png' })
+    const onFilesChange = vi.fn()
+    render(<TemplateFields idPrefix="x" fields={[...fields, ...extra]} drafts={emptyDrafts([...fields, ...extra])}
+      onChange={() => {}} files={[photo]} onFilesChange={onFilesChange} maxImages={3} />)
+
+    const remove = screen.getByRole('button', { name: 'Bỏ mau.png' })
+    expect(remove).toHaveClass('min-h-11', 'min-w-11')
+    for (const input of [screen.getByRole('radio', { name: 'Sang trọng' }), screen.getByRole('checkbox', { name: 'Ấm' })])
+      expect(input).toHaveClass('accent-primary')
+    await userEvent.click(remove)
+    expect(onFilesChange).toHaveBeenCalledWith([])
+  })
 })

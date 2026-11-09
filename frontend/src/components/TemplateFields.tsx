@@ -97,7 +97,7 @@ function Question({ field, idPrefix, drafts, onChange, errors, files, onFilesCha
         <Choices legend={title} describedBy={describedBy} footer={footer}>
           {field.options.map(o => (
             <label key={o} className={choiceRow}>
-              <input type="radio" name={id} value={o} checked={draft === o} disabled={disabled} className="h-4 w-4" onChange={() => set(o)} />
+              <input type="radio" name={id} value={o} checked={draft === o} disabled={disabled} className="h-4 w-4 accent-primary" onChange={() => set(o)} />
               {o}
             </label>
           ))}
@@ -114,7 +114,7 @@ function Question({ field, idPrefix, drafts, onChange, errors, files, onFilesCha
         <Choices legend={title} describedBy={describedBy} footer={footer}>
           {field.options.map(o => (
             <label key={o} className={choiceRow}>
-              <input type="checkbox" checked={picked.includes(o)} disabled={disabled} className="h-4 w-4"
+              <input type="checkbox" checked={picked.includes(o)} disabled={disabled} className="h-4 w-4 accent-primary"
                 onChange={e => set(e.target.checked ? [...picked, o] : picked.filter(p => p !== o))} />
               {o}
             </label>
@@ -128,13 +128,13 @@ function Question({ field, idPrefix, drafts, onChange, errors, files, onFilesCha
         <Choices legend={title} describedBy={describedBy} footer={footer}>
           {field.options.map(o => (
             <label key={o} className={choiceRow}>
-              <input type="radio" name={id} checked={s.mode === 'preset' && s.preset === o} disabled={disabled} className="h-4 w-4"
+              <input type="radio" name={id} checked={s.mode === 'preset' && s.preset === o} disabled={disabled} className="h-4 w-4 accent-primary"
                 onChange={() => set({ ...s, mode: 'preset', preset: o })} />
               {o}
             </label>
           ))}
           <label className={choiceRow}>
-            <input type="radio" name={id} checked={s.mode === 'custom'} disabled={disabled} className="h-4 w-4"
+            <input type="radio" name={id} checked={s.mode === 'custom'} disabled={disabled} className="h-4 w-4 accent-primary"
               aria-label="Kích thước tuỳ chỉnh" onChange={() => set({ ...s, mode: 'custom', preset: '' })} />
             Tuỳ chỉnh (rộng × cao)
           </label>
@@ -166,7 +166,7 @@ function Question({ field, idPrefix, drafts, onChange, errors, files, onFilesCha
               {files.map((f, i) => (
                 <li key={`${f.name}-${i}`} className="inline-flex min-h-8 items-center gap-1 rounded-full bg-muted px-2.5 text-xs">
                   {f.name}
-                  <button type="button" aria-label={`Bỏ ${f.name}`} className="p-1" onClick={() => onFilesChange(files.filter((_, j) => j !== i))}>
+                  <button type="button" aria-label={`Bỏ ${f.name}`} className="-my-1.5 -mr-2.5 inline-flex min-h-11 min-w-11 items-center justify-center" onClick={() => onFilesChange(files.filter((_, j) => j !== i))}>
                     <X className="h-3 w-3" aria-hidden="true" />
                   </button>
                 </li>
