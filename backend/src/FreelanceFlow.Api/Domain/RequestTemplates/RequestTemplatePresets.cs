@@ -8,7 +8,8 @@ public sealed record RequestTemplatePreset(string Name, string Description, stri
 
 /// <summary>
 /// The six templates seeded ONCE by migration 20261113090000_AddRequestTemplatesAndIntake (decision #1).
-/// FROZEN after release: the migration calls <see cref="SeedSql"/>, so changing a preset needs a new migration.
+/// The migration holds a frozen copy of <see cref="SeedSql"/>'s output (R2 M6), so editing a preset here does not
+/// change existing or fresh databases; seeding changed presets needs a new migration.
 /// The designer edits or deletes the seeded rows freely afterwards.
 /// </summary>
 public static class RequestTemplatePresets
