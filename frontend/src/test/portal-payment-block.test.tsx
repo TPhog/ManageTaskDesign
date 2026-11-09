@@ -51,6 +51,28 @@ describe('PortalPaymentBlock (CF-04/05)', () => {
     await waitFor(() => expect(api.post).toHaveBeenCalledWith('/portal/quotations/q1/payment-notice', { purpose: 'deposit', note: 'TK chồng' }))
   })
 
+  it('moves between the amounts with the arrow keys, one Tab stop (ARIA radio group)', () => {
+    renderBlock()
+    const deposit = screen.getByRole('radio', { name: /Chuyển tiền cọc/ })
+    const full = screen.getByRole('radio', { name: /Chuyển toàn bộ một lần/ })
+    expect(deposit).toHaveAttribute('tabindex', '0')
+    expect(full).toHaveAttribute('tabindex', '-1')
+    fireEvent.keyDown(deposit, { key: 'ArrowDown' })
+    expect(full).toHaveAttribute('aria-checked', 'true')
+    expect(full).toHaveFocus()
+    expect(screen.getByTestId('qr-amount')).toHaveTextContent('7.020.000')
+    fireEvent.keyDown(full, { key: 'ArrowDown' })
+    expect(deposit).toHaveAttribute('aria-checked', 'true')
+  })
+
+  it('asks for nothing on an expired quotation', () => {
+    renderBlock({ effectiveStatus: 'EXPIRED' })
+    expect(screen.getByText('Báo giá đã hết hạn, vui lòng liên hệ nhà thiết kế trước khi chuyển tiền.')).toBeInTheDocument()
+    expect(screen.queryByTestId('pay-now')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('vietqr')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Tôi đã chuyển khoản' })).not.toBeInTheDocument()
+  })
+
   it('hides the report button while a notice for this amount is pending', () => {
     renderBlock({ clientPaymentNotice: { purpose: 'deposit', amount: 3_510_000, at: '2026-11-08T03:00:00Z', note: null, pending: true } })
     expect(screen.queryByRole('button', { name: 'Tôi đã chuyển khoản' })).not.toBeInTheDocument()

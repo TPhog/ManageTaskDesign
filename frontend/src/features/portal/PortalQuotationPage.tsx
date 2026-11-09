@@ -62,10 +62,14 @@ export default function PortalQuotationPage() {
   // The live page's QuotationDecision already says "Bạn đã đồng ý lúc … — đang chờ" with the time; don't say it twice.
   const agreedShownByDecision = live && q.status === 'SENT' && !!q.clientAcceptedAt
   const notice = agreedShownByDecision ? null : quotationNotice(q, designerName)
-  const showCompany = !!s.client.company && s.client.company.trim().toLowerCase() !== s.client.name.trim().toLowerCase()
+  // Review M-9: older snapshots may lack optional text fields — never call .trim() on undefined
+  const text = (v: string | null | undefined) => (v ?? '').trim()
+  const notes = text(s.notesToClient)
+  const terms = text(s.terms)
+  const showCompany = !!text(s.client.company) && text(s.client.company).toLowerCase() !== text(s.client.name).toLowerCase()
   const hasPayment = live && q.qrOptions.length > 0
   const chapters = [
-    'items', hasPayment && 'payment', s.notesToClient.trim() && 'notes', s.terms.trim() && 'terms', 'info',
+    'items', hasPayment && 'payment', notes && 'notes', terms && 'terms', 'info',
     q.versions.length > 1 && 'versions',
   ].filter((c): c is string => !!c)
   const no = (key: string) => ROMAN[chapters.indexOf(key)]
@@ -80,7 +84,7 @@ export default function PortalQuotationPage() {
       <header className="-mt-2">
         <Kicker tone="highlight">{portalQuotationKind[s.kind] ?? s.kind} · {versionText(s)}</Kicker>
         <h1 className="mt-2 font-display text-[2rem] font-medium leading-[1.1] tracking-[-0.02em] text-foreground">{s.title}</h1>
-        {s.project.name.trim() !== s.title.trim() && (
+        {text(s.project.name) !== text(s.title) && (
           <p className="mt-1 font-serif text-base italic text-muted-foreground">{s.project.name}</p>
         )}
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
@@ -139,7 +143,7 @@ export default function PortalQuotationPage() {
 
       {hasPayment && <PortalPaymentBlock quotation={q} number={no('payment')} />}
 
-      {s.notesToClient.trim() && (
+      {notes && (
         <EditorialSection number={no('notes')} title="Lời nhắn của nhà thiết kế">
           <div className="mt-2 whitespace-pre-wrap break-words">
             <PullQuote cite={designerName || undefined}>{s.notesToClient}</PullQuote>
@@ -147,7 +151,7 @@ export default function PortalQuotationPage() {
         </EditorialSection>
       )}
 
-      {s.terms.trim() && (
+      {terms && (
         <EditorialSection number={no('terms')} title="Điều khoản">
           <p className="mt-2 max-w-[60ch] whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground">{s.terms}</p>
         </EditorialSection>

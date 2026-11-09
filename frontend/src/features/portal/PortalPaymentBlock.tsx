@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { Copy, Download } from 'lucide-react'
 import { toast } from 'sonner'
@@ -62,8 +62,30 @@ export function PortalPaymentBlock({ quotation: q, number }: Props) {
   const [reporting, setReporting] = useState(false)
   const [note, setNote] = useState('')
   const notice = usePaymentNotice(q.id)
+  const radios = useRef<(HTMLButtonElement | null)[]>([])
   const current = q.qrOptions.find(o => o.purpose === selected) ?? q.qrOptions[0]
   if (!current) return null
+
+  // Review M-2: an expired quotation never asks for money — no amount due, no QR, no "Tôi đã chuyển khoản"
+  if (q.effectiveStatus === 'EXPIRED') {
+    return (
+      <EditorialSection number={number} title="Thanh toán">
+        <p role="status" className="mt-2 border-l-4 border-warning py-1 pl-4 font-serif text-base italic leading-relaxed text-foreground">
+          Báo giá đã hết hạn, vui lòng liên hệ nhà thiết kế trước khi chuyển tiền.
+        </p>
+      </EditorialSection>
+    )
+  }
+
+  /** ARIA radio pattern: one Tab stop, arrow keys move and select (review M-4). */
+  function onRadioKey(e: KeyboardEvent<HTMLButtonElement>, i: number) {
+    const step = e.key === 'ArrowDown' || e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' || e.key === 'ArrowLeft' ? -1 : 0
+    if (!step) return
+    e.preventDefault()
+    const next = (i + step + q.qrOptions.length) % q.qrOptions.length
+    setSelected(q.qrOptions[next].purpose)
+    radios.current[next]?.focus()
+  }
 
   const sum = paymentSummary(q)
   const bank = q.snapshot.bank
@@ -96,14 +118,17 @@ export function PortalPaymentBlock({ quotation: q, number }: Props) {
 
       {q.qrOptions.length > 1 && (
         <div role="radiogroup" aria-label="Chọn khoản muốn chuyển" className="mt-5 space-y-2">
-          {q.qrOptions.map(o => {
+          {q.qrOptions.map((o, i) => {
             const on = o.purpose === current.purpose
             return (
               <button
                 key={o.purpose}
+                ref={el => { radios.current[i] = el }}
                 type="button"
                 role="radio"
                 aria-checked={on}
+                tabIndex={on ? 0 : -1}
+                onKeyDown={e => onRadioKey(e, i)}
                 onClick={() => setSelected(o.purpose)}
                 className={cn(
                   'flex min-h-11 w-full items-center gap-3 border px-4 py-3 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
