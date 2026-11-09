@@ -21,10 +21,11 @@ import { TaskChecklist } from './TaskChecklist'
 import { LinkListEditor } from './LinkListEditor'
 import { NO_BLOCKER, TaskBlockedField } from './TaskBlockedField'
 import { TaskRecurrenceField } from './TaskRecurrenceField'
+import { recurrenceUntilError } from './recurrenceUtils'
 import { useTaskImages } from '@/features/admin/images/useImages'
 import { TaskImages } from './TaskImages'
 import { TaskNotes } from './TaskNotes'
-import { TASK_PRIORITIES, TASK_STATUSES, taskFormSchema, taskPriorityLabel, taskStatusLabel } from './taskUtils'
+import { TASK_PRIORITIES, TASK_STATUSES, taskFormSchema, taskPriorityLabel, taskStatusLabel, todayVn } from './taskUtils'
 import { useDirtyMap, useReportDirty } from './useDirtyMap'
 import { useDeleteTask, useTask, useUpdateTask } from './useTasks'
 
@@ -168,6 +169,11 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
     const rule = fromFormRecurrence(v.recurrence)
     const recurrence: RecurrenceInput = rule ?? { kind: 'NONE', weekdays: 0, monthDay: null, until: null }
     setExtraErrors({})
+    // shown inline under "Lặp đến ngày"; the server would accept it, but the rule would never repeat
+    if (rule && recurrenceUntilError(rule.until, v.dueDate || null, todayVn())) {
+      document.getElementById('task-recurrence-until')?.focus()
+      return
+    }
     update.mutate({
       title: v.title,
       description: v.description,
