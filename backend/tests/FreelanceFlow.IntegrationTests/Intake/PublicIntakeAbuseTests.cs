@@ -216,8 +216,22 @@ public class PublicIntakeAbuseTests(AppFactory factory) : IntakeTestBase(factory
         var anon = Anonymous();
         var token = (await GetFormAsync(anon, slug)).GetProperty("formToken").GetString()!;
         var form = IntakeForm(token, note: "lớn", images: 1);
-        form.Headers.ContentLength = FreelanceFlow.Api.Features.Images.ImageLimits.MaxPublicIntakeBodyBytes + 1;   // declared, not allocated
+        form.Headers.ContentLength = FreelanceFlow.Api.Features.Images.ImageLimits.PublicIntakeBodyBytes(20, 3) + 1;   // declared, not allocated
 
         (await anon.PostAsync($"/api/public/intake/{slug}", form)).StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge);
+    }
+
+    [Fact]
+    public async Task Body_limit_follows_the_configured_photo_size()   // review P13-BE #6: 3 × App:MaxUploadMb + 1 MB of text
+    {
+        var slug = await EnableIntakeAsync();
+        await using var host = Factory.WithWebHostBuilder(b => b.UseSetting("App:MaxUploadMb", "1"));
+        var anon = Anonymous(host);
+        var form = await GetFormAsync(anon, slug);
+        form.GetProperty("maxImageMb").GetInt32().Should().Be(1);
+        var body = IntakeForm(form.GetProperty("formToken").GetString()!, note: "lớn", images: 1);
+        body.Headers.ContentLength = 4L * 1024 * 1024 + 1;   // above 3 × 1 MB + 1 MB, far below the old fixed 61 MB
+
+        (await anon.PostAsync($"/api/public/intake/{slug}", body)).StatusCode.Should().Be(HttpStatusCode.RequestEntityTooLarge);
     }
 }

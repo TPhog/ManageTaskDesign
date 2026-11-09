@@ -44,6 +44,15 @@ public class IntakeSubmissionTests
     }
 
     [Fact]
+    public void A_template_submission_needs_an_answer_or_a_note()   // review P13-BE #10
+    {
+        FluentActions.Invoking(() => IntakeSubmission.Create("Lan", "0909123456", null, Guid.NewGuid(), "Poster", [], "  "))
+            .Should().Throw<DomainException>().Which.Code.Should().Be("VALIDATION_FAILED");
+        IntakeSubmission.Create("Lan", "0909123456", null, Guid.NewGuid(), "Poster", [], "Chỉ ghi chú").Body
+            .Should().Be("Mẫu: Poster\n\nGhi chú thêm:\nChỉ ghi chú");
+    }
+
+    [Fact]
     public void Phone_digits_ignore_formatting() =>
         IntakeSubmission.PhoneDigits("+84 909.123-456").Should().Be("84909123456");
 

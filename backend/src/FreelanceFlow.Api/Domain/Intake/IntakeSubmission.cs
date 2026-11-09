@@ -81,6 +81,7 @@ public partial class IntakeSubmission : IAuditable
         if (templateId is null && text.Length == 0) throw Invalid("Mô tả yêu cầu của bạn");
         if (templateId is null && answers.Count > 0) throw Invalid("Câu trả lời cần một mẫu yêu cầu");
         if (templateId is not null && string.IsNullOrWhiteSpace(templateName)) throw Invalid("Thiếu tên mẫu yêu cầu");
+        if (templateId is not null && answers.Count == 0 && text.Length == 0) throw Invalid(TemplateAnswers.NothingAnswered);
         var body = TemplateRenderer.Render(templateName, answers, text);
         if (body.Length is < 1 or > MaxBody) throw Invalid("Nội dung quá dài — vui lòng rút gọn câu trả lời");
         var email = (contactEmail ?? "").Trim();

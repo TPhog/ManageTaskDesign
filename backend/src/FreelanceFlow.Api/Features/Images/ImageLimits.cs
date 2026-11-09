@@ -10,8 +10,8 @@ public static class ImageLimits
     public const long MaxAdminBodyBytes = 220L * 1024 * 1024;
     /// <summary>5 images × 20 MB + text fields.</summary>
     public const long MaxPortalRequestBodyBytes = 101L * 1024 * 1024;
-    /// <summary>Plan 13 public intake: 3 images × 20 MB + text fields.</summary>
-    public const long MaxPublicIntakeBodyBytes = 61L * 1024 * 1024;
+    /// <summary>Plan 13 public intake: the photos it advertises (maxImages × App:MaxUploadMb) + 1 MB of text fields.</summary>
+    public static long PublicIntakeBodyBytes(int maxUploadMb, int maxImages) => ((long)maxUploadMb * maxImages + 1) * 1024 * 1024;
 
     public static Dictionary<string, string[]> ValidateCount(int count, int max, bool required)
     {

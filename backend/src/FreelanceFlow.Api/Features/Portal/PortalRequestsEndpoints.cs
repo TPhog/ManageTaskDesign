@@ -132,6 +132,8 @@ public static class PortalRequestsEndpoints
                 foreach (var (key, message) in result.Errors)
                     errors[key == TemplateAnswers.FormErrorKey ? "answers" : $"answers.{key}"] = [message];
                 answers = result.Answers;
+                if (result.IsValid && answers.Count == 0 && content.Trim().Length == 0)   // never just "Mẫu: …"
+                    errors["answers"] = [TemplateAnswers.NothingAnswered];
             }
             if (content.Trim().Length > TemplateLimits.MaxNote)
                 errors["content"] = [$"Ghi chú tối đa {TemplateLimits.MaxNote} ký tự"];

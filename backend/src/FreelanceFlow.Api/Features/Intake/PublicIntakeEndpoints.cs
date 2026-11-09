@@ -28,17 +28,20 @@ public static class PublicIntakeEndpoints
     public const string RateLimitPolicy = "public-intake";
     /// <summary>Per IP per hour, posting the form (review P13-BE #2) — stricter than the read limit, so it replaces it on POST.</summary>
     public const string SubmitRateLimitPolicy = "public-intake-submit";
-    private const long MaxBodyBytes = ImageLimits.MaxPublicIntakeBodyBytes;
     /// <summary>Serialises the studio-wide daily count with the insert (pg_advisory_xact_lock key, plan 13).</summary>
     private const long DailyCapLockKey = 20261113090000;
 
     public static void MapPublicIntakeEndpoints(this IEndpointRouteBuilder app)
     {
+        // the body limit follows the advertised photo size, so raising App:MaxUploadMb never turns valid photos into 413
+        var maxBodyBytes = MaxBodyBytes(app.ServiceProvider.GetRequiredService<IOptions<AppSettings>>().Value);
         var pub = app.MapGroup("/api/public/intake").AllowAnonymous();
         pub.MapGet("{slug}", GetForm).RequireRateLimiting(RateLimitPolicy);
         pub.MapPost("{slug}", Submit).RequireRateLimiting(SubmitRateLimitPolicy)
-            .WithMetadata(new RequestSizeLimitAttribute(MaxBodyBytes));
+            .WithMetadata(new RequestSizeLimitAttribute(maxBodyBytes));
     }
+
+    private static long MaxBodyBytes(AppSettings app) => ImageLimits.PublicIntakeBodyBytes(app.MaxUploadMb, IntakeSubmission.MaxImages);
 
     private static IResult DailyCapReached() => Results.Json(
         new { code = "RATE_LIMITED", detail = "Hôm nay studio đã nhận nhiều yêu cầu — vui lòng liên hệ trực tiếp hoặc gửi lại vào ngày mai" },
@@ -85,7 +88,7 @@ public static class PublicIntakeEndpoints
         var ct = http.HttpContext.RequestAborted;
         if (await FindFormAsync(db, slug, ct) is null) return Results.NotFound();
 
-        // cheap refusals before the (up to 61 MB) body is read
+        // cheap refusals before the (up to 3 photos + 1 MB) body is read
         var today = clock.TodayVn;
         var dayStart = ClientRequest.DayStartUtc(today);   // BR-137: studio-wide, then per IP
         if (await db.IntakeSubmissions.CountAsync(s => s.CreatedAt >= dayStart, ct) >= IntakeSubmission.DailyLimit)
@@ -98,7 +101,7 @@ public static class PublicIntakeEndpoints
         // photos stop at 80 % for anonymous senders (the designer's own block stays at 90 %); text is always accepted
         var mayCarryPhotos = http.HasFormContentType && http.ContentLength is not (<= ImageForms.TextOnlyBodyBytes);
         if (mayCarryPhotos && await storageAlerts.IntakePhotosBlockedAsync(ct)) return PhotosRefused();
-        var (form, readError) = await ImageForms.ReadAsync(http, MaxBodyBytes, ct);
+        var (form, readError) = await ImageForms.ReadAsync(http, MaxBodyBytes(appSettings.Value), ct);
         if (readError is not null) return readError;
         if (form!.Files.Count > 0 && await storageAlerts.IntakePhotosBlockedAsync(ct)) return PhotosRefused();
 
@@ -138,6 +141,8 @@ public static class PublicIntakeEndpoints
                 foreach (var (key, message) in result.Errors)
                     errors[key == TemplateAnswers.FormErrorKey ? "answers" : $"answers.{key}"] = [message];
                 answers = result.Answers;
+                if (result.IsValid && answers.Count == 0 && note.Trim().Length == 0)
+                    errors["answers"] = [TemplateAnswers.NothingAnswered];
             }
         }
         else if (note.Trim().Length == 0)

@@ -12,6 +12,9 @@ public static class TemplateAnswers
     /// <summary>Errors key for a malformed answers JSON (the endpoint maps it to "answers").</summary>
     public const string FormErrorKey = "";
 
+    /// <summary>A template request must carry at least one answer (photos count) or a note — never just "Mẫu: …".</summary>
+    public const string NothingAnswered = "Trả lời ít nhất một câu hỏi hoặc viết ghi chú thêm";
+
     public static TemplateAnswerResult Evaluate(IReadOnlyList<TemplateField> fields, string? answersJson, int imageCount, DateOnly todayVn)
     {
         JsonElement root = default;

@@ -87,6 +87,29 @@ public class PublicIntakeTests(AppFactory factory) : IntakeTestBase(factory)
     }
 
     [Fact]
+    public async Task A_template_with_nothing_answered_and_no_note_is_refused()   // review P13-BE #10
+    {
+        var slug = await EnableIntakeAsync();
+        var created = await Client.PostAsJsonAsync("/api/admin/request-templates", new
+        {
+            name = "Tuỳ chọn", description = "", designType = "OTHER", serviceId = (Guid?)null, active = true,
+            fields = new[] { new { key = "idea", label = "Ý tưởng", type = "SHORT_TEXT", required = false, help = (string?)null, options = Array.Empty<string>() } },
+        });
+        created.StatusCode.Should().Be(HttpStatusCode.Created);
+        var anon = Anonymous();
+        var form = await GetFormAsync(anon, slug);
+        var before = await SubmissionCountAsync();
+
+        var resp = await anon.PostAsync($"/api/public/intake/{slug}",
+            IntakeForm(form.GetProperty("formToken").GetString()!, TemplateId(form, "Tuỳ chọn"), new { }));
+
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors").EnumerateObject().Select(e => e.Name)
+            .Should().Equal("answers");
+        (await SubmissionCountAsync()).Should().Be(before);
+    }
+
+    [Fact]
     public async Task Contact_answers_and_photo_count_are_validated_per_field()
     {
         var slug = await EnableIntakeAsync();

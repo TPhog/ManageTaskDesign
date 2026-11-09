@@ -138,6 +138,26 @@ public class PortalTemplateRequestTests(AppFactory factory) : PortalTestBase(fac
     }
 
     [Fact]
+    public async Task A_template_request_with_nothing_answered_and_no_note_is_refused()   // review P13-BE #10
+    {
+        var (portal, projectId, _) = await ArrangeAsync();
+        var created = await Client.PostAsJsonAsync("/api/admin/request-templates", new
+        {
+            name = "Tuỳ chọn " + Guid.NewGuid(), description = "", designType = "OTHER", serviceId = (Guid?)null, active = true,
+            fields = new[] { new { key = "idea", label = "Ý tưởng", type = "SHORT_TEXT", required = false, help = (string?)null, options = Array.Empty<string>() } },
+        });
+        var templateId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var resp = await portal.PostAsync($"/api/portal/projects/{projectId}/requests", TemplateForm(templateId, new { }, note: "  "));
+
+        resp.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+        (await resp.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("errors").EnumerateObject().Select(e => e.Name)
+            .Should().Equal("answers");
+        (await portal.PostAsync($"/api/portal/projects/{projectId}/requests", TemplateForm(templateId, new { }, note: "Chỉ ghi chú")))
+            .StatusCode.Should().Be(HttpStatusCode.Created);
+    }
+
+    [Fact]
     public async Task Free_text_request_is_unchanged()
     {
         var (portal, projectId, _) = await ArrangeAsync();

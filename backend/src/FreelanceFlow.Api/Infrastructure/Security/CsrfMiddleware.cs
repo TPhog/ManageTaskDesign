@@ -19,6 +19,7 @@ public class CsrfMiddleware(RequestDelegate next, IOptions<AppSettings> settings
 
         // Login and portal session set the CSRF cookie — no token yet.
         // /api/public/* (plan 13) is anonymous: there is no session to forge, and /f/* pages send "Origin: null" (no-referrer).
+        // GUARD: every endpoint under /api/public must stay anonymous and never read HttpContext.User — it gets no CSRF check.
         if (ctx.Request.Path.StartsWithSegments("/api/auth/login") ||
             ctx.Request.Path.StartsWithSegments("/api/portal/session") ||
             ctx.Request.Path.StartsWithSegments("/api/public"))
