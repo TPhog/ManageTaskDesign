@@ -1,4 +1,24 @@
+import { z } from 'zod'
 import type { TaskListItem, TaskPriority, TaskStatus } from '@/lib/types'
+
+/** Both dates set and the due date lies before the start date ('YYYY-MM-DD' strings compare as dates). */
+export const dueBeforeStart = (start: string, due: string): boolean => !!start && !!due && due < start
+
+export const taskFormSchema = z
+  .object({
+    title: z.string().trim().min(1, 'Vui lòng nhập tiêu đề').max(200, 'Tối đa 200 ký tự'),
+    description: z.string().max(20000, 'Tối đa 20000 ký tự'),
+    status: z.enum(['TODO', 'IN_PROGRESS', 'REVIEW', 'DONE', 'BLOCKED']),
+    priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
+    startDate: z.string(),
+    dueDate: z.string(),
+    deliverableId: z.string(),
+  })
+  .superRefine((v, ctx) => {
+    if (dueBeforeStart(v.startDate, v.dueDate)) {
+      ctx.addIssue({ code: 'custom', path: ['dueDate'], message: 'Hạn hoàn thành phải từ ngày bắt đầu trở đi' })
+    }
+  })
 
 /** Kanban column order (docs/08 §2.2) */
 export const TASK_STATUSES: TaskStatus[] = ['TODO', 'IN_PROGRESS', 'REVIEW', 'DONE', 'BLOCKED']

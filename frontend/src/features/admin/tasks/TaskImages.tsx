@@ -20,7 +20,7 @@ export function TaskImages({ taskId }: { taskId: string }) {
   const upload = useUploadTaskImages(taskId)
   const visibility = useSetImageVisibility()
   const remove = useDeleteImage()
-  const [shareNew, setShareNew] = useState(true)
+  const [shareNew, setShareNew] = useState(false)
   const [open, setOpen] = useState<number | null>(null)
   const [confirmId, setConfirmId] = useState<string | null>(null)
 
@@ -29,7 +29,7 @@ export function TaskImages({ taskId }: { taskId: string }) {
   function onFiles(files: File[]) {
     upload.mutate({ files, visibleToClient: shareNew }, {
       onSuccess: list => {
-        toast.success(`Đã tải ${list.length} ảnh`)
+        toast.success(`Đã tải ${list.length} ảnh${shareNew ? '' : ' · chỉ mình bạn thấy'}`)
         const duplicate = duplicateNotice(list)
         if (duplicate) toast.warning(duplicate)
       },
@@ -47,9 +47,10 @@ export function TaskImages({ taskId }: { taskId: string }) {
         </h3>
         <label className="flex items-center gap-2 text-xs text-muted-foreground">
           <input type="checkbox" checked={shareNew} onChange={e => setShareNew(e.target.checked)} className="h-4 w-4 accent-primary" />
-          Khách xem được ảnh mới tải
+          Cho khách xem các ảnh mới tải lên
         </label>
       </div>
+      {!shareNew && <p className="text-xs text-muted-foreground">Ảnh chỉ mình bạn thấy — bật ô trên để khách xem được</p>}
       <ImagePicker
         id="task-images-input"
         max={MAX_ADMIN_IMAGES}

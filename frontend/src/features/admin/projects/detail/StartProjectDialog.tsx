@@ -2,6 +2,8 @@ import { useState, type FormEvent } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { DateInput } from '@/components/DateInput'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Dialog,
@@ -75,6 +77,10 @@ function StartForm({ project, preview, warnings, onClose }: FormProps) {
     )
   }
 
+  function patchDue(deliverableIndex: number, dueDate: string) {
+    setDrafts(prev => prev.map((d, i) => (i === deliverableIndex ? { ...d, dueDate } : d)))
+  }
+
   function submit(e: FormEvent) {
     e.preventDefault()
     start.mutate({ rowVersion: project.rowVersion, tasks }, { onSuccess: onClose })
@@ -104,7 +110,13 @@ function StartForm({ project, preview, warnings, onClose }: FormProps) {
             {d.titles.length === 0 ? (
               <p className="text-xs text-muted-foreground">Dịch vụ chưa có bước mẫu — thêm công việc sau trong tab Công việc.</p>
             ) : (
-              d.titles.map((t, ti) => (
+              <>
+              <div className="space-y-1">
+                <Label htmlFor={`start-due-${d.deliverableId}`}>Hạn chung · {d.name}</Label>
+                <DateInput id={`start-due-${d.deliverableId}`} value={d.dueDate} onChange={iso => patchDue(di, iso)} />
+                <p className="text-xs text-muted-foreground">Áp cho mọi công việc bên dưới; sửa riêng từng việc sau trong tab Công việc.</p>
+              </div>
+              {d.titles.map((t, ti) => (
                 <div key={ti} className="flex items-center gap-2">
                   <input
                     type="checkbox"
@@ -121,7 +133,8 @@ function StartForm({ project, preview, warnings, onClose }: FormProps) {
                     aria-label={`Tên công việc ${ti + 1} của ${d.name}`}
                   />
                 </div>
-              ))
+              ))}
+              </>
             )}
           </fieldset>
         ))

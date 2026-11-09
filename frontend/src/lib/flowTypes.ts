@@ -89,11 +89,13 @@ export interface StartPreviewItem {
   name: string
   serviceName: string | null
   titles: string[]
+  /** the deliverable's due date, else the project's; null when neither is set */
+  suggestedDueDate: string | null
 }
 
 export interface StartProjectBody {
   rowVersion: number
-  tasks: { deliverableId: string; titles: string[] }[]
+  tasks: { deliverableId: string; titles: string[]; dueDate: string | null }[]
 }
 
 export interface StartProjectResult {

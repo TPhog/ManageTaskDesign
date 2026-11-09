@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { z } from 'zod'
 import { useQuery } from '@tanstack/react-query'
 import { Trash2 } from 'lucide-react'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -14,30 +13,22 @@ import { MarkdownField } from './MarkdownField'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DateInput } from '@/components/DateInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { api } from '@/lib/api'
+import type { z } from 'zod'
+import { api, type ApiError } from '@/lib/api'
 import { qk } from '@/lib/queryKeys'
 import type { ProjectDetail, TaskDetail } from '@/lib/types'
 import { TaskChecklist } from './TaskChecklist'
 import { useTaskImages } from '@/features/admin/images/useImages'
 import { TaskImages } from './TaskImages'
 import { TaskNotes } from './TaskNotes'
-import { TASK_PRIORITIES, TASK_STATUSES, taskPriorityLabel, taskStatusLabel } from './taskUtils'
+import { TASK_PRIORITIES, TASK_STATUSES, taskFormSchema, taskPriorityLabel, taskStatusLabel } from './taskUtils'
 import { useDirtyMap, useReportDirty } from './useDirtyMap'
 import { useDeleteTask, useTask, useUpdateTask } from './useTasks'
 
 // Radix Select reserves '' for "no value"
 const NO_DELIVERABLE = '_none'
 
-const schema = z.object({
-  title: z.string().trim().min(1, 'Vui lòng nhập tiêu đề').max(200, 'Tối đa 200 ký tự'),
-  description: z.string().max(20000, 'Tối đa 20000 ký tự'),
-  status: z.enum(['TODO', 'IN_PROGRESS', 'REVIEW', 'DONE', 'BLOCKED']),
-  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']),
-  startDate: z.string(),
-  dueDate: z.string(),
-  deliverableId: z.string(),
-})
-type FormValues = z.infer<typeof schema>
+type FormValues = z.infer<typeof taskFormSchema>
 
 interface Props {
   /** null = closed */
@@ -131,8 +122,8 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
   const deliverables = project?.deliverables ?? []
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { register, handleSubmit, watch, setValue, formState: { errors, isDirty } } = useForm<FormValues>({
-    resolver: zodResolver(schema) as any,
+  const { register, handleSubmit, watch, setValue, setError, formState: { errors, isDirty } } = useForm<FormValues>({
+    resolver: zodResolver(taskFormSchema) as any,
     defaultValues: {
       title: task.title,
       description: task.description,
@@ -155,6 +146,12 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
       startDate: v.startDate || null,
       dueDate: v.dueDate || null,
       deliverableId: v.deliverableId === NO_DELIVERABLE ? null : v.deliverableId,
+    }, {
+      // the server enforces the same rule (400 errors.dueDate): show it on the field too
+      onError: err => {
+        const message = (err as ApiError).errors?.dueDate?.[0]
+        if (message) setError('dueDate', { message })
+      },
     })
   }
 
@@ -202,7 +199,8 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
         </div>
         <div className="space-y-2">
           <Label htmlFor="task-dueDate">Hạn hoàn thành</Label>
-          <DateInput id="task-dueDate" value={watch('dueDate')} onChange={v => setValue('dueDate', v, { shouldDirty: true })} />
+          <DateInput id="task-dueDate" value={watch('dueDate')} onChange={v => setValue('dueDate', v, { shouldDirty: true, shouldValidate: !!errors.dueDate })} />
+          {errors.dueDate && <p id="task-dueDate-error" role="alert" className="text-sm text-destructive">{errors.dueDate.message}</p>}
         </div>
       </div>
 

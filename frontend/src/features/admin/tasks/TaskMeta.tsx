@@ -10,7 +10,9 @@ const priorityStyle: Record<TaskPriority, [string, LucideIcon]> = {
   LOW: ['text-sky-700', ArrowDown],
 }
 
-export function PriorityBadge({ priority }: { priority: TaskPriority }) {
+/** Medium is the default: only worth a badge when it differs (alwaysShow keeps it in the table column). */
+export function PriorityBadge({ priority, alwaysShow = false }: { priority: TaskPriority; alwaysShow?: boolean }) {
+  if (priority === 'MEDIUM' && !alwaysShow) return null
   const [cls, Icon] = priorityStyle[priority]
   return (
     <span className={cn('inline-flex items-center gap-1 whitespace-nowrap text-xs font-medium', cls)}>

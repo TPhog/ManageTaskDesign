@@ -56,7 +56,7 @@ export function TaskTable({ tasks, onOpen, showProject = false }: Props) {
                 <StatusBadge status={t.status} label={taskStatusLabel[t.status]} />
               </td>
               <td className="hidden px-4 py-3 sm:table-cell">
-                <PriorityBadge priority={t.priority} />
+                <PriorityBadge priority={t.priority} alwaysShow />
               </td>
               <td className="px-4 py-3">
                 <DueText dueDate={t.dueDate} status={t.status} today={today} />

@@ -6,6 +6,8 @@ export interface StartDraft {
   name: string
   serviceName: string | null
   titles: { title: string; checked: boolean }[]
+  /** one due date for every task created from this deliverable; '' = none */
+  dueDate: string
 }
 
 export function draftsFromPreview(items: StartPreviewItem[]): StartDraft[] {
@@ -14,6 +16,7 @@ export function draftsFromPreview(items: StartPreviewItem[]): StartDraft[] {
     name: i.name,
     serviceName: i.serviceName,
     titles: i.titles.map(title => ({ title, checked: true })),
+    dueDate: i.suggestedDueDate ?? '',
   }))
 }
 
@@ -23,6 +26,7 @@ export function toStartTasks(drafts: StartDraft[]): StartProjectBody['tasks'] {
     .map(d => ({
       deliverableId: d.deliverableId,
       titles: d.titles.filter(t => t.checked).map(t => t.title.trim()).filter(t => t.length > 0),
+      dueDate: d.dueDate || null,
     }))
     .filter(d => d.titles.length > 0)
 }

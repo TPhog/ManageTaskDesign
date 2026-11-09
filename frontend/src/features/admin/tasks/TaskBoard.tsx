@@ -102,7 +102,7 @@ export function TaskBoard({ projectId, tasks, onOpen }: Props) {
       onDragEnd={onDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className="flex gap-3 overflow-x-auto p-4">
+      <div className="flex gap-3 overflow-x-auto p-4 lg:grid lg:grid-cols-[repeat(5,minmax(11rem,1fr))]">
         {TASK_STATUSES.map(status => (
           <BoardColumn
             key={status}
@@ -141,7 +141,7 @@ function BoardColumn({ projectId, status, activeStatus, tasks, today, onOpen, on
       ref={setNodeRef}
       aria-label={`Cột ${label}`}
       className={cn(
-        'flex min-h-[24rem] w-64 shrink-0 flex-col gap-2 rounded-xl bg-muted/60 p-2.5 transition-shadow duration-150',
+        'flex min-h-[24rem] w-64 min-w-[16rem] shrink-0 flex-col lg:w-auto lg:min-w-0 gap-2 rounded-xl bg-muted/60 p-2.5 transition-shadow duration-150',
         isOver && 'ring-2 ring-primary/40',
       )}
     >
