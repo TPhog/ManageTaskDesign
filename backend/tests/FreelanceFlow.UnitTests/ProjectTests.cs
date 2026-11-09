@@ -140,6 +140,15 @@ public class ProjectTests
     }
 
     [Fact]
+    public void ValidateTransition_ToCompletedWithAGivenOpenTaskCount_UsesItForTheTotalAndTheRest()
+    {
+        var warnings = InProgress.ValidateTransition("COMPLETED", null, true, false, false,
+            openTaskTitles: ["T1", "T2", "T3"], openRevisionItems: 0, openTaskCount: 7);
+
+        Assert.Equal(["Còn 7 công việc chưa xong: T1, T2, T3, … (+4)"], warnings);
+    }
+
+    [Fact]
     public void ValidateTransition_ToInProgress_IgnoresOpenItems()
     {
         var warnings = Draft.ValidateTransition("IN_PROGRESS", null, true, false, false,

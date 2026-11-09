@@ -2,7 +2,6 @@ using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
 using FreelanceFlow.Api.Domain.Projects;
 using FreelanceFlow.Api.Domain.Quotations;
-using FreelanceFlow.Api.Domain.Requests;
 using FreelanceFlow.Api.Domain.Revisions;
 using FreelanceFlow.Api.Domain.Tasks;
 using FreelanceFlow.Api.Infrastructure;
@@ -325,23 +324,21 @@ public static class ProjectsEndpoints
         var hasUnpaidAccepted = body.To == "COMPLETED" && await db.Quotations
             .AnyAsync(q => q.ProjectId == id && q.Status == "ACCEPTED" && q.PaymentStatus != "PAID");
 
-        // P14 DF-08: open tasks and TODO / IN_PROGRESS revision items (D-11) are listed when completing
+        // P14 DF-08: open tasks (first 3 titles + count) and open revision items (same definition as the flow) when completing
         List<string> openTaskTitles = [];
+        var openTaskCount = 0;
         var openRevisionItems = 0;
         if (body.To == "COMPLETED")
         {
-            openTaskTitles = await db.Tasks.AsNoTracking()
-                .Where(t => t.ProjectId == id && t.Status != "DONE")
-                .OrderBy(t => t.SortOrder).ThenBy(t => t.CreatedAt)
-                .Select(t => t.Title)
-                .ToListAsync();
-            openRevisionItems = await (
-                    from i in db.RevisionItems.AsNoTracking()
-                    join r in db.RevisionRounds on i.RoundId equals r.Id
-                    where r.ProjectId == id
-                          && (i.WorkStatus == RevisionWorkStatuses.Todo || i.WorkStatus == RevisionWorkStatuses.InProgress)
-                    select i.Id)
-                .CountAsync();
+            var openTasks = db.Tasks.AsNoTracking().Where(t => t.ProjectId == id && t.Status != "DONE");
+            openTaskCount = await openTasks.CountAsync();
+            if (openTaskCount > 0)
+                openTaskTitles = await openTasks
+                    .OrderBy(t => t.SortOrder).ThenBy(t => t.CreatedAt)
+                    .Select(t => t.Title)
+                    .Take(3)
+                    .ToListAsync();
+            openRevisionItems = await ProjectFlowReads.OpenRevisionItems(db).CountAsync(x => x.ProjectId == id);
         }
 
         string[] warnings;
@@ -354,7 +351,8 @@ public static class ProjectsEndpoints
                 hasIncompleteDeliverables,
                 hasUnpaidAccepted,
                 openTaskTitles,
-                openRevisionItems);
+                openRevisionItems,
+                openTaskCount);
         }
         catch (DomainException ex) when (ex.Code == "INVALID_TRANSITION")
         {

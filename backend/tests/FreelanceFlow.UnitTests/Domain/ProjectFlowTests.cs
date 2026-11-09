@@ -448,6 +448,15 @@ public class ProjectFlowTests
             .Which.Should().Be(new FlowWarning("COMPLETED_WITH_OPEN_ITEMS", message, "info"));
     }
 
+    [Fact]   // same scope as the completion warning: rounds tied to no deliverable count too
+    public void Completed_project_counts_open_items_of_project_level_rounds()
+    {
+        var facts = Facts("COMPLETED", true, [D("DELIVERED", openRevisions: 1)], [Q("ACCEPTED", payment: "PAID")])
+            with { OpenUnassignedRevisionItems = 2 };
+        Eval(facts).Warnings.Single(w => w.Kind == "COMPLETED_WITH_OPEN_ITEMS").Message.Should()
+            .Be("Dự án đã hoàn thành nhưng còn 3 mục sửa chưa xong — mở lại dự án nếu cần làm tiếp");
+    }
+
     [Fact]
     public void Completed_project_joins_three_kinds_of_open_items()
     {

@@ -83,7 +83,8 @@ public sealed record FlowQuotation(
 
 /// <summary>
 /// Everything Evaluate needs, loaded by Features/Projects/ProjectFlowReads. NewRequestIds: oldest first.
-/// OpenTasks: tasks of the project that are not DONE.
+/// OpenTasks: tasks of the project that are not DONE. OpenUnassignedRevisionItems: TODO / IN_PROGRESS revision items of
+/// project-level rounds (no deliverable) — per-deliverable ones are FlowDeliverable.OpenRevisionItems.
 /// </summary>
 public sealed record FlowFacts(
     string ProjectStatus,
@@ -93,7 +94,8 @@ public sealed record FlowFacts(
     int OverdueTasks,
     IReadOnlyList<Guid> NewRequestIds,
     int UnquotedChargeableItems,
-    int OpenTasks = 0);
+    int OpenTasks = 0,
+    int OpenUnassignedRevisionItems = 0);
 
 public sealed record FlowTarget(Guid? DeliverableId = null, Guid? QuotationId = null, Guid? RequestId = null);
 
@@ -311,7 +313,7 @@ public static class ProjectFlow
     private static void CompletedWithOpenItems(Builder b, FlowFacts f, List<FlowDeliverable> active)
     {
         var deliverables = active.Count(d => d.Status != "DELIVERED");
-        var items = active.Sum(d => d.OpenRevisionItems);
+        var items = active.Sum(d => d.OpenRevisionItems) + f.OpenUnassignedRevisionItems;   // same scope as the completion warning
         var parts = new List<string>();
         if (deliverables > 0) parts.Add($"{deliverables} hạng mục");
         if (f.OpenTasks > 0) parts.Add($"{f.OpenTasks} công việc");

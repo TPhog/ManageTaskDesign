@@ -28,7 +28,8 @@ public class Project : IAuditable
         bool hasIncompleteDeliverables,
         bool hasUnpaidAcceptedQuotations,
         IReadOnlyList<string>? openTaskTitles = null,
-        int openRevisionItems = 0)
+        int openRevisionItems = 0,
+        int? openTaskCount = null)
     {
         var from = Status;
         var warnings = new List<string>();
@@ -74,12 +75,14 @@ public class Project : IAuditable
                 warnings.Add("Còn hạng mục chưa bàn giao (chưa ở trạng thái Đã bàn giao hoặc Đã huỷ).");
             if (hasUnpaidAcceptedQuotations)
                 warnings.Add("Còn báo giá đã chấp nhận chưa thu đủ tiền.");
-            // P14 DF-08: name what is still open (at most 3 titles, tasks not DONE)
-            if (openTaskTitles is { Count: > 0 })
+            // P14 DF-08: name what is still open (at most 3 titles, tasks not DONE); openTaskCount = all of them when the
+            // caller only loaded the first titles
+            var taskCount = openTaskCount ?? openTaskTitles?.Count ?? 0;
+            if (taskCount > 0)
             {
-                var shown = string.Join(", ", openTaskTitles.Take(3));
-                var more = openTaskTitles.Count > 3 ? $", … (+{openTaskTitles.Count - 3})" : "";
-                warnings.Add($"Còn {openTaskTitles.Count} công việc chưa xong: {shown}{more}");
+                var shown = string.Join(", ", (openTaskTitles ?? []).Take(3));
+                var more = taskCount > 3 ? $", … (+{taskCount - 3})" : "";
+                warnings.Add($"Còn {taskCount} công việc chưa xong: {shown}{more}");
             }
             if (openRevisionItems > 0) warnings.Add($"Còn {openRevisionItems} mục sửa chưa xong (Cần làm / Đang làm)");
         }

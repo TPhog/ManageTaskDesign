@@ -60,6 +60,52 @@ public class ProjectCompletionWarningsTests(AppFactory factory) : TaskTestBase(f
     }
 
     [Fact]
+    public async Task Completion_warning_and_completed_flow_note_count_the_same_revision_items()
+    {
+        await LoginAsync();
+        var (projectId, taskIds) = await RunningProjectWithOpenTasksAsync();
+        for (var i = 0; i < taskIds.Count; i++)
+            await MoveAsync(taskIds[i], "DONE", 1024.0 * (i + 1));
+        var logo = (await Client.GetFromJsonAsync<JsonElement>($"/api/admin/projects/{projectId}"))
+            .GetProperty("deliverables")[0].GetProperty("id").GetGuid();
+        var poster = await CreateDeliverableAsync(projectId, "Poster");
+        (await Client.PostAsJsonAsync($"/api/admin/deliverables/{poster}/status", new { to = "IN_PROGRESS" })).EnsureSuccessStatusCode();
+        await TriageAsync(projectId, logo, poster, null);   // one open item each: Logo, Poster, project-level round
+        (await Client.PostAsJsonAsync($"/api/admin/deliverables/{poster}/status", new { to = "CANCELLED" })).EnsureSuccessStatusCode();
+
+        var resp = await ChangeStatusAsync(projectId, "COMPLETED");
+
+        resp.StatusCode.Should().Be(HttpStatusCode.UnprocessableEntity);
+        (await WarningsAsync(resp)).Should().Contain("Còn 2 mục sửa chưa xong (Cần làm / Đang làm)");   // Poster is cancelled
+        (await ChangeStatusAsync(projectId, "COMPLETED", confirm: true)).EnsureSuccessStatusCode();
+        var note = (await Client.GetFromJsonAsync<JsonElement>($"/api/admin/projects/{projectId}/flow")).GetProperty("warnings")
+            .EnumerateArray().Single(w => w.GetProperty("kind").GetString() == "COMPLETED_WITH_OPEN_ITEMS");
+        note.GetProperty("message").GetString().Should()
+            .Be("Dự án đã hoàn thành nhưng còn 2 mục sửa chưa xong — mở lại dự án nếu cần làm tiếp");
+    }
+
+    /// <summary>A designer request triaged into one round (one open MINOR item) per given deliverable (null = project-level).</summary>
+    private async Task TriageAsync(Guid projectId, params Guid?[] deliverableIds)
+    {
+        var created = await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/requests",
+            new { content = "Sửa nhiều chỗ", source = "ZALO" });
+        created.EnsureSuccessStatusCode();
+        var requestId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("request").GetProperty("id").GetGuid();
+        var rv = (await Client.GetFromJsonAsync<JsonElement>($"/api/admin/requests/{requestId}"))
+            .GetProperty("request").GetProperty("rowVersion").GetUInt32();
+        var triage = await Client.PostAsJsonAsync($"/api/admin/requests/{requestId}/triage", new
+        {
+            rounds = deliverableIds.Select(d => new
+            {
+                deliverableId = d, receivedAt = (string?)null,
+                items = new[] { new { description = "Đổi màu", type = "MINOR", billing = (string?)(d == null ? "FREE_FIX" : "IN_QUOTA") } },
+            }).ToArray(),
+            rowVersion = rv,
+        });
+        triage.StatusCode.Should().Be(HttpStatusCode.OK, await triage.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task Completing_with_open_revision_items_counts_them()
     {
         await LoginAsync();

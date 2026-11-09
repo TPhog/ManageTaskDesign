@@ -85,15 +85,17 @@ internal static class ProjectFlowReads
                 select new { ProjectId = g.Key, Count = g.Count() })
             .ToDictionaryAsync(x => x.ProjectId, x => x.Count);
 
-        // D-11: revision items still TODO / IN_PROGRESS, per deliverable
-        var openRevisions = await (
-                from i in db.RevisionItems.AsNoTracking()
-                join r in db.RevisionRounds on i.RoundId equals r.Id
-                where ids.Contains(r.ProjectId) && r.DeliverableId != null
-                      && (i.WorkStatus == RevisionWorkStatuses.Todo || i.WorkStatus == RevisionWorkStatuses.InProgress)
-                group i by r.DeliverableId into g
-                select new { DeliverableId = g.Key!.Value, Count = g.Count() })
+        // D-11: revision items still TODO / IN_PROGRESS, per deliverable, and of project-level rounds per project
+        var openRevisions = await OpenRevisionItems(db)
+            .Where(x => ids.Contains(x.ProjectId) && x.DeliverableId != null)
+            .GroupBy(x => x.DeliverableId)
+            .Select(g => new { DeliverableId = g.Key!.Value, Count = g.Count() })
             .ToDictionaryAsync(x => x.DeliverableId, x => x.Count);
+        var openUnassignedRevisions = await OpenRevisionItems(db)
+            .Where(x => ids.Contains(x.ProjectId) && x.DeliverableId == null)
+            .GroupBy(x => x.ProjectId)
+            .Select(g => new { ProjectId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.ProjectId, x => x.Count);
 
         var deliverablesByProject = deliverables.ToLookup(d => d.ProjectId);
         var quotationsByProject = quotations.ToLookup(q => q.ProjectId);
@@ -117,6 +119,24 @@ internal static class ProjectFlowReads
             overdue.GetValueOrDefault(p.Key),
             requestsByProject[p.Key].Select(r => r.Id).ToList(),
             unquoted.GetValueOrDefault(p.Key),
-            openTasks.GetValueOrDefault(p.Key)));
+            openTasks.GetValueOrDefault(p.Key),
+            openUnassignedRevisions.GetValueOrDefault(p.Key)));
+    }
+
+    /// <summary>
+    /// D-11 / P14 DF-08, the one definition of "open revision item" (flow facts and the completion warning): TODO /
+    /// IN_PROGRESS items of rounds tied to no deliverable or to one that is not CANCELLED.
+    /// </summary>
+    public static IQueryable<OpenRevisionItemRow> OpenRevisionItems(AppDbContext db) =>
+        from i in db.RevisionItems.AsNoTracking()
+        join r in db.RevisionRounds.AsNoTracking() on i.RoundId equals r.Id
+        where (i.WorkStatus == RevisionWorkStatuses.Todo || i.WorkStatus == RevisionWorkStatuses.InProgress)
+              && (r.DeliverableId == null || db.Deliverables.Any(d => d.Id == r.DeliverableId && d.Status != "CANCELLED"))
+        select new OpenRevisionItemRow { ProjectId = r.ProjectId, DeliverableId = r.DeliverableId };
+
+    internal sealed class OpenRevisionItemRow
+    {
+        public Guid ProjectId { get; init; }
+        public Guid? DeliverableId { get; init; }
     }
 }
