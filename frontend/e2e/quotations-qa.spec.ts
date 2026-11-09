@@ -67,7 +67,7 @@ test.describe('Quotations QA (D-02, D-03, D-04, D-12)', () => {
     await expect(dialog.getByRole('button', { name: 'Tạo nháp' })).toBeEnabled()
     await dialog.getByRole('button', { name: 'Huỷ' }).click()
 
-    await page.getByRole('tab', { name: /Deliverables/ }).click()
+    await page.getByRole('tab', { name: /Hạng mục/ }).click()
     await expect(page.getByRole('link', { name: `${sent.number} · đã gửi` })).toBeVisible()
   })
 })

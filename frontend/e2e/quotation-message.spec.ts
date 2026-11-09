@@ -31,7 +31,7 @@ test.describe('Quotation message template', () => {
     await expect(message).toHaveValue(/mở link portal em đã gửi trước đó/)
 
     await dialog.getByRole('button', { name: 'Tạo link portal' }).click()
-    await expectToast(page, 'Đã tạo link portal')
+    await expectToast(page, 'Đã tạo link và sao chép tin nhắn')
     await expect(message).toHaveValue(/quét QR tại: \S+\/p\/[A-Za-z0-9_-]{43}$/)
 
     await dialog.getByRole('button', { name: 'Copy tin nhắn', exact: true }).click()
@@ -45,6 +45,14 @@ test.describe('Quotation message template', () => {
     const again = page.getByRole('dialog', { name: 'Tin nhắn mẫu' })
     await expect(again.getByLabel('Tin nhắn gửi khách')).toHaveValue(/mở link portal em đã gửi trước đó/)
     await expect(again.getByRole('button', { name: 'Tạo link portal' })).toHaveCount(0)
+
+    // A client that already holds a (hidden) link can get a new one inserted into the message, after a warning
+    await again.getByRole('button', { name: 'Tạo link mới và chèn vào tin nhắn' }).click()
+    const warn = page.getByRole('dialog', { name: 'Tạo link mới?' })
+    await expect(warn).toContainText('Link cũ khách đang giữ sẽ ngừng dùng được')
+    await warn.getByRole('button', { name: 'Tạo link mới' }).click()
+    await expectToast(page, 'Đã tạo link và sao chép tin nhắn')
+    await expect(again.getByLabel('Tin nhắn gửi khách')).toHaveValue(/quét QR tại: \S+\/p\/[A-Za-z0-9_-]{43}$/)
 
     // Portal turned off: no "old link" message, the dialog points to the client page instead
     await page.keyboard.press('Escape')

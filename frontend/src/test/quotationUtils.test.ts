@@ -5,6 +5,7 @@ import {
   percentHalfUp,
   quotationErrorMessage,
   quoteTargetWarnings,
+  quotationSendBlockers,
   todayVn,
   zeroPriceRows,
   zeroPriceLineNames,
@@ -154,5 +155,12 @@ describe('clientStatementNotes (Plan 12)', () => {
     expect(notes[1]).toContain(`Khách báo đã chuyển ${formatVnd(1_000_000)} (tiền cọc)`)
     expect(notes[1]).toContain('“TK chồng”')
     expect(clientStatementNotes({ status: 'ACCEPTED', clientAcceptedAt: '2026-11-08T03:00:00Z', clientPaymentNotice: null })).toEqual([])
+  })
+})
+
+describe('quotationSendBlockers', () => {
+  it('names every row without a description, 1-based', () => {
+    expect(quotationSendBlockers([{ description: 'A' }, { description: '' }, { description: '  ' }])).toEqual(['Dòng 2 chưa có mô tả', 'Dòng 3 chưa có mô tả'])
+    expect(quotationSendBlockers([{ description: 'A' }])).toEqual([])
   })
 })

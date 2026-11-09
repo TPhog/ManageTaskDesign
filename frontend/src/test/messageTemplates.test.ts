@@ -110,3 +110,12 @@ describe('portal invite (Plan 02 message, now a template)', () => {
     ].join('\n'))
   })
 })
+
+describe('quotationSentMessage with a fresh portal link', () => {
+  it('embeds the link and drops the "old link" wording', () => {
+    const q = { clientName: 'Chị Lan', number: 'BG-2026-0001', version: 1, total: 3_000_000, snapshot: null } as Parameters<typeof quotationSentMessage>[0]
+    const msg = quotationSentMessage(q, 'https://x/p/abc')
+    expect(msg).toContain('https://x/p/abc')
+    expect(msg).not.toContain('link portal em đã gửi trước đó')
+  })
+})

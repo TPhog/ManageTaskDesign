@@ -69,15 +69,16 @@ describe('DateInput', () => {
 })
 
 describe('MoneyInput', () => {
-  it('shows thousands separators until focused', async () => {
+  it('keeps the thousands separators while focused and typing', async () => {
     render(<MoneyHarness />)
     const input = screen.getByLabelText('Đơn giá')
     expect(input).toHaveValue('500.000')
     await userEvent.click(input)
-    expect(input).toHaveValue('500000')
+    expect(input).toHaveValue('500.000')
     await userEvent.clear(input)
     await userEvent.type(input, '2000000')
     expect(screen.getByTestId('money')).toHaveTextContent('2000000')
+    expect(input).toHaveValue('2.000.000')
     await userEvent.tab()
     expect(input).toHaveValue('2.000.000')
   })

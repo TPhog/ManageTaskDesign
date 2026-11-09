@@ -37,7 +37,8 @@ test.describe('Project flow', () => {
     await expect(nextStep.getByRole('list', { name: 'Cảnh báo' })).toContainText('Brief chưa được xác nhận')
     await nextStep.getByRole('link', { name: 'Thêm hạng mục' }).click()
     await expect(page).toHaveURL(/tab=deliverables/)
-    await expect(page.getByRole('tab', { name: /Deliverables/ })).toHaveAttribute('aria-selected', 'true')
+    // ?new=1 opens the create dialog on that tab
+    await expect(page.getByRole('dialog', { name: 'Thêm hạng mục' })).toBeVisible()
   })
 
   test('starting the project creates the template tasks and the deliverable shows its progress', async ({ page }) => {

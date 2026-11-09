@@ -68,7 +68,7 @@ test.describe('Services', () => {
     await page.getByLabel('Tên dịch vụ').fill(name)
     await page.getByLabel('Giá gốc').fill('2000000')
     await page.getByLabel('Số vòng sửa miễn phí').fill('3')
-    await page.getByLabel('Giá vòng thêm').fill('200000')
+    await page.getByLabel('Giá vòng sửa thêm').fill('200000')
     await page.getByRole('button', { name: 'Lưu', exact: true }).click()
 
     await expectToast(page, 'Đã tạo dịch vụ')

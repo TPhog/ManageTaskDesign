@@ -53,7 +53,7 @@ test.describe('Project detail (QA D-01, D-08, D-27)', () => {
     const projectId = await createProject(page)
     await page.goto(`/admin/projects/${projectId}?tab=brief`)
     await expect(page.getByRole('button', { name: 'Xác nhận brief' })).toBeDisabled()
-    await page.getByLabel('Nội dung brief').fill('Logo tông xanh, phong cách tối giản')
+    await page.locator('#brief-content').fill('Logo tông xanh, phong cách tối giản')
     await page.getByRole('button', { name: 'Xác nhận brief' }).click()
     await page.getByRole('dialog', { name: /Xác nhận brief phiên bản 1/ }).getByRole('button', { name: 'Xác nhận', exact: true }).click()
     await expectToast(page, 'Đã xác nhận brief')

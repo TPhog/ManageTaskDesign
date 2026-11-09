@@ -70,7 +70,7 @@ test.describe('Project Detail', () => {
     await expect(page).toHaveURL(/\/admin\/projects\/[0-9a-f-]+/)
     await expect(page.getByRole('tab', { name: 'Tổng quan' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Brief' })).toBeVisible()
-    await expect(page.getByRole('tab', { name: /Deliverables/ })).toBeVisible()
+    await expect(page.getByRole('tab', { name: /Hạng mục/ })).toBeVisible()
   })
 
   test('unknown route shows the 404 page', async ({ page }) => {

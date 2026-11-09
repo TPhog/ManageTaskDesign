@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { createClient, createProject } from './helpers'
 
-const PLACEHOLDER = 'Tìm khách, dự án, số báo giá…'
+const PLACEHOLDER = 'Tìm khách, dự án, báo giá, công việc, yêu cầu…'
 
 test.describe('Quick search (Ctrl+K)', () => {
   test('finds a project typed without diacritics and opens it with the keyboard', async ({ page }) => {

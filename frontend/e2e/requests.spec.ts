@@ -29,7 +29,7 @@ test.describe('Requests inbox', () => {
     await expect(sheet).toContainText('Vòng 1 — Logo E2E')
 
     await page.goto(`/admin/projects/${projectId}`)
-    await page.getByRole('tab', { name: /Deliverables/ }).click()
+    await page.getByRole('tab', { name: /Hạng mục/ }).click()
     await expect(page.getByText('1/1 vòng')).toBeVisible()
   })
 
