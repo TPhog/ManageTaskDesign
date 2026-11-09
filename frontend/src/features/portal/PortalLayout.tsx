@@ -11,6 +11,9 @@ import type { PortalMe } from '@/lib/portalTypes'
 import { PortalMessage } from './PortalMessage'
 import { PublicStudioContact, StudioContact } from './StudioContact'
 import { isSessionExpired, logoutCompleted } from './errors'
+import { usePortalTheme } from './kit/usePortalTheme'
+import { Masthead } from './kit/Masthead'
+import { EditorialSection } from './kit/editorial'
 
 // docs/08 §3.1: bottom navigation of the portal (mobile-first)
 const navItems: { to: string; label: string; icon: LucideIcon; match: (path: string) => boolean }[] = [
@@ -23,6 +26,7 @@ const navItems: { to: string; label: string; icon: LucideIcon; match: (path: str
 const reopenHint = 'Mở lại link nhà thiết kế đã gửi cho bạn. Không tìm thấy link hoặc link không mở được? Nhắn nhà thiết kế để nhận link mới.'
 
 export default function PortalLayout() {
+  usePortalTheme()
   const qc = useQueryClient()
   const { pathname } = useLocation()
   const [loggedOut, setLoggedOut] = useState(false)
@@ -53,7 +57,7 @@ export default function PortalLayout() {
 
   if (isLoading) {
     return (
-      <div role="status" className="flex min-h-screen items-center justify-center gap-2 bg-slate-50 text-sm text-muted-foreground">
+      <div role="status" className="flex min-h-screen items-center justify-center gap-2 bg-background text-sm text-muted-foreground">
         <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
         Đang tải…
       </div>
@@ -79,34 +83,33 @@ export default function PortalLayout() {
   const hasContact = !!(designer.contactPhone || designer.contactEmail)
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="sticky top-0 z-10 border-b bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-2xl items-center gap-2 px-4">
-          <Link to="/portal" className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-foreground">{designer.displayName || 'Nhà thiết kế'}</p>
-            <p className="truncate text-xs text-slate-600">Xin chào, {me.clientName}</p>
-          </Link>
+    <div data-theme="editorial" className="min-h-screen bg-background text-foreground">
+      <Masthead
+        studioName={designer.displayName || 'Nhà thiết kế'}
+        logoUrl={designer.logoUrl}
+        homeHref="/portal"
+        subline={`Xin chào, ${me.clientName}`}
+        actions={
           <Button variant="ghost" onClick={logout} className="h-11 gap-1.5 px-3">
             <LogOut aria-hidden="true" />
             Thoát
           </Button>
-        </div>
-      </header>
-      <main className="mx-auto max-w-2xl px-4 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-5">
+        }
+      />
+      <main className="mx-auto max-w-2xl px-5 pb-[calc(6rem+env(safe-area-inset-bottom))] pt-6">
         <Outlet />
         {hasContact && (
-          <section aria-labelledby="portal-contact" className="mt-8 rounded-xl border bg-card p-4 shadow-card">
-            <h2 id="portal-contact" className="text-sm font-semibold text-foreground">Cần hỏi nhà thiết kế?</h2>
-            <p className="mt-1 text-xs text-slate-600">
+          <EditorialSection id="portal-contact" title="Cần hỏi nhà thiết kế?" className="mt-10">
+            <p className="mt-1 text-sm text-muted-foreground">
               {designer.displayName || 'Nhà thiết kế'} trả lời qua điện thoại, Zalo hoặc email.
             </p>
             <StudioContact phone={designer.contactPhone} email={designer.contactEmail} className="mt-3" />
-          </section>
+          </EditorialSection>
         )}
       </main>
       <nav
         aria-label="Điều hướng portal"
-        className="fixed inset-x-0 bottom-0 z-10 border-t bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+        className="fixed inset-x-0 bottom-0 z-10 border-t border-rule bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
       >
         <ul className="mx-auto flex max-w-2xl">
           {navItems.map(item => {
@@ -118,7 +121,7 @@ export default function PortalLayout() {
                   aria-current={active ? 'page' : undefined}
                   className={cn(
                     'flex h-14 flex-col items-center justify-center gap-0.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring',
-                    active ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
+                    active ? 'text-highlight-text shadow-[inset_0_2px_0_var(--highlight)]' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
                   <item.icon className="h-5 w-5" aria-hidden="true" />

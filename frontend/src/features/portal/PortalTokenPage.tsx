@@ -5,9 +5,11 @@ import { api } from '@/lib/api'
 import { PortalMessage } from './PortalMessage'
 import { PublicStudioContact } from './StudioContact'
 import { sessionFailureKind, type PortalSessionFailure } from './errors'
+import { usePortalTheme } from './kit/usePortalTheme'
 
 /** /p/:token — exchanges the magic-link token for a portal session (07-security §4.2). */
 export default function PortalTokenPage() {
+  usePortalTheme()
   const { token = '' } = useParams<{ token: string }>()
   const [failed, setFailed] = useState<PortalSessionFailure | null>(token ? null : 'INVALID')
   const started = useRef(false)
@@ -50,8 +52,8 @@ export default function PortalTokenPage() {
   }
 
   return (
-    <div role="status" className="flex min-h-screen flex-col items-center justify-center gap-3 bg-slate-50 text-sm text-muted-foreground">
-      <Loader2 className="h-6 w-6 animate-spin text-primary" aria-hidden="true" />
+    <div role="status" className="flex min-h-screen flex-col items-center justify-center gap-3 bg-background text-sm text-muted-foreground">
+      <Loader2 className="h-6 w-6 animate-spin text-highlight-text" aria-hidden="true" />
       Đang mở trang theo dõi dự án…
     </div>
   )
