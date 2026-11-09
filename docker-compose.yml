@@ -28,6 +28,9 @@ services:
     restart: unless-stopped
   web:
     image: caddy:2-alpine
+    environment:
+      # site address in deploy/Caddyfile ({$DOMAIN}); read from .env by compose
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
     ports:
       - "80:80"
       - "443:443"

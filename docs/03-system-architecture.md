@@ -145,7 +145,8 @@ Client(Portal)        API                         DB                     Designe
 | `App__MaxUploadMb` | `20` | |
 | `Seed__DesignerUsername` | `me@example.com` | Chỉ dùng lần đầu khi chưa có tài khoản |
 | `Seed__DesignerPassword` | (secret) | Chỉ dùng lần đầu; xóa khỏi env sau khi seed |
-| `ASPNETCORE_ENVIRONMENT` | `Production` | |
+| `ASPNETCORE_ENVIRONMENT` | `Production` | `.env.example` mặc định `Production`. Không đặt `Development` trong container: nới mọi rate limit, bỏ các kiểm tra fail-fast và key ring không nằm trên volume `keys` |
+| `DOMAIN` | `app.example.com` | Tên miền Caddy phục vụ + xin chứng chỉ TLS (`https://{$DOMAIN}` trong Caddyfile). Compose truyền vào service `web`; thiếu thì `docker compose` báo lỗi. `App__PublicBaseUrl` phải là `https://` + `DOMAIN` |
 | `DataProtection__KeysPath` | `/data/keys` | Thư mục key ring Data Protection (ký cookie đăng nhập/portal và token form khách mới). **Bắt buộc ngoài Development/Testing** - API không khởi động nếu thiếu; đường dẫn tương đối tính từ content root. Phải nằm trên volume bền (`keys`) |
 | `RateLimit__PublicIntakeSubmitPerHour` | `5` | `POST /api/public/intake/{slug}` tối đa N lần/giờ/IP (cửa sổ trượt, IPv6 theo /64) → `429` |
 | `RateLimit__PublicIntakePerMinute` | `10` | `GET /api/public/intake/{slug}` tối đa N lần/phút/IP |
@@ -174,12 +175,13 @@ services:
     depends_on: { db: { condition: service_healthy } }
   web:
     image: caddy:2
+    environment: { DOMAIN: "${DOMAIN:?set DOMAIN in .env}" }
     ports: ["80:80", "443:443"]
     volumes: [./deploy/Caddyfile:/etc/caddy/Caddyfile, ./frontend/dist:/srv, caddy_data:/data]
 volumes: { pgdata: {}, files: {}, keys: {}, caddy_data: {} }
 ```
 
-Caddyfile (`deploy/Caddyfile`): `handle /api/public/*` (`log_skip`) và `handle /api/*` → `reverse_proxy api:8080`; `handle /p/*` (magic link) và `handle /f/*` (form khách mới) đều `log_skip` + `Referrer-Policy: no-referrer` rồi trả `index.html` (`/f/*` thêm `X-Robots-Tag: noindex`) vì path chứa token/slug (07-security §4.3, §4.5); còn lại `try_files {path} /index.html` + `file_server`. Rate limit theo IP thật nhờ tin đúng một hop `X-Forwarded-For` từ Caddy, nên service `api` **không** được publish cổng ra ngoài.
+Caddyfile (`deploy/Caddyfile`): `handle /api/public/*` (`log_skip`) và `handle /api/*` → `reverse_proxy api:8080`; `handle /p/*` (magic link) và `handle /f/*` (form khách mới) đều `log_skip` + `Referrer-Policy: no-referrer` rồi trả `index.html` (`/f/*` thêm `X-Robots-Tag: noindex`) vì path chứa token/slug (07-security §4.3, §4.5); còn lại `try_files {path} /index.html` + `file_server`. Header bảo mật toàn site (HSTS, CSP, nosniff, …) đặt ở khối `header` cấp site (07-security §6). Rate limit theo IP thật nhờ tin đúng một hop `X-Forwarded-For` từ Caddy, nên service `api` **không** được publish cổng ra ngoài.
 
 - API chạy migration khi khởi động (`db.Database.MigrateAsync()`) — chấp nhận được với single instance.
 - Seed designer + settings mặc định + danh sách ngân hàng khi DB trống.
