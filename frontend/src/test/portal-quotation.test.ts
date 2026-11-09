@@ -1,5 +1,5 @@
 import {
-  afterPaymentHint, canAccept, memoExplanation, paymentSummary, qrPngUrl, quotationBadgeLabel, quotationNotice,
+  canAccept, memoExplanation, paymentSummary, qrPngUrl, quotationBadgeLabel, quotationNotice,
   showsPaymentStatus, statementErrorMessage, versionText,
 } from '@/features/portal/quotation'
 import type { PortalQuotationDetail } from '@/lib/portalTypes'
@@ -45,13 +45,6 @@ describe('quotationNotice', () => {
 
   it('adds nothing to an open quotation', () => {
     expect(quotationNotice({ effectiveStatus: 'SENT', paymentStatus: 'UNPAID' }, 'Lan')).toBeNull()
-  })
-})
-
-describe('afterPaymentHint', () => {
-  it('names the designer to message after paying', () => {
-    expect(afterPaymentHint('Lan')).toBe('Sau khi đồng ý hoặc chuyển khoản, vui lòng nhắn cho Lan để xác nhận.')
-    expect(afterPaymentHint('')).toContain('nhắn cho nhà thiết kế')
   })
 })
 

@@ -32,6 +32,7 @@ interface Settings {
   defaultValidityDays: number
   defaultDepositPercent: number
   defaultTerms: string
+  portalResponseTime: string
   rowVersion: number
 }
 
@@ -46,6 +47,7 @@ const settingsSchema = z.object({
   defaultValidityDays: z.coerce.number().int().min(1, 'Từ 1 đến 365').max(365, 'Từ 1 đến 365'),
   defaultDepositPercent: z.coerce.number().int().min(0, 'Từ 0 đến 100').max(100, 'Từ 0 đến 100'),
   defaultTerms: z.string(),
+  portalResponseTime: z.string().max(60, 'Tối đa 60 ký tự'),
 })
 type SettingsForm = z.infer<typeof settingsSchema>
 
@@ -128,6 +130,7 @@ export default function SettingsPage() {
       defaultValidityDays: settings.defaultValidityDays,
       defaultDepositPercent: settings.defaultDepositPercent,
       defaultTerms: settings.defaultTerms,
+      portalResponseTime: settings.portalResponseTime ?? '',
     } : undefined,
   })
 
@@ -137,7 +140,9 @@ export default function SettingsPage() {
 
   const updateMutation = useMutation({
     // blank optional inputs must reach the API as null (e.g. '' fails the bank account format check)
-    mutationFn: (body: SettingsForm & { rowVersion: number }) => api.put('/admin/settings', emptyToNull(body)),
+    // portalResponseTime: '' must reach the API as '' (= back to "trong 24 giờ"); null would mean "keep"
+    mutationFn: (body: SettingsForm & { rowVersion: number }) =>
+      api.put('/admin/settings', { ...emptyToNull(body), portalResponseTime: body.portalResponseTime.trim() }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] })
       toast.success('Đã lưu cài đặt')
@@ -322,6 +327,14 @@ export default function SettingsPage() {
               Dùng điều khoản mẫu
             </Button>
           )}
+          <Field
+            id="settings-portalResponseTime"
+            label="Thời gian phản hồi dự kiến (hiện cho khách)"
+            hint="Ví dụ: trong 24 giờ, trong 2 giờ làm việc. Để trống = “trong 24 giờ”."
+            error={errors.portalResponseTime?.message}
+          >
+            <Input id="settings-portalResponseTime" maxLength={60} {...a11y('portalResponseTime')} {...register('portalResponseTime')} />
+          </Field>
         </Section>
 
         <div className="flex justify-end">

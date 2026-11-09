@@ -10,8 +10,10 @@ import {
   zeroPriceLineNames,
   deliverablePricesBody,
   acceptOutcome,
+  clientStatementNotes,
 } from '@/features/admin/quotations/quotationUtils'
 import type { QuotationListItem } from '@/lib/quotationTypes'
+import { formatVnd } from '@/lib/format'
 
 const item = (over: Partial<QuotationListItem>): QuotationListItem => ({
   id: 'q', projectId: 'p', projectName: 'P', clientName: 'C', kind: 'INITIAL', number: null, version: 1,
@@ -140,5 +142,17 @@ describe('acceptOutcome (plan 09)', () => {
     expect(acceptOutcome('COMPLETED').text).toContain('mở lại dự án')
     expect(acceptOutcome('CANCELLED').creates).toBe(false)
     expect(acceptOutcome('DRAFT').creates).toBe(true)
+  })
+})
+
+describe('clientStatementNotes (Plan 12)', () => {
+  it('tells the designer what the client stated on the portal', () => {
+    const notes = clientStatementNotes({ status: 'SENT', clientAcceptedAt: '2026-11-08T03:00:00Z',
+      clientPaymentNotice: { purpose: 'deposit', amount: 1_000_000, at: '2026-11-08T04:00:00Z', note: 'TK chồng', pending: true } })
+    expect(notes[0]).toContain('Khách đã bấm “Đồng ý báo giá” trên portal')
+    expect(notes[0]).toContain('Đánh dấu đã chấp nhận')
+    expect(notes[1]).toContain(`Khách báo đã chuyển ${formatVnd(1_000_000)} (tiền cọc)`)
+    expect(notes[1]).toContain('“TK chồng”')
+    expect(clientStatementNotes({ status: 'ACCEPTED', clientAcceptedAt: '2026-11-08T03:00:00Z', clientPaymentNotice: null })).toEqual([])
   })
 })

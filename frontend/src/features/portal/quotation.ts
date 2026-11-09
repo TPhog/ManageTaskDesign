@@ -43,11 +43,6 @@ export function quotationNotice(
   }
 }
 
-/** docs/08 §3.2: shown under the QR — the client confirms outside the app (ADR-004). */
-export function afterPaymentHint(designerName: string): string {
-  return `Sau khi đồng ý hoặc chuyển khoản, vui lòng nhắn cho ${designerName || 'nhà thiết kế'} để xác nhận.`
-}
-
 /** Payment status only means something once the designer recorded the quotation as accepted. */
 export function showsPaymentStatus(q: { status: QuotationStatus }): boolean {
   return q.status === 'ACCEPTED'

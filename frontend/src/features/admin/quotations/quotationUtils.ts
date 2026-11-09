@@ -1,7 +1,8 @@
 import type { ApiError } from '@/lib/api'
+import { formatDatetime, formatVnd } from '@/lib/format'
 import { liveQuoteRefs } from '@/lib/quoteRefs'
 import type { Deliverable, DeliverableQuoteRef, DeliverableStatus, ProjectStatus } from '@/lib/types'
-import type { PaymentStatus, QuotationKind, QuotationListItem, QuotationStatus } from '@/lib/quotationTypes'
+import type { PaymentStatus, QrPurpose, QuotationDetail, QuotationKind, QuotationListItem, QuotationStatus } from '@/lib/quotationTypes'
 
 /** BR-03 mirror for the editor preview only (the server is authoritative): percent of whole đồng, half-up. */
 export function percentHalfUp(amount: number, percent: number): number {
@@ -138,4 +139,22 @@ export function quotationErrorMessage(err: Pick<ApiError, 'code' | 'detail' | 'e
   if (err.code === 'QUOTATION_LOCKED') return 'Báo giá đã gửi bị khóa — hãy tạo version mới để sửa'
   const firstFieldError = err.errors ? Object.values(err.errors)[0]?.[0] : undefined
   return firstFieldError ?? err.detail ?? fallback
+}
+
+const statementPurposeText: Record<QrPurpose, string> = { deposit: 'tiền cọc', full: 'toàn bộ', remaining: 'phần còn lại' }
+
+/** Plan 12 (BR-76/77): what the client stated on the portal and the designer still has to confirm. */
+export function clientStatementNotes(q: Pick<QuotationDetail, 'status' | 'clientAcceptedAt' | 'clientPaymentNotice'>): string[] {
+  const notes: string[] = []
+  if (q.status === 'SENT' && q.clientAcceptedAt) {
+    notes.push(`Khách đã bấm “Đồng ý báo giá” trên portal lúc ${formatDatetime(q.clientAcceptedAt)} — bấm “Đánh dấu đã chấp nhận” để xác nhận.`)
+  }
+  const n = q.clientPaymentNotice
+  if (n?.pending) {
+    notes.push(
+      `Khách báo đã chuyển ${formatVnd(n.amount)} (${statementPurposeText[n.purpose]}) lúc ${formatDatetime(n.at)}`
+      + `${n.note ? ` — “${n.note}”` : ''}. Kiểm tra tài khoản rồi ${q.status === 'SENT' ? 'đánh dấu đã chấp nhận và ' : ''}cập nhật trạng thái thanh toán.`,
+    )
+  }
+  return notes
 }

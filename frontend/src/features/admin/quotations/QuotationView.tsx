@@ -11,7 +11,7 @@ import { formatDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { QuotationDetail } from '@/lib/quotationTypes'
 import { AcceptDialog, PaymentDialog, RejectDialog } from './QuotationActionDialogs'
-import { kindLabel, paymentActions, quotationErrorMessage, type PaymentAction } from './quotationUtils'
+import { clientStatementNotes, kindLabel, paymentActions, quotationErrorMessage, type PaymentAction } from './quotationUtils'
 import { useQuotationCommand } from './useQuotations'
 import { QuotationMessageDialog } from './QuotationMessageDialog'
 
@@ -78,6 +78,9 @@ export function QuotationView({ quotation: q }: { quotation: QuotationDetail }) 
             {s.number} · v{s.version} · {kindLabel[q.kind]} · Ngày báo giá {formatDate(s.issueDate)}
             {q.status === 'SENT' && ` · Hiệu lực đến ${formatDate(s.expiryDate)}`}
           </p>
+          {clientStatementNotes(q).map(t => (
+            <p key={t} role="status" className="rounded-lg bg-highlight-soft p-3 text-sm text-foreground">{t}</p>
+          ))}
           {q.effectiveStatus === 'EXPIRED' && (
             <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
               Báo giá đã quá hạn. Vẫn có thể đánh dấu chấp nhận nếu khách đồng ý muộn, hoặc tạo version mới để gia hạn.
