@@ -1,3 +1,5 @@
+using FreelanceFlow.Api.Domain.Tasks;
+
 namespace FreelanceFlow.Api.Features.Tasks;
 
 // GET /api/admin/tasks item (docs/05 §3.9). Designer-only: tasks never reach the portal (TSK-05).
@@ -98,6 +100,17 @@ public record BlockedDto(string? Reason, Guid? ByTaskId);
 public record BlockedInfoDto(string? Reason, Guid? ByTaskId, string? ByTaskTitle, bool ByTaskDone);
 
 public record NextOccurrenceDto(Guid Id, DateOnly? DueDate);
+
+/// <summary>GET /api/admin/tasks?groupBy= — Count covers the whole filtered result, not only the page.</summary>
+public record TaskGroupDto(string Key, string Label, int Count);
+
+public record TaskViewDto(Guid Id, string Name, TaskViewConfig Config, int SortOrder);
+
+public record SaveTaskViewRequest(string? Name, TaskViewConfig? Config);
+
+public record SaveLastViewRequest(TaskViewConfig? Config);
+
+public record TaskViewsResponse(IReadOnlyList<TaskViewDto> Views, TaskViewConfig? Last);
 
 // Description null = keep the current one (the checkbox toggle sends only text + done)
 public record ChecklistItemRequest(string? Text, bool? Done, string? Description);

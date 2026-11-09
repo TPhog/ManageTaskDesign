@@ -40,9 +40,10 @@ public static class TasksEndpoints
         string? q = null,
         Guid? clientId = null,
         int page = 1,
-        int pageSize = 20)
+        int pageSize = 20,
+        string? groupBy = null)
     {
-        var errors = TaskValidation.ListFilters(status, due);
+        var errors = TaskValidation.ListFilters(status, due, groupBy);
         if (errors.Count > 0) return Results.ValidationProblem(errors);
 
         page = Math.Clamp(page, 1, 100_000);
@@ -81,14 +82,52 @@ public static class TasksEndpoints
             _ => query,
         };
 
-        var total = await query.CountAsync();
-        var rows = await query
-            .OrderBy(x => x.Task.DueDate == null)
-            .ThenBy(x => x.Task.DueDate)
-            .ThenBy(x => x.Task.SortOrder)
-            .ThenBy(x => x.Task.CreatedAt)
-            .Skip((page - 1) * pageSize)
-            .Take(pageSize)
+        // P15 D3: with groupBy the whole filtered set is ordered by TaskGrouping (one pure implementation) before paging,
+        // so pages follow group order and each group's count covers every page. Single designer: the set stays small.
+        int total;
+        List<TaskGroup> groups = [];
+        List<Guid>? pageIds = null;
+        Dictionary<Guid, string> groupKeys = [];
+        if (groupBy != null)
+        {
+            var groupRows = await query
+                .Select(x => new TaskGroupRow(
+                    x.Task.Id,
+                    x.Task.ProjectId,
+                    x.Project.Name,
+                    x.ClientName,
+                    x.Task.DeliverableId,
+                    db.Deliverables.Where(d => d.Id == x.Task.DeliverableId).Select(d => d.Name).FirstOrDefault(),
+                    x.Task.Priority,
+                    x.Task.Status,
+                    x.Task.DueDate,
+                    x.Task.SortOrder,
+                    x.Task.CreatedAt))
+                .ToListAsync();
+            var (orderedIds, ordered) = TaskGrouping.Order(groupBy, groupRows, today, weekEnd);
+            total = orderedIds.Count;
+            groups = ordered;
+            pageIds = orderedIds.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+            var onPage = pageIds.ToHashSet();
+            groupKeys = groupRows.Where(r => onPage.Contains(r.Id))
+                .ToDictionary(r => r.Id, r => TaskGrouping.KeyOf(groupBy, r, today, weekEnd));
+        }
+        else
+        {
+            total = await query.CountAsync();
+        }
+
+        var pageQuery = pageIds == null
+            ? query
+                .OrderBy(x => x.Task.DueDate == null)
+                .ThenBy(x => x.Task.DueDate)
+                .ThenBy(x => x.Task.SortOrder)
+                .ThenBy(x => x.Task.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+            : query.Where(x => pageIds.Contains(x.Task.Id));
+
+        var rows = await pageQuery
             .Select(x => new { x.Task.LinksJson, Dto = new TaskListItemDto(
                 x.Task.Id,
                 x.Task.ProjectId,
@@ -120,9 +159,22 @@ public static class TasksEndpoints
                 null) })
             .ToListAsync();
         // links is jsonb: counted here from the (≤ 100) rows of the page
-        var items = rows.Select(r => r.Dto with { LinksCount = ExternalLinks.Parse(r.LinksJson).Count }).ToList();
+        var items = rows.Select(r => r.Dto with
+        {
+            LinksCount = ExternalLinks.Parse(r.LinksJson).Count,
+            GroupKey = groupKeys.GetValueOrDefault(r.Dto.Id),
+        }).ToList();
+        if (pageIds != null)
+        {
+            var position = pageIds.Select((id, i) => (id, i)).ToDictionary(x => x.id, x => x.i);
+            items = items.OrderBy(i => position[i.Id]).ToList();
+        }
 
-        return Results.Ok(new { items, page, pageSize, total });
+        return Results.Ok(new
+        {
+            items, page, pageSize, total,
+            groups = groups.Select(g => new TaskGroupDto(g.Key, g.Label, g.Count)).ToList(),
+        });
     }
 
     private static async Task<IResult> GetTask(Guid id, AppDbContext db, IClock clock)

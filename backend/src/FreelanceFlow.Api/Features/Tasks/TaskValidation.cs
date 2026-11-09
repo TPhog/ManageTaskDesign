@@ -103,13 +103,15 @@ public static class TaskValidation
         return errors;
     }
 
-    public static Dictionary<string, string[]> ListFilters(string? status, string? due)
+    public static Dictionary<string, string[]> ListFilters(string? status, string? due, string? groupBy = null)
     {
         var errors = new Dictionary<string, string[]>();
         if (status != null && !ProjectTask.Statuses.Contains(status))
             errors["status"] = ["Trạng thái không hợp lệ"];
         if (due != null && !DueFilters.Contains(due))
             errors["due"] = ["Bộ lọc hạn không hợp lệ (overdue | today | week)"];
+        if (groupBy != null && !TaskGrouping.GroupBys.Contains(groupBy))
+            errors["groupBy"] = ["Nhóm theo không hợp lệ"];
         return errors;
     }
 }
