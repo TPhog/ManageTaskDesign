@@ -12,13 +12,10 @@ import { qk } from '@/lib/queryKeys'
 import type { IntakeDetail } from '@/lib/requestTemplateTypes'
 import type { DesignType } from '@/lib/types'
 import { useActiveServices } from '@/features/admin/services/ServicePicker'
+import { designTypeLabel } from '@/features/portal/labels'
 import { defaultConvertValues, toConvertBody, type ConvertFormValues } from './intakeUtils'
 import { useConvertIntake } from './useIntake'
 
-const designTypeLabel: Record<DesignType, string> = {
-  LOGO: 'Logo', BANNER: 'Banner', POSTER: 'Poster', BRANDING: 'Thương hiệu', UI_UX: 'UI/UX',
-  SOCIAL_MEDIA: 'Mạng xã hội', PACKAGING: 'Bao bì', PRINT: 'In ấn', OTHER: 'Khác',
-}
 const nativeSelect =
   'flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50'
 
@@ -49,12 +46,16 @@ function ConvertForm({ detail, onClose }: { detail: IntakeDetail; onClose: () =>
   const convert = useConvertIntake(detail.id)
   const set = <K extends keyof ConvertFormValues>(k: K, val: ConvertFormValues[K]) => setV(prev => ({ ...prev, [k]: val }))
   const existing = v.clientMode === 'existing'
-  const canSubmit = v.projectName.trim() !== '' && (existing ? v.existingClientId !== '' : v.clientName.trim() !== '') && !dateBad
 
   function submit(e: FormEvent) {
     e.preventDefault()
-    if (!canSubmit) return
-    setErrors({})
+    // validate on submit and say what is missing (a silently disabled button explains nothing)
+    const missing: Record<string, string> = {}
+    if (!v.projectName.trim()) missing.projectName = 'Nhập tên dự án'
+    if (existing ? !v.existingClientId : !v.clientName.trim()) missing.clientName = existing ? 'Chọn khách có sẵn' : 'Nhập tên khách'
+    if (dateBad) missing.dueDate = 'Ngày không hợp lệ (dd/mm/yyyy)'
+    setErrors(missing)
+    if (Object.keys(missing).length > 0) return
     convert.mutate(toConvertBody(v, detail.rowVersion), {
       onSuccess: r => { toast.success('Đã tạo khách & dự án'); onClose(); navigate(`/admin/projects/${r.projectId}`) },
       onError: err => {
@@ -63,7 +64,13 @@ function ConvertForm({ detail, onClose }: { detail: IntakeDetail; onClose: () =>
           onClose()
           toast.error('Hồ sơ đã được xử lý hoặc vừa thay đổi — đã tải lại')
           void qc.invalidateQueries({ queryKey: qk.intake.all })
-        } else if (apiErr.status === 404) toast.error('Khách đã chọn không còn hoạt động')
+        } else if (apiErr.status === 404 && apiErr.code === 'NOT_FOUND') toast.error('Khách đã chọn không còn hoạt động')
+        else if (apiErr.status === 404) {
+          // bodiless 404: the submission itself was deleted (e.g. in another tab)
+          onClose()
+          toast.error('Yêu cầu này đã bị xoá')
+          void qc.invalidateQueries({ queryKey: qk.intake.all })
+        }
         else if (apiErr.errors) setErrors(Object.fromEntries(Object.entries(apiErr.errors).map(([k, m]) => [k, m[0] ?? ''])))
         else toast.error(apiErr.detail ?? 'Không thể tạo khách & dự án')
       },
@@ -102,6 +109,7 @@ function ConvertForm({ detail, onClose }: { detail: IntakeDetail; onClose: () =>
             <select aria-label="Chọn khách có sẵn" className={nativeSelect} value={v.existingClientId} onChange={e => set('existingClientId', e.target.value)}>
               {detail.matchingClients.map(c => <option key={c.id} value={c.id}>{c.name} ({c.phone ?? c.email})</option>)}
             </select>
+            {fieldError('clientName')}
           </div>
         )}
       </fieldset>
@@ -122,6 +130,7 @@ function ConvertForm({ detail, onClose }: { detail: IntakeDetail; onClose: () =>
         <div className="space-y-1">
           <Label htmlFor="cv-due">Hạn hoàn thành</Label>
           <DateInput id="cv-due" value={v.dueDate} onChange={d => set('dueDate', d)} onInvalid={setDateBad} />
+          {fieldError('dueDate')}
         </div>
       </div>
       <div className="space-y-1">
@@ -152,7 +161,7 @@ function ConvertForm({ detail, onClose }: { detail: IntakeDetail; onClose: () =>
 
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onClose}>Huỷ</Button>
-        <Button type="submit" disabled={!canSubmit || convert.isPending}>
+        <Button type="submit" disabled={convert.isPending}>
           {convert.isPending ? 'Đang tạo…' : 'Tạo khách & dự án'}
         </Button>
       </DialogFooter>
