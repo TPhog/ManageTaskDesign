@@ -17,10 +17,10 @@ export function TodayTile({ summary, wide }: { summary: Dashboard['actionRequire
       <TileHeader title="Hôm nay của bạn" />
       <ul aria-label="Cần xử lý" className={cn('grid flex-1 grid-cols-2 gap-3 sm:grid-cols-6 sm:grid-rows-[1fr_auto]', wide && 'xl:grid-cols-5 xl:grid-rows-1')}>
         <li className={cn(big, 'col-span-2')}>
-          <StatTile to={dashboardLinks.overdueTasks} label="Task quá hạn" value={summary.overdueTasks} testId="dsh-overdueTasks" tone={summary.overdueTasks > 0 ? 'hot' : 'default'} />
+          <StatTile to={dashboardLinks.overdueTasks} label="Việc quá hạn" value={summary.overdueTasks} testId="dsh-overdueTasks" tone={summary.overdueTasks > 0 ? 'hot' : 'default'} />
         </li>
         <li className={big}>
-          <StatTile to={dashboardLinks.dueTodayTasks} label="Task đến hạn hôm nay" value={summary.dueTodayTasks} testId="dsh-dueTodayTasks" />
+          <StatTile to={dashboardLinks.dueTodayTasks} label="Việc đến hạn hôm nay" value={summary.dueTodayTasks} testId="dsh-dueTodayTasks" />
         </li>
         <li className={big}>
           <StatTile to={dashboardLinks.awaitingQuotations} label="Báo giá chờ phản hồi" value={summary.awaitingQuotations} testId="dsh-awaitingQuotations" />

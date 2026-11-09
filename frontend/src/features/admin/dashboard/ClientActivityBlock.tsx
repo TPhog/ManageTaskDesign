@@ -47,7 +47,7 @@ export function ClientActivityView({ activity }: { activity: ClientActivity }) {
 }
 
 export function ClientActivityBlock({ className }: { className?: string }) {
-  const { data, isLoading, error, refetch } = useClientActivity(10)
+  const { data, isLoading, error, refetch } = useClientActivity(8)
   return (
     <Section title="Hoạt động của khách" icon={MessageSquare} className={className}>
       {isLoading ? (

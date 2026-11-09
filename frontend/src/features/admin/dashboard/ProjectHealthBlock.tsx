@@ -72,7 +72,7 @@ function HealthRow({ item }: { item: ProjectHealthItem }) {
 
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 md:contents">
         {item.progressPercent === null ? (
-          <span className="text-xs text-muted-foreground">Chưa có task</span>
+          <span className="text-xs text-muted-foreground">Chưa có việc</span>
         ) : (
           <div className="flex items-center gap-2.5">
             <div
@@ -130,6 +130,9 @@ export function ProjectHealthView({ health }: { health: ProjectHealth }) {
   )
 }
 
+/** Rows shown on the dashboard; the rest is summed into "và N dự án khác". */
+const HEALTH_ROWS = 8
+
 export function ProjectHealthBlock() {
   const { data, isLoading, error, refetch } = useProjectHealth()
   return (
@@ -149,7 +152,9 @@ export function ProjectHealthBlock() {
           <Button variant="link" className="px-0" onClick={() => refetch()}>Thử lại</Button>
         </div>
       ) : (
-        <ProjectHealthView health={data} />
+        <ProjectHealthView
+          health={{ ...data, items: data.items.slice(0, HEALTH_ROWS), hidden: data.hidden + Math.max(0, data.items.length - HEALTH_ROWS) }}
+        />
       )}
     </Section>
   )

@@ -7,6 +7,9 @@ import { cn } from '@/lib/utils'
 import { barPercent, compactVnd, dashboardLinks, monthLabel } from './dashboardUtils'
 import { Section } from './DashboardSection'
 
+/** Any month with money stays a visible bar even when another month dwarfs it. */
+const MIN_BAR = 12
+
 const rowLink = 'flex min-h-11 items-center justify-between gap-3 border-t border-border text-sm link-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
 /**
@@ -35,7 +38,7 @@ function AcceptedChart({ data }: { data: MonthTotal[] }) {
                 'relative w-full rounded-t-[6px]',
                 i === last ? 'border-2 border-b-0 border-dashed border-foreground bg-transparent' : 'bg-foreground',
               )}
-              style={{ height: `${barPercent(d.total, max)}%` }}
+              style={{ height: `${Math.max(barPercent(d.total, max), d.total > 0 ? MIN_BAR : 0)}%` }}
             >
               {d.total > 0 && (i === last || i === best) && (
                 <span className="absolute bottom-full left-1/2 mb-1 -translate-x-1/2 whitespace-nowrap text-[0.6875rem] font-semibold tabular-nums">

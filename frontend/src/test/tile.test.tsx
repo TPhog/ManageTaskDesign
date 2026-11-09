@@ -15,8 +15,8 @@ describe('bento patterns (P16)', () => {
   })
 
   it('StatTile links to the filtered list and keeps the test id on the value', () => {
-    render(<MemoryRouter><StatTile to="/admin/tasks?due=overdue" label="Task quá hạn" value={2} testId="dsh-overdueTasks" tone="hot" /></MemoryRouter>)
-    const link = screen.getByRole('link', { name: /Task quá hạn/ })
+    render(<MemoryRouter><StatTile to="/admin/tasks?due=overdue" label="Việc quá hạn" value={2} testId="dsh-overdueTasks" tone="hot" /></MemoryRouter>)
+    const link = screen.getByRole('link', { name: /Việc quá hạn/ })
     expect(link).toHaveAttribute('href', '/admin/tasks?due=overdue')
     expect(link).toHaveAttribute('data-tone', 'hot')
     expect(screen.getByTestId('dsh-overdueTasks')).toHaveTextContent('2')

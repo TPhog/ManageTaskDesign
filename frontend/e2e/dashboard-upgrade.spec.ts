@@ -5,14 +5,22 @@ import { quotedProject } from './flowHelpers'
 const isoDay = (offsetDays: number) => new Date(Date.now() + offsetDays * 24 * 3600 * 1000).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' })
 
 /** The overdue group shows the oldest tasks first and is capped, so e2e tasks use a date older than any real one. */
-const OLDEST = '2000-01-01'
+const OLDEST = '1990-01-01'
 
 test.describe('Dashboard upgrade (P11)', () => {
+  /** Tasks a test created: marked DONE afterwards so the capped overdue group never fills up on the shared dev DB. */
+  const created: string[] = []
+  test.afterEach(async ({ page }) => {
+    for (const id of created.splice(0)) {
+      await apiPost(page.request, page, `/api/admin/tasks/${id}/move`, { status: 'DONE', sortOrder: 1 })
+    }
+  })
+
   test('ticks an overdue task done from the 7-day schedule, undo puts it back', async ({ page }) => {
     await page.goto('/admin')
     const projectId = await createProject(page, `E2E Lịch ${Date.now()}`)
     const title = `Việc quá hạn ${Date.now()}`
-    await createTask(page, projectId, { title, dueDate: OLDEST })
+    created.push(await createTask(page, projectId, { title, dueDate: OLDEST }))
     await page.reload()
 
     const schedule = page.getByRole('region', { name: 'Lịch làm việc 7 ngày' })
@@ -28,15 +36,13 @@ test.describe('Dashboard upgrade (P11)', () => {
     await page.goto('/admin')
     const projectId = await createProject(page, `E2E Lịch drawer ${Date.now()}`)
     const title = `Việc mở drawer ${Date.now()}`
-    const taskId = await createTask(page, projectId, { title, dueDate: OLDEST })
+    created.push(await createTask(page, projectId, { title, dueDate: OLDEST }))
     await page.reload()
 
     const schedule = page.getByRole('region', { name: 'Lịch làm việc 7 ngày' })
     await schedule.getByRole('button', { name: title }).click()
     await expect(page.getByRole('dialog', { name: 'Chi tiết công việc' }).locator('input').first()).toHaveValue(title)
     await page.keyboard.press('Escape')
-    // keep the shared dev DB's capped overdue group free for the next run
-    await apiPost(page.request, page, `/api/admin/tasks/${taskId}/move`, { status: 'DONE', sortOrder: 1 })
   })
 
   test('shows collected money for the period, switches period and copies a payment reminder', async ({ page }) => {

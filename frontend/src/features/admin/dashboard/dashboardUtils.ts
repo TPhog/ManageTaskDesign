@@ -29,7 +29,7 @@ export const dashboardLinks = {
 } as const
 
 /** Projects shown before "Hiện thêm". */
-export const DASHBOARD_FLOW_LIMIT = 8
+export const DASHBOARD_FLOW_LIMIT = 5
 
 /**
  * "Việc cần làm": projects with something to do now (an action, or a warning-level chip such as money due),
@@ -110,7 +110,7 @@ export const RISK_LABEL: Record<HealthRisk, string> = {
   DEPOSIT_UNPAID: 'Chưa nhận cọc',
   BALANCE_DUE: 'Còn nợ',
   OPEN_REQUESTS: 'Có yêu cầu mới',
-  TASKS_OVERDUE: 'Task quá hạn',
+  TASKS_OVERDUE: 'Việc quá hạn',
   QUOTA_EXCEEDED: 'Hết lượt sửa',
 }
 

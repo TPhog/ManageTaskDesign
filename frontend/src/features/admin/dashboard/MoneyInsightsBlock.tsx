@@ -10,10 +10,13 @@ import { tableHeadRowClass, tableRowClass } from '@/components/dataTable'
 import type { MoneyInsights, MoneyPeriod, ReceivableItem } from '@/lib/dashboardTypes'
 import { formatDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
-import { agingLabel, AGING_BUCKET_LABEL, deltaLabel, lastDayOf, PERIOD_LABEL, receivableReminder } from './dashboardUtils'
+import { agingLabel, dashboardLinks, AGING_BUCKET_LABEL, deltaLabel, lastDayOf, PERIOD_LABEL, receivableReminder } from './dashboardUtils'
 import { useMoneyInsights } from './useDashboardBlocks'
 
 const PERIODS: MoneyPeriod[] = ['month', 'quarter', 'year']
+/** Visible rows of the receivables ledger and of the per-client totals. */
+const RECEIVABLE_ROWS = 8
+const CLIENT_ROWS = 8
 const REGION = 'Tiền đã thu và công nợ'
 
 async function copyReminder(item: ReceivableItem) {
@@ -120,6 +123,9 @@ export function MoneyInsightsView({ insights, period, onPeriodChange, loading = 
   loading?: boolean
 }) {
   const { collected, accepted, receivables } = insights
+  const receivableCount = receivables.items.length + receivables.hiddenItems
+  const clientsShown = receivables.byClient.slice(0, CLIENT_ROWS)
+  const clientsHidden = receivables.byClient.length - clientsShown.length
   const periods = (
     <div role="group" aria-label="Kỳ báo cáo" className="inline-flex rounded-md bg-muted p-[3px]">
       {PERIODS.map(p => (
@@ -164,7 +170,7 @@ export function MoneyInsightsView({ insights, period, onPeriodChange, loading = 
               <span className="block text-xs font-medium">Phải thu</span>
               <span data-testid="dsh-receivables-total" className={valueClass}><MoneyText amount={receivables.total} /></span>
               <span className="mt-1 block text-xs">
-                {receivables.items.length + receivables.hiddenItems} khoản đang chờ
+                {receivableCount} khoản đang chờ
               </span>
             </div>
             <Stat
@@ -188,13 +194,14 @@ export function MoneyInsightsView({ insights, period, onPeriodChange, loading = 
           <div className="min-w-0 lg:col-span-5 xl:col-span-4">
             <h4 className="kicker mb-2 text-muted-foreground lg:mt-1.5">Tổng theo khách</h4>
             <ul>
-              {receivables.byClient.map(c => (
+              {clientsShown.map(c => (
                 <li key={c.clientId} className="flex justify-between gap-3 border-t border-border py-2 text-sm">
                   <span className="min-w-0 truncate">{c.clientName}</span>
                   <span className="shrink-0 font-semibold tabular-nums"><MoneyText amount={c.outstanding} /></span>
                 </li>
               ))}
             </ul>
+            {clientsHidden > 0 && <p className="border-t border-border py-2 text-xs text-muted-foreground">và {clientsHidden} khách khác</p>}
           </div>
         )}
       </Tile>
@@ -219,13 +226,13 @@ export function MoneyInsightsView({ insights, period, onPeriodChange, loading = 
                   </tr>
                 </thead>
                 <tbody className="block xl:table-row-group">
-                  {receivables.items.map(i => <ReceivableRow key={i.quotationId} item={i} />)}
+                  {receivables.items.slice(0, RECEIVABLE_ROWS).map(i => <ReceivableRow key={i.quotationId} item={i} />)}
                 </tbody>
               </table>
             </div>
-            {receivables.hiddenItems > 0 && (
-              <Link to="/admin/quotations?status=ACCEPTED" className="inline-block text-sm link-inline">
-                và {receivables.hiddenItems} khoản khác
+            {receivableCount > RECEIVABLE_ROWS && (
+              <Link to={dashboardLinks.outstanding} className="inline-block text-sm link-inline">
+                Xem tất cả {receivableCount} khoản
               </Link>
             )}
           </>

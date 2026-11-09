@@ -71,9 +71,9 @@ describe('MoneyInsightsView', () => {
     await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Đã sao chép tin nhắc thanh toán'))
   })
 
-  it('links to the accepted quotations for hidden rows and explains an empty list', () => {
-    const { unmount } = renderView(insights({ hiddenItems: 4 }))
-    expect(screen.getByRole('link', { name: 'và 4 khoản khác' })).toHaveAttribute('href', '/admin/quotations?status=ACCEPTED')
+  it('links to all outstanding quotations when rows are hidden and explains an empty list', () => {
+    const { unmount } = renderView(insights({ hiddenItems: 8 }))
+    expect(screen.getByRole('link', { name: 'Xem tất cả 9 khoản' })).toHaveAttribute('href', '/admin/quotations?status=ACCEPTED')
     unmount()
     renderView(insights({ items: [], byClient: [], total: 0 }))
     expect(screen.getByText('Không có khoản nào đang chờ thu.')).toBeInTheDocument()

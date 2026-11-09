@@ -27,7 +27,7 @@ describe('ProjectHealthView', () => {
     expect(screen.getByRole('progressbar', { name: 'Tiến độ Logo ABC' })).toHaveAttribute('aria-valuenow', '40')
     expect(screen.getByText('2/4 lượt sửa')).toBeInTheDocument()
     expect(screen.getByText('Không có lượt sửa miễn phí')).toBeInTheDocument()
-    expect(screen.getByText('Chưa có task')).toBeInTheDocument()
+    expect(screen.getByText('Chưa có việc')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Logo ABC' })).toHaveAttribute('href', '/admin/projects/p1')
   })
 

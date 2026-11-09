@@ -16,7 +16,7 @@ describe('TodayTile (P16)', () => {
   })
   it('turns a counter vermilion only when it needs attention', () => {
     render(<MemoryRouter><TodayTile summary={summary} wide /></MemoryRouter>)
-    expect(screen.getByRole('link', { name: /Task quá hạn/ })).toHaveAttribute('data-tone', 'hot')
+    expect(screen.getByRole('link', { name: /Việc quá hạn/ })).toHaveAttribute('data-tone', 'hot')
     expect(screen.getByRole('link', { name: /Báo giá hết hạn trong 3 ngày/ })).toHaveAttribute('data-tone', 'default')
   })
 })
