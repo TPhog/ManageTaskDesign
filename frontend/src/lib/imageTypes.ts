@@ -1,7 +1,7 @@
 // Plan 08 — image & storage API (see plan "API Contract"). URLs are API paths usable directly in <img src>.
 import type { ProjectStatus } from './types'
 
-export type ImageOwnerType = 'TASK' | 'PROGRESS_UPDATE' | 'CLIENT_REQUEST' | 'DELIVERABLE'
+export type ImageOwnerType = 'TASK' | 'PROGRESS_UPDATE' | 'CLIENT_REQUEST' | 'DELIVERABLE' | 'INTAKE_SUBMISSION'
 export type StorageLevel = 'OK' | 'NOTICE' | 'WARNING' | 'BLOCKED' | 'CRITICAL'
 
 /** P10: an earlier image in the project with the same content (SHA-256). */

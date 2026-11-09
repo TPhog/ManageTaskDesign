@@ -16,6 +16,8 @@ import NotFoundPage from './features/admin/NotFoundPage'
 import DashboardPage from './features/admin/dashboard/DashboardPage'
 import SettingsPage from './features/admin/settings/SettingsPage'
 import StoragePage from './features/admin/settings/StoragePage'
+import RequestTemplatesPage from './features/admin/request-templates/RequestTemplatesPage'
+import RequestTemplateEditorPage from './features/admin/request-templates/RequestTemplateEditorPage'
 import ServicesPage from './features/admin/services/ServicesPage'
 import ProjectsPage from './features/admin/projects/ProjectsPage'
 import ProjectDetailPage from './features/admin/projects/detail/ProjectDetailPage'
@@ -41,6 +43,9 @@ export const router = createBrowserRouter([
       { path: 'requests/:id', element: <RequestsPage /> },
       { path: 'settings', element: <SettingsPage /> },
       { path: 'settings/storage', element: <StoragePage /> },
+      { path: 'settings/request-templates', element: <RequestTemplatesPage /> },
+      { path: 'settings/request-templates/new', element: <RequestTemplateEditorPage /> },
+      { path: 'settings/request-templates/:id', element: <RequestTemplateEditorPage /> },
       { path: 'services', element: <ServicesPage /> },
       { path: 'projects', element: <ProjectsPage /> },
       { path: 'projects/:id', element: <ProjectDetailPage /> },

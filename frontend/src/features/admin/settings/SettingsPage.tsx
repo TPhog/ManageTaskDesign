@@ -17,6 +17,7 @@ import { DEFAULT_TERMS_TEMPLATE } from './termsTemplate'
 import { WatermarkSection } from './WatermarkSection'
 import { DigestSection } from './DigestSection'
 import { StorageSummarySection } from './StorageSummarySection'
+import { IntakeLinkSection } from './IntakeLinkSection'
 import { PageHeader } from '@/components/PageHeader'
 import { cn } from '@/lib/utils'
 
@@ -347,6 +348,7 @@ export default function SettingsPage() {
       <WatermarkSection />
       <DigestSection />
       <StorageSummarySection />
+      <IntakeLinkSection />
       <form onSubmit={handlePwSubmit(data => changePwMutation.mutate(data))} noValidate>
         <Section title="Đổi mật khẩu" description="Mật khẩu mới tối thiểu 12 ký tự.">
           <Field id="pw-current" label="Mật khẩu hiện tại" error={pwErrors.currentPassword?.message}>

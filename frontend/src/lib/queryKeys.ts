@@ -80,6 +80,12 @@ export const qk = {
 
   watermark: ['settings', 'watermark'] as const,
 
+  requestTemplates: {
+    all:    ['request-templates']                      as const,
+    detail: (id: string) => ['request-templates', id]  as const,
+  },
+  intakeLink: ['settings', 'intake'] as const,
+
   portal: {
     images:   (id: string) => ['portal', 'projects', id, 'images']    as const,
     me:       ['portal', 'me']                                         as const,

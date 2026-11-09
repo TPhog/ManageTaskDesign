@@ -47,6 +47,7 @@ export function ownerLabel(img: Pick<StorageImage, 'ownerType' | 'taskTitle'>): 
     case 'PROGRESS_UPDATE': return 'Cập nhật tiến độ'
     case 'CLIENT_REQUEST': return 'Ảnh khách gửi'
     case 'DELIVERABLE': return 'Bàn giao'
+    case 'INTAKE_SUBMISSION': return 'Ảnh khách mới gửi'
   }
 }
 
