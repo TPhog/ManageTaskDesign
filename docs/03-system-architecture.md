@@ -184,6 +184,7 @@ volumes: { pgdata: {}, files: {}, keys: {}, caddy_data: {} }
 Caddyfile (`deploy/Caddyfile`): `handle /api/public/*` (`log_skip`) và `handle /api/*` → `reverse_proxy api:8080`; `handle /p/*` (magic link) và `handle /f/*` (form khách mới) đều `log_skip` + `Referrer-Policy: no-referrer` rồi trả `index.html` (`/f/*` thêm `X-Robots-Tag: noindex`) vì path chứa token/slug (07-security §4.3, §4.5); còn lại `try_files {path} /index.html` + `file_server`. Header bảo mật toàn site (HSTS, CSP, nosniff, …) đặt ở khối `header` cấp site (07-security §6). Rate limit theo IP thật nhờ tin đúng một hop `X-Forwarded-For` từ Caddy, nên service `api` **không** được publish cổng ra ngoài.
 
 - API chạy migration khi khởi động (`db.Database.MigrateAsync()`) — chấp nhận được với single instance.
+- Ghi chú phát hành (round 2): Data Protection có `SetApplicationName("FreelanceFlow")` và key ring mới trên volume `keys`, nên lần deploy đầu tiên làm mọi cookie designer/portal cũ hết hiệu lực một lần — designer đăng nhập lại, khách mở lại magic link.
 - Seed designer + settings mặc định + danh sách ngân hàng khi DB trống.
 
 ### Backup

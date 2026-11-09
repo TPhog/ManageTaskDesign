@@ -1,6 +1,7 @@
 using System.Net;
 using FreelanceFlow.IntegrationTests.Intake;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace FreelanceFlow.IntegrationTests.Security;
@@ -55,6 +56,43 @@ public class DataProtectionKeysTests(AppFactory factory) : IntakeTestBase(factor
             if (Directory.Exists(expected)) Directory.Delete(expected, recursive: true);
             var wrong = Path.GetFullPath(relative);
             if (Directory.Exists(wrong)) Directory.Delete(wrong, recursive: true);
+        }
+    }
+
+    private WebApplicationFactory<Program> ProductionHost(string keysPath) => Factory.WithWebHostBuilder(b =>
+    {
+        b.UseEnvironment("Production");
+        b.UseSetting("App:PublicBaseUrl", "https://studio.example.com");
+        b.UseSetting("DataProtection:KeysPath", keysPath);
+    });
+
+    [Theory]   // AC-INT10, R2 M1: blank, or a folder that is not there (no keys volume) - never created silently
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Production_refuses_to_start_without_an_existing_keys_folder(bool setButMissing)
+    {
+        var path = setButMissing ? Path.Combine(Path.GetTempPath(), "ff-it-keys-missing", Guid.NewGuid().ToString("N")) : "";
+        await using var host = ProductionHost(path);
+
+        var start = () => host.Services;
+
+        start.Should().Throw<InvalidOperationException>().WithMessage("*DataProtection:KeysPath*");
+        if (setButMissing) Directory.Exists(path).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Production_starts_with_an_existing_writable_keys_folder()
+    {
+        var keys = Path.Combine(Path.GetTempPath(), "ff-it-keys", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(keys);
+        try
+        {
+            await using var host = ProductionHost(keys);
+            host.Services.Should().NotBeNull();
+        }
+        finally
+        {
+            Directory.Delete(keys, recursive: true);
         }
     }
 }

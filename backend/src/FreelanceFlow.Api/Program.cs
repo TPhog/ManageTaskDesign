@@ -71,10 +71,16 @@ builder.Services.AddScoped<ImageUploader>();
 // redeploy keeps them valid (docker-compose mounts the `keys` volume at /data/keys). Tests leave the path empty.
 var dataProtection = builder.Services.AddDataProtection().SetApplicationName("FreelanceFlow");
 var keysPath = builder.Configuration["DataProtection:KeysPath"];
-if (!string.IsNullOrWhiteSpace(keysPath))   // relative = under the content root (like Storage:Local:RootPath), never the cwd
-    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(
-        Path.IsPathRooted(keysPath) ? keysPath : Path.Combine(builder.Environment.ContentRootPath, keysPath)));
-else if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing"))
+var strictKeys = !builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing");
+if (!string.IsNullOrWhiteSpace(keysPath))
+{
+    // relative = under the content root (like Storage:Local:RootPath), never the cwd
+    var keysDir = Path.IsPathRooted(keysPath) ? keysPath : Path.Combine(builder.Environment.ContentRootPath, keysPath);
+    // outside Development the folder must be the mounted volume: refuse to start rather than create a throw-away one
+    if (strictKeys) EnsureKeysFolder(keysDir);
+    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keysDir));
+}
+else if (strictKeys)
     throw new InvalidOperationException("DataProtection:KeysPath must be set outside Development (docker-compose mounts /data/keys).");
 
 // Public intake form (plan 13): signed form token + minimum fill time
@@ -327,5 +333,24 @@ app.MapGet("/health", async (AppDbContext db) =>
 
 app.Run();
 
+static void EnsureKeysFolder(string dir)
+{
+    if (!Directory.Exists(dir))
+        throw new InvalidOperationException(
+            $"DataProtection:KeysPath '{dir}' does not exist. Mount the keys volume (docker-compose: keys:/data/keys) or fix the path.");
+    var probe = Path.Combine(dir, ".write-probe-" + Guid.NewGuid().ToString("N"));
+    try
+    {
+        File.WriteAllBytes(probe, [0]);
+        File.Delete(probe);
+    }
+    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+    {
+        throw new InvalidOperationException(
+            $"DataProtection:KeysPath '{dir}' is not writable by the app user. Fix the volume ownership (e.g. chown -R 1001:1001).", ex);
+    }
+}
+
 // Make Program class accessible for integration tests
 public partial class Program { }
+
