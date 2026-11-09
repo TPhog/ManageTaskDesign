@@ -25,6 +25,9 @@ public sealed record StorageImageDto(
 
 public sealed record StorageImagePageDto(IReadOnlyList<StorageImageDto> Items, int Page, int PageSize, int Total, long TotalBytes);
 
+/// <summary>GET /api/admin/storage/intake: photos of intake submissions not converted into a project yet.</summary>
+public sealed record StorageIntakeDto(int SubmissionCount, int ImageCount, long TotalBytes);
+
 /// <summary>P10 Settings › Dung lượng › Theo dự án. CompletedAt only for COMPLETED projects.</summary>
 public sealed record StorageProjectDto(
     Guid ProjectId, string ProjectName, string ClientName, string ProjectStatus, DateTimeOffset? CompletedAt,

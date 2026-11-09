@@ -7,13 +7,15 @@ import { EmptyState } from '@/components/EmptyState'
 import { StatusBadge } from '@/components/StatusBadge'
 import { formatBytes } from '@/lib/images'
 import { completedLabel, projectUsageLine } from './storage'
-import { useStorageProjects } from './useStorage'
+import { useStorageIntake, useStorageProjects } from './useStorage'
 
 const SHOWN_PROJECTS = 10
 
 /** P10: usage per project, largest first; "Xem ảnh" filters the image list below. */
 export function StorageProjectsSection({ onSelect }: { onSelect: (projectId: string) => void }) {
   const { data, isLoading, isError } = useStorageProjects()
+  const intake = useStorageIntake().data
+  const hasIntake = !!intake && intake.imageCount > 0
   const [showAll, setShowAll] = useState(false)
   const shown = showAll ? data : data?.slice(0, SHOWN_PROJECTS)
   return (
@@ -23,10 +25,24 @@ export function StorageProjectsSection({ onSelect }: { onSelect: (projectId: str
         <div className="space-y-2 p-5"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div>
       ) : isError ? (
         <p className="p-5 text-sm text-muted-foreground">Không tải được dung lượng theo dự án.</p>
-      ) : !data || data.length === 0 ? (
+      ) : (!data || data.length === 0) && !hasIntake ? (
         <EmptyState icon={ImageOff} title="Chưa có ảnh nào" description="Ảnh công việc, tiến độ và ảnh khách gửi sẽ hiện ở đây." />
       ) : (
         <ul className="divide-y">
+          {hasIntake && (
+            <li className="flex flex-wrap items-center gap-3 px-5 py-3 transition-colors duration-150 hover:bg-surface-sunk">
+              <div className="min-w-0 flex-1 space-y-0.5">
+                <p className="truncate text-sm font-medium text-foreground">Khách mới (chưa chuyển)</p>
+                <p className="text-xs text-muted-foreground">
+                  {`${intake.submissionCount} hồ sơ · ${intake.imageCount} ảnh — chuyển thành dự án hoặc xoá hồ sơ để giải phóng`}
+                </p>
+              </div>
+              <p className="text-sm font-medium tabular-nums text-foreground">{formatBytes(intake.totalBytes)}</p>
+              <Button asChild variant="outline" size="sm" className="min-h-11">
+                <Link to="/admin/intake">Mở Khách mới</Link>
+              </Button>
+            </li>
+          )}
           {(shown ?? []).map(p => (
             <li key={p.projectId} className="flex flex-wrap items-center gap-3 px-5 py-3 transition-colors duration-150 hover:bg-surface-sunk">
               <div className="min-w-0 flex-1 space-y-0.5">

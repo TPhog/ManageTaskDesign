@@ -335,6 +335,7 @@ Tất cả dưới `/api/admin/*`, cookie `Designer`; POST/PUT/PATCH/DELETE cầ
 | GET | `/api/admin/storage/usage` | Dung lượng đã dùng / hạn mức |
 | GET | `/api/admin/storage/images` | Liệt kê ảnh theo dung lượng để dọn; item có `originalDeletedAt` |
 | GET | `/api/admin/storage/projects` | Dung lượng theo dự án (sắp `totalBytes` giảm dần): `projectId, projectName, clientName, projectStatus, completedAt, imageCount, totalBytes, originalBytes, originalsDeleted` |
+| GET | `/api/admin/storage/intake` | Ảnh của hồ sơ khách mới chưa chuyển thành dự án (vẫn tính vào quota): `{ submissionCount, imageCount, totalBytes }`; trang Dung lượng hiện thành nhóm "Khách mới (chưa chuyển)" → `/admin/intake` |
 | GET | `/api/admin/storage/original-cleanup?olderThanMonths=` | Xem trước xóa bản gốc (BR-89): `olderThanMonths, cutoff, projectCount, imageCount, freedBytes, digest, projects[]`; N 1–120 |
 | POST | `/api/admin/storage/original-cleanup` | `{ olderThanMonths, expectedImageCount, expectedFreedBytes, expectedDigest }` → `{ projectCount, imageCount, freedBytes }`; `409 CONCURRENCY_CONFLICT` nếu số ảnh/MB/digest khác bản xem trước hoặc có dòng không còn đủ điều kiện |
 | GET/PUT | `/api/admin/settings/digest` | Nhắc việc hằng ngày (BR-94): GET trả `{ enabled, hourVn, channelConfigured }`; PUT nhận `{ enabled, hourVn }`, `hourVn` ngoài 0..23 → `400` (`errors.hourVn`); `channelConfigured` chỉ cho biết đã có Discord webhook hay chưa, không trả URL; ghi activity `settings.digest_updated`; policy `DesignerOnly` |

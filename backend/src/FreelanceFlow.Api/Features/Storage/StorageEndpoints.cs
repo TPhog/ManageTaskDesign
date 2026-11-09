@@ -19,6 +19,7 @@ public static class StorageEndpoints
         admin.MapGet("usage", async (StorageAlertService storage, CancellationToken ct) => Results.Ok(await storage.UsageAsync(ct)));
         admin.MapGet("images", ListImages);
         admin.MapGet("projects", ListProjects);
+        admin.MapGet("intake", IntakeUsage);
         admin.MapGet("original-cleanup", PreviewOriginalCleanup);
         admin.MapPost("original-cleanup", RunOriginalCleanup);
     }
@@ -111,6 +112,20 @@ public static class StorageEndpoints
             .OrderByDescending(x => x.TotalBytes).ThenBy(x => x.ProjectName, StringComparer.Ordinal)
             .ToList();
         return Results.Ok(items);
+    }
+
+    /// <summary>
+    /// R2 M7: photos of intake submissions not converted yet (no project) still count toward the quota (UsedBytesAsync);
+    /// the per-project list cannot show them, so the page shows them as one "Khách mới (chưa chuyển)" group.
+    /// </summary>
+    private static async Task<IResult> IntakeUsage(AppDbContext db, CancellationToken ct)
+    {
+        var files = db.Files.AsNoTracking()
+            .Where(f => f.DeletedAt == null && f.OwnerType == ImageOwnerTypes.IntakeSubmission && f.ProjectId == null);
+        return Results.Ok(new StorageIntakeDto(
+            await files.Select(f => f.OwnerId).Distinct().CountAsync(ct),
+            await files.CountAsync(ct),
+            await files.SumAsync(f => f.SizeBytes, ct)));
     }
 
     private static async Task<IResult> PreviewOriginalCleanup(

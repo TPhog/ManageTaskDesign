@@ -2,7 +2,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { api } from '@/lib/api'
 import { qk } from '@/lib/queryKeys'
 import type {
-  BulkDeleteResult, OriginalCleanupPreview, OriginalCleanupResult, StorageImagePage, StorageImageParams, StorageProject, StorageUsage,
+  BulkDeleteResult, OriginalCleanupPreview, OriginalCleanupResult, StorageImagePage, StorageImageParams, StorageIntake, StorageProject,
+  StorageUsage,
   WatermarkSettings,
 } from '@/lib/imageTypes'
 import { toStorageQuery } from './storage'
@@ -31,6 +32,11 @@ export function useStorageImages(params: StorageImageParams) {
 
 export function useStorageProjects() {
   return useQuery({ queryKey: qk.storage.projects, queryFn: () => api.get<StorageProject[]>('/admin/storage/projects') })
+}
+
+/** Unconverted intake photos: no project yet, freed only from the "Khách mới" inbox. */
+export function useStorageIntake() {
+  return useQuery({ queryKey: qk.storage.intake, queryFn: () => api.get<StorageIntake>('/admin/storage/intake') })
 }
 
 export function useOriginalCleanupPreview(months: number) {

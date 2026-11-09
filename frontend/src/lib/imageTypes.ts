@@ -123,6 +123,13 @@ export interface LightboxImage {
   caption?: string
 }
 
+/** R2 — photos of intake submissions not converted into a project yet (they count toward the quota). */
+export interface StorageIntake {
+  submissionCount: number
+  imageCount: number
+  totalBytes: number
+}
+
 /** P10 — Settings › Dung lượng › Theo dự án. completedAt only for COMPLETED projects. */
 export interface StorageProject {
   projectId: string
