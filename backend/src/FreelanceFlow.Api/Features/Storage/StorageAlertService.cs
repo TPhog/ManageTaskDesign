@@ -34,6 +34,10 @@ public sealed class StorageAlertService(
                 "Dung lượng lưu trữ đã đạt 90% — xoá bớt ảnh trong Cài đặt › Dung lượng để tải ảnh mới");
     }
 
+    /// <summary>Plan 13: the public intake form takes photos only below 80 % (text is always accepted).</summary>
+    public async Task<bool> IntakePhotosBlockedAsync(CancellationToken ct = default) =>
+        StorageThresholds.IntakePhotosBlocked(await UsedBytesAsync(ct), Quota);
+
     /// <summary>
     /// Runs after a commit that changed usage (and daily). Own transaction: storage_alerts + activity storage.threshold;
     /// notifications are queued only once that commit succeeded.

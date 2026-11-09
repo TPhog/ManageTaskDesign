@@ -44,6 +44,10 @@ public static class PublicIntakeEndpoints
         new { code = "RATE_LIMITED", detail = "Hôm nay studio đã nhận nhiều yêu cầu — vui lòng liên hệ trực tiếp hoặc gửi lại vào ngày mai" },
         statusCode: StatusCodes.Status429TooManyRequests);
 
+    private static IResult PhotosRefused() => Results.Json(
+        new { code = "STORAGE_FULL", detail = "Hiện studio chưa nhận ảnh đính kèm — vui lòng gửi yêu cầu không kèm ảnh" },
+        statusCode: StatusCodes.Status507InsufficientStorage);
+
     private static IResult FormExpired() =>
         Results.BadRequest(new { code = "FORM_EXPIRED", detail = "Biểu mẫu đã hết hạn — vui lòng tải lại trang rồi gửi lại" });
 
@@ -58,7 +62,8 @@ public static class PublicIntakeEndpoints
                 .FirstOrDefaultAsync(ct);
 
     private static async Task<IResult> GetForm(
-        string slug, HttpContext http, AppDbContext db, IntakeFormToken tokens, IOptions<AppSettings> app, CancellationToken ct)
+        string slug, HttpContext http, AppDbContext db, IntakeFormToken tokens, StorageAlertService storageAlerts,
+        IOptions<AppSettings> app, CancellationToken ct)
     {
         var studio = await FindFormAsync(db, slug, ct);
         if (studio is null) return Results.NotFound();
@@ -68,7 +73,8 @@ public static class PublicIntakeEndpoints
         return Results.Ok(new PublicIntakeFormDto(
             new PublicStudioDto(name, studio.ContactPhone, studio.ContactEmail),
             await RequestTemplateDtos.ListPublicAsync(db, ct),
-            IntakeSubmission.MaxImages, app.Value.MaxUploadMb, tokens.Issue(slug)));
+            await storageAlerts.IntakePhotosBlockedAsync(ct) ? 0 : IntakeSubmission.MaxImages,   // 0 = text only for now
+            app.Value.MaxUploadMb, tokens.Issue(slug)));
     }
 
     private static async Task<IResult> Submit(
@@ -89,10 +95,12 @@ public static class PublicIntakeEndpoints
             return Results.Json(
                 new { code = "RATE_LIMITED", detail = "Bạn đã gửi nhiều yêu cầu hôm nay — vui lòng liên hệ trực tiếp với studio hoặc gửi lại vào ngày mai" },
                 statusCode: StatusCodes.Status429TooManyRequests);
-        var blocked = await ImageForms.EnsureUploadsAllowedAsync(storageAlerts, http, imagesOptional: true, ct);
-        if (blocked is not null) return blocked;
+        // photos stop at 80 % for anonymous senders (the designer's own block stays at 90 %); text is always accepted
+        var mayCarryPhotos = http.HasFormContentType && http.ContentLength is not (<= ImageForms.TextOnlyBodyBytes);
+        if (mayCarryPhotos && await storageAlerts.IntakePhotosBlockedAsync(ct)) return PhotosRefused();
         var (form, readError) = await ImageForms.ReadAsync(http, MaxBodyBytes, ct);
         if (readError is not null) return readError;
+        if (form!.Files.Count > 0 && await storageAlerts.IntakePhotosBlockedAsync(ct)) return PhotosRefused();
 
         // BR-138: bots get the same empty 204 as people, and nothing is stored
         if (form!["website"].ToString().Length > 0)

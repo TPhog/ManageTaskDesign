@@ -23,6 +23,12 @@ public static class StorageThresholds
     public static bool UploadsBlocked(long usedBytes, long quotaBytes) =>
         BasisPoints(usedBytes, quotaBytes) >= BlockUploadsAt * 100;
 
+    /// <summary>Plan 13: photos sent by anonymous new clients stop earlier, so they can never eat the designer's room.</summary>
+    public const int BlockIntakePhotosAt = 80;
+
+    public static bool IntakePhotosBlocked(long usedBytes, long quotaBytes) =>
+        BasisPoints(usedBytes, quotaBytes) >= BlockIntakePhotosAt * 100;
+
     public static string Level(long usedBytes, long quotaBytes) => BasisPoints(usedBytes, quotaBytes) switch
     {
         >= 9_500 => "CRITICAL",

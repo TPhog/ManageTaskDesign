@@ -176,6 +176,40 @@ public class PublicIntakeAbuseTests(AppFactory factory) : IntakeTestBase(factory
     }
 
     [Fact]
+    public async Task From_80_percent_storage_the_form_takes_text_only()   // review P13-BE #5: anonymous photos stop before the designer's 90 %
+    {
+        var slug = await EnableIntakeAsync();
+        await using var host = Factory.WithWebHostBuilder(b => b.ConfigureTestServices(s =>
+            s.PostConfigure<StorageOptions>(o => o.QuotaBytes = 1000)));
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var used = await scope.ServiceProvider.GetRequiredService<FreelanceFlow.Api.Features.Storage.StorageAlertService>().UsedBytesAsync();
+            var filler = FreelanceFlow.Api.Domain.Intake.IntakeSubmission.Create("Filler", "0909000000", null, null, null, [], "filler");
+            db.IntakeSubmissions.Add(filler);
+            var third = (850 - used) / 3;   // → about 85 %: above the intake limit, below the designer's 90 %
+            db.Files.Add(ProjectFile.CreateImage(null, ImageOwnerTypes.IntakeSubmission, filler.Id, null, "CLIENT", false, "f.webp",
+                1, 1, third, third, third, [1], DateTimeOffset.UtcNow));
+            await db.SaveChangesAsync();
+        }
+        var anon = Anonymous(host);
+        var form = await GetFormAsync(anon, slug);
+        form.GetProperty("maxImages").GetInt32().Should().Be(0, "the form hides the photo picker");
+        var token = form.GetProperty("formToken").GetString()!;
+
+        foreach (var declareLarge in new[] { true, false })
+        {
+            var withPhoto = IntakeForm(token, note: "có ảnh", images: 1);
+            if (declareLarge) withPhoto.Headers.ContentLength = 1_000_000;
+            var refused = await anon.PostAsync($"/api/public/intake/{slug}", withPhoto);
+            refused.StatusCode.Should().Be(HttpStatusCode.InsufficientStorage);
+            (await refused.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString().Should().Be("STORAGE_FULL");
+        }
+
+        (await anon.PostAsync($"/api/public/intake/{slug}", IntakeForm(token, note: "chỉ chữ"))).StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
     public async Task Oversized_body_is_413()
     {
         var slug = await EnableIntakeAsync();

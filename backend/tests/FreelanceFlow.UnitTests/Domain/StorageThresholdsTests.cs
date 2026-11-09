@@ -50,6 +50,16 @@ public class StorageThresholdsTests
         StorageThresholds.UploadsBlocked(used, Quota).Should().Be(blocked);
     }
 
+    [Theory]
+    [InlineData(7_999, false)]
+    [InlineData(8_000, true)]
+    [InlineData(8_999, true)]   // the designer can still upload here
+    public void Anonymous_intake_photos_stop_at_80_percent(long used, bool blocked)   // plan 13 review #5
+    {
+        StorageThresholds.IntakePhotosBlocked(used, Quota).Should().Be(blocked);
+        StorageThresholds.IntakePhotosBlocked(0, 0).Should().BeTrue();
+    }
+
     [Fact]
     public void Percent_has_one_decimal_and_a_zero_quota_counts_as_full()
     {
