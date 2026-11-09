@@ -77,13 +77,14 @@ URL        = {PublicBaseUrl}/p/{token}
   files `visible_to_client OR uploaded_by = 'CLIENT'` và `deleted_at IS NULL`; activity `visible_to_client`.
 - DTO Portal là **class riêng** (không tái dùng DTO admin) để không vô tình lộ `internalNotes`, `notes`, `status_reason` khi không public.
 - Test integration bắt buộc cho **mọi** endpoint Portal: khách B gọi với id tài nguyên của khách A → 404 (09-test-plan §4).
+- **Lệnh ghi của khách (Plan 12):** `POST /api/portal/quotations/{id}/accept` và `.../payment-notice`, `POST /api/portal/deliverables/{id}/approve` đều cần CSRF (§3), scope theo `PortalPrincipal.ClientId` (ngoài phạm vi → `404`), idempotent, và **chỉ ghi các cột `client_*` / `client_decision`** - không đổi `status`, `payment_status` hay tiền (BR-01, BR-76/77). Ghi chú của khách ≤ 500 ký tự được lưu nhưng **không** đi vào log hay `activity_logs.data` (chỉ `hasNote`); Discord cắt còn 200 ký tự. Trigger `fn_quotation_locked` là fail-closed: chỉ whitelist đúng 4 cột `client_*` mới (04 §2), mọi cột nội dung khác vẫn bị khóa.
 
 ## 5. Upload file
 
 | Kiểm tra | Giá trị |
 |---|---|
 | Kích thước | ≤ 20 MB/file (Kestrel `MaxRequestBodySize` 220 MB cho 10 file); proxy cùng giới hạn |
-| Số file | ≤ 10/request (portal), ≤ 20 (admin) |
+| Số file | ≤ 5/request (portal, Plan 12), ≤ 3 ảnh (form khách mới, §4.5), ≤ 20 (admin) |
 | Định dạng cho khách upload | `jpg, jpeg, png, webp, gif, pdf` |
 | Định dạng cho designer upload | trên + `zip, ai, psd, fig, eps, svg, mp4` |
 | Kiểm tra | Phần mở rộng **và** magic bytes khớp; MIME từ server, không tin header client |

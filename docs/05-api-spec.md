@@ -61,7 +61,7 @@ Các resource có `rowVersion` (xmin, kiểu `uint`) trong response. Lệnh upda
 | Method | Path | Ghi chú |
 |---|---|---|
 | GET | `/api/admin/settings` | |
-| PUT | `/api/admin/settings` | `{ displayName, contactEmail, contactPhone, logoFileId, bankBin, bankAccountNo, bankAccountName, quotationPrefix, defaultValidityDays, defaultDepositPercent, defaultTerms }` |
+| PUT | `/api/admin/settings` | `{ displayName, contactEmail, contactPhone, logoFileId, bankBin, bankAccountNo, bankAccountName, quotationPrefix, defaultValidityDays, defaultDepositPercent, defaultTerms, portalResponseTime }`; `portalResponseTime` ≤ 60 ký tự, trống → "trong 24 giờ", quá dài → `400` (`errors.portalResponseTime`). GET trả thêm `portalResponseTime` |
 | GET | `/api/admin/banks` | Danh sách ngân hàng active |
 
 ### 3.2 Services
@@ -178,7 +178,7 @@ Endpoint hỗ trợ UI xem trước gợi ý trước khi lưu:
 | Method | Path | Ghi chú |
 |---|---|---|
 | GET | `/api/admin/quotations?projectId=&status=&effectiveStatus=&page=` | Item có `effectiveStatus`, `outstanding` |
-| GET | `/api/admin/quotations/{id}` | DRAFT: dữ liệu bảng; khác DRAFT: `snapshot` + trạng thái + `qrOptions`; kèm `newDeliverables: [{ revisionItemId, quotationItemId, lineDescription, serviceId, serviceName, createdDeliverableId, createdDeliverableName }]` |
+| GET | `/api/admin/quotations/{id}` | DRAFT: dữ liệu bảng; khác DRAFT: `snapshot` + trạng thái + `qrOptions` + `clientAcceptedAt` + `clientPaymentNotice` (P12, BR-76/77); kèm `newDeliverables: [{ revisionItemId, quotationItemId, lineDescription, serviceId, serviceName, createdDeliverableId, createdDeliverableName }]` |
 | POST | `/api/admin/projects/{id}/quotations` | INITIAL: `{ kind:"INITIAL", title, fromDeliverables: true, deliverableIds?, deliverablePrices?: [{ deliverableId, unitPrice }] }` → item theo deliverable (`quantity × (giá nhập → service.base_price → 0)`); `400 errors.deliverablePrices` (âm / > 100 tỷ / deliverable ngoài tập / `fromDeliverables=false`) |
 | POST | `/api/admin/projects/{id}/quotations/from-revisions/preview` | `{ revisionItemIds }` → `{ lines: [{ kind: ROUND/NEW_DELIVERABLE/SCOPE_CHANGE, revisionItemIds, description, details, suggestedUnitPrice }] }`; không ghi DB |
 | POST | `/api/admin/projects/{id}/quotations/from-revisions` | ADDITIONAL: `{ title, revisionItemIds, newDeliverableServices?: [{ revisionItemId, serviceId?, unitPrice? }], linePrices?: [{ revisionItemId, unitPrice }] }` (BR-46); `400 errors.newDeliverableServices` / `errors.linePrices` (giá âm / > 100 tỷ, `linePrices` cho NEW_DELIVERABLE hoặc item ngoài danh sách, 2 giá khác nhau cho 1 vòng, service không tồn tại) |
@@ -311,7 +311,7 @@ Tất cả dưới `/api/admin/*`, cookie `Designer`; POST/PUT/PATCH/DELETE cầ
 | Method | Path | Ghi chú |
 |---|---|---|
 | GET | `/api/admin/search?q=` | Tìm nhanh header: `{ clients, projects, quotations }`, tối đa 5/nhóm; q 2–100 ký tự, không phân biệt hoa/thường/dấu; SĐT bỏ qua khoảng trắng, `.`, `-` |
-| GET | `/api/admin/projects/{id}/flow` | Các bước luồng dự án (ProjectFlow) và bước hiện tại |
+| GET | `/api/admin/projects/{id}/flow` | Các bước luồng dự án (ProjectFlow) và bước hiện tại. Action kinds P12: `CONFIRM_CLIENT_ACCEPTANCE` (báo giá `SENT` đã có `client_accepted_at`; khi đó không còn `RECORD_ACCEPTANCE`), `CONFIRM_CLIENT_PAYMENT` (có `clientPaymentNotice.pending`); hai kind này đứng đầu danh sách. Warning P12: `REVIEW_WITH_OPEN_REVISIONS`. `CONFIRM_APPROVAL` chỉ khi `reviewState = CLIENT_APPROVED` (BR-97) |
 | GET | `/api/admin/flow/actions` | Danh sách việc cần làm tiếp theo trên mọi dự án |
 | GET | `/api/admin/projects/{id}/start-preview` | Cảnh báo trước khi bắt đầu (vd chưa có báo giá gốc được chấp nhận) |
 | POST | `/api/admin/projects/{id}/start` | DRAFT/QUOTED → IN_PROGRESS; cảnh báo không chặn |
@@ -340,23 +340,25 @@ Mọi endpoint lấy `clientId` **từ session**, không nhận `clientId` từ 
 |---|---|---|
 | POST | `/api/portal/session` | `{ token }` → `204` + cookie `ff_portal`; token sai/portal tắt → `401` (thông báo chung). Rate limit 10/phút/IP |
 | POST | `/api/portal/logout` | |
-| GET | `/api/portal/me` | `{ clientName, designer: { displayName, logoUrl, contactPhone, contactEmail } }` |
-| GET | `/api/portal/projects` | `[{ id, name, designType, status, dueDate, deliverableSummary: { total, delivered }, hasOpenQuotation }]` |
-| GET | `/api/portal/projects/{id}` | Project công khai: status (+ lý do nếu public), dates, deliverables (`status`, `includedRounds`, `usedRounds`, `remainingRounds`), brief CONFIRMED mới nhất |
+| GET | `/api/portal/me` | `{ clientName, designer: { displayName, logoUrl, contactPhone, contactEmail, responseTime, intakeUrl } }` — `responseTime` từ `settings.portal_response_time`; `intakeUrl` là link form khách mới khi đang bật, ngược lại `null` (BR-133) |
+| GET | `/api/portal/projects` | `[{ id, name, designType, status, dueDate, deliverableSummary: { total, delivered, approved, inReview, awaitingClient }, hasOpenQuotation, openQuotationId }]` — `awaitingClient` = sản phẩm `AWAITING_CLIENT` (BR-97) |
+| GET | `/api/portal/projects/{id}` | Project công khai: status (+ lý do nếu public), dates, deliverables (`status`, `includedRounds`, `usedRounds`, `remainingRounds`, `progressPercent`, `clientDecision`, `reviewState` ∈ `NONE`/`AWAITING_CLIENT`/`CLIENT_APPROVED`/`CHANGES_IN_PROGRESS`, `hasOpenChangeRequest`), brief CONFIRMED mới nhất |
 | GET | `/api/portal/projects/{id}/revisions` | Rounds + items: `description, type, billing, workStatus` (không `internalNotes`) |
 | GET | `/api/portal/projects/{id}/files` | Chỉ `visible_to_client = true`, không xóa |
 | GET | `/api/portal/files/{id}/content` | Kiểm tra thuộc khách + visible (hoặc khách tự upload) |
 | GET | `/api/portal/projects/{id}/timeline?page=` | Activity `visible_to_client = true`: `{ occurredAt, message }` |
 | GET | `/api/portal/quotations?projectId=` | Status ≠ DRAFT, ≠ SUPERSEDED |
-| GET | `/api/portal/quotations/{id}` | `snapshot` + `effectiveStatus` + `paymentStatus` + `qrOptions` + `versions: [{version, status}]` |
+| GET | `/api/portal/quotations/{id}` | `snapshot` + `effectiveStatus` + `paymentStatus` + `qrOptions` + `versions: [{version, status}]` + `clientAcceptedAt` + `clientPaymentNotice: { purpose, amount, at, note, pending }` hoặc `null` (list item cũng có hai trường này) |
 | GET | `/api/portal/quotations/{id}/versions/{version}` | Xem bản SUPERSEDED (lịch sử) |
 | GET | `/api/portal/quotations/{id}/qr/{purpose}.png` | Tải ảnh QR |
+| POST | `/api/portal/quotations/{id}/accept` | **"Đồng ý báo giá"** (BR-76). Không body. `200` = chi tiết báo giá (như GET) với `clientAcceptedAt` đã có; idempotent. `409 INVALID_TRANSITION` (không còn `SENT`), `409 QUOTATION_EXPIRED`, `409 CONCURRENCY_CONFLICT`; ngoài phạm vi khách → `404`. Ghi `quotation.client_accepted`, Discord sau commit; **không** đổi `status` |
+| POST | `/api/portal/quotations/{id}/payment-notice` | **"Tôi đã chuyển khoản"** (BR-77). `{ purpose: "deposit" / "full" / "remaining", note?: string(≤500) }` → `200` chi tiết báo giá với `clientPaymentNotice`; idempotent cho đúng khoản đang chờ. `400` (`errors.purpose` / `errors.note`), `409 PAYMENT_NOT_APPLICABLE`, `409 CONCURRENCY_CONFLICT`, `404` ngoài phạm vi. Ghi `quotation.client_payment_notice`; **không** đổi `payment_status` |
 | GET | `/api/portal/studio` | **Public** (`AllowAnonymous`, không cần session): `{ displayName, contactPhone, contactEmail }` — cho trang hết hạn/link lỗi. Rate limit 60/phút/IP (`RateLimit:PortalStudioPerMinute`) |
 | GET | `/api/portal/projects/{id}/images` | Ảnh dự án được chia sẻ cho khách (scope theo `clientId`) |
 | GET | `/api/portal/images/{id}/{variant}` | Stream ảnh `preview`/`thumb`; ảnh khách gửi lưu một bản nên `preview` là chính ảnh khách gửi; ngoài scope → 404. `Cache-Control: private, max-age=600` (ẩn/xóa/đăng xuất phải có hiệu lực sớm trên máy dùng chung); ETag là validator duy nhất |
-| POST | `/api/portal/deliverables/{id}/approve` | Khách duyệt hạng mục đang chờ duyệt; ngoài scope → 404 |
+| POST | `/api/portal/deliverables/{id}/approve` | Khách duyệt hạng mục `AWAITING_CLIENT`; ngoài scope → `404`; đang có việc sửa mở → `409 CHANGE_REQUEST_OPEN` (BR-97); đã duyệt → `200` idempotent; không còn chờ duyệt → `409 INVALID_TRANSITION` |
 | GET | `/api/portal/requests?projectId=` | `[{ id, createdAt, content, status, declineReason, attachments }]` |
-| POST | `/api/portal/projects/{id}/requests` | multipart `content`, `deliverableId?`, `files[]` (≤ 10, ≤ 20MB/file) — BR-53/54 |
+| POST | `/api/portal/projects/{id}/requests` | multipart `content`, `deliverableId?`, `files[]` (≤ 5, ≤ 20MB/file) — BR-53/54 |
 
 Portal **không** có endpoint nào trả: tasks, internal_notes, services, settings ngân hàng ngoài snapshot,
 dữ liệu khách khác.

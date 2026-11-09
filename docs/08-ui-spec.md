@@ -89,10 +89,30 @@ Header: logo + tên designer, nút liên hệ (gọi/email). Bottom nav (mobile)
 
 ### 3.3 Nguyên tắc nội dung Portal
 
-- Không dùng thuật ngữ nội bộ: hiển thị "Lần sửa" thay "Round", "Hạng mục" thay "Deliverable",
-  "Miễn phí / Trong số lần sửa / Tính phí" thay FREE_FIX/IN_QUOTA/CHARGEABLE.
+- Không dùng thuật ngữ nội bộ (bảng thuật ngữ Portal ở §3.4; "designer", "deliverable", "round", "brief" không xuất hiện).
 - Mọi số tiền là từ snapshot báo giá.
-- Không có nút Accept/Reject (ADR-004).
+- Khách **không** có nút Từ chối. "Đồng ý báo giá" và "Tôi đã chuyển khoản" chỉ ghi nhận lời khách, nhà thiết kế xác nhận (ADR-012, thay một phần ADR-004).
+
+### 3.4 Portal vòng 2 (Plan 12)
+
+- **Trang chủ** (`/portal`): lời chào theo tên khách, khối "Việc bạn cần làm" (liên kết lớn theo thứ tự: "Xem và đồng ý báo giá …", "Chuyển tiền cọc … (số báo giá)" / "Chuyển phần còn lại …", "Duyệt N sản phẩm của …"), rồi danh sách dự án; dự án có sản phẩm chờ duyệt lên đầu. Tải lỗi hiện "Không tải được …" + nút Thử lại (không giả làm "không có việc gì"). Khi studio bật form khách mới (BR-133), dưới danh sách có "Đặt thiết kế mới" (`designer.intakeUrl`).
+- **Sản phẩm**: một badge duy nhất theo `reviewState` (BR-97): "Chờ bạn duyệt" / "Bạn đã duyệt — chờ xác nhận" / "Đang sửa theo yêu cầu của bạn"; đang sửa thì ẩn nút Duyệt và Yêu cầu sửa. Ảnh cần duyệt nằm ngay trong thẻ sản phẩm; bấm ảnh mở lightbox toàn màn hình (100dvh, nút đóng và điều khiển ≥ 44 px, zoom bằng pinch / chạm đúp một lần, vuốt đổi ảnh).
+- **Báo giá**: nút "Đồng ý báo giá" (hộp xác nhận, nút ≥ 44 px) → dòng "Bạn đã đồng ý lúc … — đang chờ nhà thiết kế xác nhận"; khối thanh toán ở docs/06 §6.1 với "Tôi đã chuyển khoản" (hộp có ghi chú tuỳ chọn) → "Bạn đã báo chuyển …".
+- **Yêu cầu mới / Yêu cầu sửa**: cùng một form (`PortalRequestForm`): nội dung, ảnh minh hoạ (≤ 5), gửi xong hiện tóm tắt "Đã gửi yêu cầu" + "Nhà thiết kế thường phản hồi {responseTime}" + câu về lượt miễn phí còn lại ("Nếu yêu cầu này dùng lượt miễn phí, bạn còn N lượt chỉnh sửa miễn phí" hoặc "Nhà thiết kế sẽ báo giá trước khi sửa …"). Trang "Gửi yêu cầu mới" có thêm bộ chọn mẫu (BR-130..132). Ô "Dự án" chỉ hiện khi khách có hơn một dự án đang mở.
+- **Không có nút nổi** che nội dung; "Thoát" có hộp xác nhận. Ở 390 px không cuộn ngang, mọi nút bấm chính ≥ 44 px.
+
+| Thuật ngữ nội bộ | Khách thấy |
+|---|---|
+| Deliverable / hạng mục | **Sản phẩm** |
+| Revision round / lần sửa | **Lượt chỉnh sửa** ("Còn 2 lượt chỉnh sửa miễn phí") |
+| FREE_FIX / IN_QUOTA / CHARGEABLE | "Miễn phí (lỗi của nhà thiết kế)" / "Dùng lượt miễn phí" / "Tính phí" |
+| Timeline / tiến trình | **Hoạt động gần đây** |
+| IN_REVIEW (chưa duyệt) | "Chờ bạn duyệt" |
+| Quotation `SENT` / `ACCEPTED` / `REJECTED` / `SUPERSEDED` | "Chờ bạn đồng ý" / "Đã chốt" / "Không tiếp tục" / "Phiên bản cũ" |
+| Request `NEW` / `TRIAGED` / `DECLINED` | "Đã gửi — chờ nhà thiết kế xem" / "Nhà thiết kế đã nhận, đang xử lý" / "Nhà thiết kế không nhận yêu cầu này" |
+| Tải ảnh QR | **Lưu ảnh QR** |
+| Gửi yêu cầu chỉnh sửa | **Gửi yêu cầu mới** |
+| Hạng mục (tuỳ chọn) trong form | "Sản phẩm cần sửa (tuỳ chọn)" |
 
 ## 4. Trạng thái rỗng / lỗi / loading
 

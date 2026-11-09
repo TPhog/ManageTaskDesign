@@ -115,6 +115,16 @@ Ràng buộc (validate trước khi build):
   nội dung CK (nút copy) — cho trường hợp khách không quét được.
 - Hiển thị logo VietQR/NAPAS là **tùy chọn**; nếu dùng phải tuân thủ guideline thương hiệu của NAPAS.
 
+### 6.1 Portal (Plan 12)
+
+Payload và nội dung CK ở §2–§4 **không đổi**. Màn báo giá trên Portal thêm:
+
+- Khối "Bây giờ cần chuyển" nêu khoản đang cần trả (cọc / còn lại / toàn bộ theo BR-75); khi chọn được giữa cọc và toàn bộ thì là nhóm radio (một điểm Tab, phím mũi tên đổi lựa chọn). Báo giá đã hết hạn **không** hiện số tiền cần chuyển, QR hay nút "Tôi đã chuyển khoản" - chỉ có lời nhắn liên hệ nhà thiết kế.
+- Nút sao chép cho 5 dòng: ngân hàng, số TK, tên chủ TK, số tiền, nội dung CK.
+- Nút "Lưu ảnh QR" (`.../qr/{purpose}.png`) kèm hướng dẫn quét bằng ảnh đã lưu ngay trên điện thoại (mở app ngân hàng → quét từ ảnh).
+- Giải thích nội dung CK bằng lời: `COC` = cọc, `CONLAI` = còn lại, `TT` = thanh toán (giúp nhà thiết kế nhận ra khoản tiền).
+- Nút "Tôi đã chuyển khoản" (BR-77) chỉ báo cho nhà thiết kế; app không xử lý hay xác minh tiền.
+
 ## 7. Test vectors (đã tính và kiểm CRC)
 
 BIN `970436`, số TK `0123456789`:

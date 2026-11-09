@@ -139,6 +139,14 @@ Từ tập item CHARGEABLE đã chọn (chưa có `quotation_item_id`). UI mở 
 - Item đang trỏ dòng báo giá **SENT/ACCEPTED** không được đổi loại sang/khỏi NEW_DELIVERABLE: `409 BILLING_LOCKED`
   (cùng cơ chế BR-61, vì accept hành động theo loại item).
 
+### 5.7 Trạng thái duyệt trên Portal — một giọng (BR-97)
+
+> Plan 12 dự định số **BR-48**, nhưng BR-48 đã thuộc §5.6 (P09), nên quy tắc này là **BR-97**.
+
+| ID | Rule |
+|---|---|
+| BR-97 | Khách chỉ thấy **một** trạng thái duyệt cho mỗi sản phẩm (`reviewState`, server tính bằng `ClientReviewStates.Of`): `CHANGES_IN_PROGRESS` khi sản phẩm đang `IN_PROGRESS`/`IN_REVIEW` **và** có việc sửa đang mở — một request `NEW` gắn với sản phẩm, hoặc một mục sửa `TODO`/`IN_PROGRESS` thuộc bất kỳ vòng nào của sản phẩm; `CLIENT_APPROVED` khi `IN_REVIEW` + `client_decision = APPROVED`; `AWAITING_CLIENT` khi `IN_REVIEW` còn lại; `NONE` cho mọi trạng thái khác. Việc đang sửa thắng mọi trạng thái khác. Khách chỉ duyệt được ở `AWAITING_CLIENT`; đang sửa thì `409 CHANGE_REQUEST_OPEN` (điều kiện nằm trong cùng câu `UPDATE ... WHERE` của lệnh duyệt nên request tạo đồng thời không lọt được); duyệt lặp lại khi đã `CLIENT_APPROVED` trả `200` không ghi gì thêm. Số "chờ bạn duyệt" = số sản phẩm `AWAITING_CLIENT` (`deliverableSummary.awaitingClient`). Phía designer, luồng dùng cùng quy tắc: `CONFIRM_APPROVAL` chỉ xuất hiện khi `CLIENT_APPROVED`, và cảnh báo `REVIEW_WITH_OPEN_REVISIONS` khi sản phẩm `IN_REVIEW` còn mục sửa chưa xong. |
+
 ## 6. Client Request
 
 ```text
@@ -153,6 +161,8 @@ NEW ──► TRIAGED
 | BR-52 | DECLINED bắt buộc `decline_reason` (khách thấy). |
 | BR-53 | Khách gửi request chỉ cho dự án của mình và dự án ở DRAFT/QUOTED/IN_PROGRESS/ON_HOLD. |
 | BR-54 | Rate limit: tối đa 20 request/khách/ngày. |
+
+Màn "Đã gửi yêu cầu" trên Portal hiện "Nhà thiết kế thường phản hồi {`settings.portal_response_time`}" — designer đặt ở Cài đặt › Khách hàng & Portal; tối đa 60 ký tự, bỏ trống = mặc định "trong 24 giờ" (`GET /api/portal/me` → `designer.responseTime`). Ảnh đính kèm request từ Portal tối đa **5** ảnh/lần gửi.
 
 ## 7. Revision Item — Work status
 
@@ -242,6 +252,17 @@ UNPAID ──► DEPOSIT_PAID ──► PAID
 
 Nội dung chuyển khoản: `{number_no_dash} {COC|CONLAI|TT}` — ví dụ `BG20260007 COC` (06-vietqr-spec §4).
 
+### 8.6 Lời khách trên Portal (BR-76, BR-77)
+
+Nguyên tắc BR-01: Portal chỉ **ghi nhận** lời khách; designer xác nhận bằng hành động có sẵn. Không có thay đổi trạng thái tự động.
+
+| ID | Rule |
+|---|---|
+| BR-76 | **"Đồng ý báo giá".** Khi báo giá `SENT` và chưa hết hạn, khách bấm → chỉ ghi `client_accepted_at` (+ activity `quotation.client_accepted`, hiện cho khách, + Discord sau commit). `status` vẫn `SENT` cho tới khi designer bấm chấp nhận (BR-31). Idempotent: bấm lại khi đã ghi trả `200` và không ghi activity/Discord thứ hai (kiểm trước điều kiện hết hạn). Báo giá không còn `SENT` → `409 INVALID_TRANSITION`; `SENT` nhưng quá `expiry_date` và chưa đồng ý → `409 QUOTATION_EXPIRED`. Designer thấy bước `CONFIRM_CLIENT_ACCEPTANCE` ("Khách đã đồng ý báo giá … — xác nhận") thay cho `RECORD_ACCEPTANCE`; bước này biến mất khi báo giá chuyển `ACCEPTED`. |
+| BR-77 | **"Tôi đã chuyển khoản".** Khách chọn một khoản trong các lựa chọn QR của BR-75 (`deposit` / `full` / `remaining`) và ghi chú tuỳ chọn ≤ 500 ký tự → ghi `client_payment_notice_purpose/at/note` (+ activity `quotation.client_payment_notice` kèm `purpose`, `amount`, `hasNote` — không log nội dung ghi chú, + Discord). Khoản không nằm trong lựa chọn QR hiện tại → `409 PAYMENT_NOT_APPLICABLE`; `purpose` sai/thiếu hoặc ghi chú quá dài → `400`. Gửi lại đúng khoản đang chờ là idempotent; khoản khác thay thế báo cũ. "Chờ xác nhận" (`pending`) = báo giá `SENT`/`ACCEPTED` và `payment_status` chưa tới mức khách báo (`deposit`: `UNPAID`; `full`: khác `PAID`; `remaining`: `DEPOSIT_PAID`). `payment_status` do designer đổi như BR-70..72 (bước `CONFIRM_CLIENT_PAYMENT` dẫn tới đó); các cột `client_*` **không bị xoá** khi designer xác nhận, chỉ `pending` chuyển `false`. |
+
+Cả hai hành động chỉ ghi các cột `client_*` của báo giá nên được whitelist trong trigger `fn_quotation_locked` (xem 04 §2); `updated_at` cũng được cập nhật để `xmin`/concurrency vẫn đúng.
+
 ## 9. Task
 
 | ID | Rule |
@@ -296,5 +317,8 @@ Activity được ghi `visible_to_client = true` cho các action sau (kèm `clie
 | brief.confirmed | "Brief phiên bản 2 đã được xác nhận" |
 | request.triaged / request.declined | "Yêu cầu của bạn đã được tiếp nhận" / "Yêu cầu bị từ chối: {lý do}" |
 | quotation.sent / accepted / rejected | "Báo giá BG-2026-0007 (v2) đã được gửi" |
+| quotation.client_accepted | "Bạn đã đồng ý báo giá BG-2026-0007 — chờ nhà thiết kế xác nhận" |
+| quotation.client_payment_notice | "Bạn báo đã chuyển 1.000.000 ₫ (tiền cọc) cho báo giá BG-2026-0007 — chờ nhà thiết kế kiểm tra" |
+| deliverable.client_approved | "Khách đã duyệt Logo" |
 | quotation.payment_status_changed | "Đã nhận tiền cọc cho BG-2026-0007" |
 | file.shared | "Đã chia sẻ file: logo_v3.png" |

@@ -24,6 +24,8 @@ Format: Bối cảnh → Quyết định → Hệ quả. Trạng thái tất c�
 
 ## ADR-004 — Khách không Accept/Reject trong app
 
+- **Trạng thái:** thay một phần bởi ADR-012 (2026-11): khách có nút "Đồng ý báo giá" và "Tôi đã chuyển khoản" chỉ để **ghi nhận**; việc chấp nhận/từ chối và đổi trạng thái vẫn của designer, khách vẫn không có nút Từ chối.
+
 - **Bối cảnh:** Designer muốn kiểm soát hoàn toàn; khách quen xác nhận qua Zalo.
 - **Quyết định:** Portal chỉ đọc + gửi request. Designer đánh dấu ACCEPTED kèm ghi chú/bằng chứng (ảnh chụp tin nhắn).
 - **Hệ quả:** Bằng chứng đồng ý nằm ngoài hệ thống (ảnh chụp). Có thể thêm nút "Tôi đồng ý" ở Phase sau mà không đổi schema lớn.
@@ -68,3 +70,10 @@ Format: Bối cảnh → Quyết định → Hệ quả. Trạng thái tất c�
 - **Bối cảnh:** "Hóa đơn" có nghĩa pháp lý (hóa đơn điện tử).
 - **Quyết định:** Chỉ dùng "Báo giá"/"Đề nghị thanh toán".
 - **Hệ quả:** App không thay thế hóa đơn điện tử nếu designer có nghĩa vụ xuất hóa đơn.
+
+## ADR-012 — Khách ghi nhận "Đồng ý" và "Đã chuyển khoản" trên Portal
+
+- **Trạng thái:** thay một phần ADR-004.
+- **Bối cảnh:** QA CF-03: khách không biết đồng ý báo giá hay báo đã chuyển tiền ở đâu, nên quay lại nhắn Zalo; designer không có chỗ trong hệ thống để thấy điều đó.
+- **Quyết định:** hai nút trên Portal chỉ ghi `client_accepted_at` / `client_payment_notice_*` + activity khách thấy được + Discord. Designer xác nhận bằng hành động có sẵn qua "Bước tiếp theo" (`CONFIRM_CLIENT_ACCEPTANCE` → chấp nhận như BR-31, `CONFIRM_CLIENT_PAYMENT` → đổi `payment_status` như BR-70..72). Hai nút idempotent; không đổi `status`/`payment_status`; app không xử lý hay xác minh tiền (BR-01). Trigger `fn_quotation_locked` whitelist đúng bốn cột mới.
+- **Hệ quả:** bằng chứng khách đồng ý có trong hệ thống (thời điểm + ghi chú); designer vẫn phải kiểm tra tài khoản ngân hàng trước khi xác nhận; không có tự động đổi trạng thái nên không thể "chốt nhầm" do khách bấm.

@@ -75,6 +75,7 @@ CREATE TABLE settings (
     default_terms            text NOT NULL DEFAULT '',
     digest_enabled           boolean NOT NULL DEFAULT true,          -- P11 BR-94
     digest_hour_vn           int NOT NULL DEFAULT 8 CHECK (digest_hour_vn BETWEEN 0 AND 23),
+    portal_response_time     varchar(60) NOT NULL DEFAULT 'trong 24 giờ',  -- P12: "Nhà thiết kế thường phản hồi …" (1-60 ký tự, trống → mặc định)
     updated_at               timestamptz NOT NULL
 );
 
@@ -316,8 +317,15 @@ CREATE TABLE quotations (
     payment_status       text NOT NULL DEFAULT 'UNPAID' CHECK (payment_status IN ('UNPAID','DEPOSIT_PAID','PAID')),
     deposit_paid_at      date,
     paid_at              date,
+    -- P12 (migration 20261112120000_AddPortalClientStatements): lời khách trên Portal (BR-76/77), designer xác nhận bằng hành động có sẵn
+    client_accepted_at             timestamptz,                  -- "Đồng ý báo giá"
+    client_payment_notice_purpose  varchar(20),                  -- 'deposit' | 'full' | 'remaining' (mục đích QR, BR-75)
+    client_payment_notice_at       timestamptz,
+    client_payment_notice_note     varchar(500),
     created_at           timestamptz NOT NULL,
     updated_at           timestamptz NOT NULL,
+    CONSTRAINT ck_quotations_payment_notice_purpose CHECK (client_payment_notice_purpose IS NULL OR client_payment_notice_purpose IN ('deposit','full','remaining')),
+    CONSTRAINT ck_quotations_payment_notice_at CHECK ((client_payment_notice_purpose IS NULL) = (client_payment_notice_at IS NULL)),
     CHECK (discount_amount <= subtotal),
     CHECK (status = 'DRAFT' OR (number IS NOT NULL AND snapshot IS NOT NULL AND issue_date IS NOT NULL AND expiry_date IS NOT NULL)),
     CHECK (expiry_date IS NULL OR expiry_date >= issue_date),
@@ -350,25 +358,35 @@ CREATE INDEX ix_quotation_items_quotation ON quotation_items (quotation_id, sort
 ALTER TABLE revision_items
   ADD CONSTRAINT fk_items_quotation_item FOREIGN KEY (quotation_item_id) REFERENCES quotation_items(id);
 
--- Quotation đã gửi: chặn sửa nội dung (chỉ cho đổi status/accept/reject/payment fields)
-CREATE FUNCTION trg_quotation_locked() RETURNS trigger AS $$
+-- Quotation đã gửi: chặn sửa nội dung. Hàm thật là `fn_quotation_locked` (migration 20261108100000_FixQuotationLocksAndLiveIndex,
+-- viết lại ở 20261112120000_AddPortalClientStatements): FAIL-CLOSED - sau DRAFT chỉ các cột whitelist dưới đây được đổi,
+-- mọi cột khác (kể cả cột thêm sau này) phải bằng giá trị cũ.
+CREATE OR REPLACE FUNCTION fn_quotation_locked() RETURNS TRIGGER LANGUAGE plpgsql AS $$
 BEGIN
-  IF OLD.status <> 'DRAFT' AND (
-       NEW.snapshot IS DISTINCT FROM OLD.snapshot OR NEW.total IS DISTINCT FROM OLD.total OR
-       NEW.subtotal IS DISTINCT FROM OLD.subtotal OR NEW.discount_amount IS DISTINCT FROM OLD.discount_amount OR
-       NEW.vat_amount IS DISTINCT FROM OLD.vat_amount OR NEW.deposit_amount IS DISTINCT FROM OLD.deposit_amount OR
-       NEW.number IS DISTINCT FROM OLD.number OR NEW.version IS DISTINCT FROM OLD.version OR
-       NEW.terms IS DISTINCT FROM OLD.terms OR NEW.issue_date IS DISTINCT FROM OLD.issue_date OR
-       NEW.expiry_date IS DISTINCT FROM OLD.expiry_date) THEN
-    RAISE EXCEPTION 'quotation % is locked', OLD.id USING ERRCODE = 'check_violation';
-  END IF;
-  IF TG_OP = 'DELETE' AND OLD.status <> 'DRAFT' THEN
-    RAISE EXCEPTION 'quotation % cannot be deleted', OLD.id USING ERRCODE = 'check_violation';
-  END IF;
-  RETURN COALESCE(NEW, OLD);
-END $$ LANGUAGE plpgsql;
+    IF TG_OP = 'DELETE' THEN
+        IF OLD.status <> 'DRAFT' THEN
+            RAISE EXCEPTION 'quotation_locked: quotation % with status % cannot be deleted', OLD.id, OLD.status
+                USING ERRCODE = 'check_violation';
+        END IF;
+        RETURN OLD;
+    END IF;
+    IF OLD.status <> 'DRAFT' AND (
+           NEW.status = 'DRAFT'
+        OR (to_jsonb(NEW) - ARRAY[<whitelist>]) IS DISTINCT FROM (to_jsonb(OLD) - ARRAY[<whitelist>])) THEN
+        RAISE EXCEPTION 'quotation_locked: content of quotation % (status %) cannot be modified', OLD.id, OLD.status
+            USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+END; $$;
+-- <whitelist> = 15 cột:
+--   status, accepted_at, accepted_note, evidence_file_id, rejected_at, rejected_reason,
+--   payment_status, deposit_paid_at, paid_at, internal_notes, updated_at                    (vòng đời, trước P12)
+--   client_accepted_at, client_payment_notice_purpose, client_payment_notice_at,
+--   client_payment_notice_note                                                              (P12)
+-- Thiếu 4 cột P12 trong whitelist thì mọi lệnh "Đồng ý" / "Tôi đã chuyển khoản" trên báo giá SENT bị trigger từ chối
+-- (test PortalClientStatementLockTests).
 CREATE TRIGGER quotation_locked BEFORE UPDATE OR DELETE ON quotations
-  FOR EACH ROW EXECUTE FUNCTION trg_quotation_locked();
+  FOR EACH ROW EXECUTE FUNCTION fn_quotation_locked();
 
 CREATE FUNCTION trg_quotation_items_locked() RETURNS trigger AS $$
 DECLARE s text;

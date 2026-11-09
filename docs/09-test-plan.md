@@ -129,6 +129,20 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
 | AC-DSH-09 | Cấu hình digest lưu/validate 0–23, cảnh báo khi chưa có webhook | `DigestSettingsTests`, `digestSection.test.tsx` |
 | AC-DSH-10 | Không tràn ngang ở 390px; bảng/thanh có bản đọc được bằng chữ | e2e `dashboard-upgrade.spec.ts` + kiểm tay |
 
+### AC-CF — Portal vòng 2 (P12; BR-76, BR-77, BR-97)
+
+| ID | Given | When | Then | Test |
+|---|---|---|---|---|
+| AC-CF1 | Báo giá SENT của khách A | Khách bấm "Đồng ý báo giá" 2 lần | 200 cả hai; `status` vẫn SENT; 1 activity `quotation.client_accepted`; 1 Discord | `PortalQuotationStatementTests`, `QuotationClientStatementTests` |
+| AC-CF2 | Báo giá ACCEPTED / hết hạn | Khách bấm "Đồng ý" | 409 `INVALID_TRANSITION` / `QUOTATION_EXPIRED` | như trên |
+| AC-CF3 | Báo giá SENT cọc 50% | Khách báo đã chuyển `deposit` | 200, `clientPaymentNotice.pending = true`, `payment_status` vẫn UNPAID; `remaining` → 409 `PAYMENT_NOT_APPLICABLE`; `purpose` sai → 400 | như trên |
+| AC-CF4 | Khách đã đồng ý + báo cọc | Designer mở dự án | 2 action đầu: `CONFIRM_CLIENT_ACCEPTANCE`, `CONFIRM_CLIENT_PAYMENT`; không còn `RECORD_ACCEPTANCE` | `ProjectFlowTests` |
+| AC-CF5 | Sản phẩm IN_REVIEW | Khách duyệt | `reviewState = CLIENT_APPROVED`, `awaitingClient` giảm 1 | `PortalReviewStateTests`, `ClientReviewStateTests` |
+| AC-CF6 | Sản phẩm IN_REVIEW có request NEW gắn nó (hoặc mục sửa TODO) | Khách duyệt | 409 `CHANGE_REQUEST_OPEN`; `reviewState = CHANGES_IN_PROGRESS` tới khi request bị từ chối hoặc mục sửa DONE | `PortalReviewStateTests` |
+| AC-CF7 | Designer đặt "Thời gian phản hồi dự kiến" | Khách gửi yêu cầu | Màn tóm tắt hiện "Nhà thiết kế thường phản hồi {giá trị}"; trống → "trong 24 giờ"; > 60 ký tự → 400 | `PortalResponseTimeSettingsTests`, `portal-request-form.test.tsx` |
+| AC-CF8 | Mobile 390px | Mở trang dự án/báo giá | Không cuộn ngang, không nút nổi che nội dung, nút chính ≥ 44px, lightbox phủ toàn màn hình | `portal-lightbox.test.tsx`, `portal-payment-block.test.tsx`, e2e `portal-round2.spec.ts` |
+| AC-CF9 | Trigger khóa báo giá SENT | UPDATE bốn cột `client_*` / UPDATE `total` | cột `client_*` đổi được; `total`/`snapshot` bị `quotation_locked` | `PortalClientStatementLockTests`, `QuotationLockMigrationTests` |
+
 ## 3. Luồng E2E (Playwright)
 
 1. **Onboarding:** đăng nhập → cấu hình ngân hàng → tạo dịch vụ → tạo khách → tạo link portal.
@@ -142,6 +156,7 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
 6. **Dashboard nâng cấp (P11, `dashboard-upgrade.spec.ts`):** tick task quá hạn từ lịch 7 ngày rồi Hoàn tác; mở TaskDrawer từ lịch; đổi kỳ tiền đã thu và copy nhắc thanh toán; widget dung lượng dẫn tới trang Dung lượng; ẩn checklist (bỏ qua nếu DB dev đã xong/đã ẩn); lưu giờ digest; không tràn ngang ở 390px.
 7. **Báo giá phát sinh có giá (P09, `quotation-pricing.spec.ts`):** định giá báo giá phát sinh qua dialog → chấp nhận → hạng mục mới trong Deliverables (AC-Q9, AC-Q11); giá deliverable không dịch vụ + Chọn từ dịch vụ + xác nhận 0 ₫ (AC-B20, AC-B21).
 8. **Dung lượng ảnh (P10, `storage-optimization.spec.ts`):** upload ảnh trùng → cảnh báo; Cài đặt › Dung lượng › Theo dự án; xóa task → ảnh của task mất; xem trước xóa bản gốc của dự án đã hoàn thành (AC-STO9).
+9. **Portal vòng 2 (P12):** khách đồng ý báo giá + báo đã chuyển cọc, designer thấy hai bước xác nhận và ghi chú của khách (AC-CF1, CF3, CF4; `portal-quotation-request.spec.ts` › "client agrees to a sent quotation …"); một giọng trạng thái duyệt qua Duyệt và Yêu cầu sửa kèm ảnh, thời gian phản hồi, không nút nổi (AC-CF5..8; `portal-round2.spec.ts`). Chữ trên các spec `portal*.spec.ts` theo bảng thuật ngữ Portal (08 §3.4).
 
 ## 4. Test cô lập Portal (bắt buộc, tự động sinh)
 
@@ -159,6 +174,7 @@ Thêm:
 - Portal response không chứa khóa JSON `internalNotes`, `notes`, `scopeOverrideReason` (test snapshot schema).
 - Portal bị tắt / khách archived / token version cũ → 401.
 - Request portal không có header CSRF → 403.
+- Route Portal ghi mới của P12 có trong bảng isolation (`RouteTable`): `POST /api/portal/quotations/{id}/accept` và `.../payment-notice` (khách B với id báo giá của A → 404, không đổi cột `client_*` của A); `POST /api/portal/deliverables/{id}/approve` cũng vậy.
 
 Triển khai: một test `[Theory]` lấy danh sách route từ `EndpointDataSource`, lọc prefix `/api/portal`,
 và **fail nếu có route mới chưa được khai báo trong bảng isolation-case** — buộc mọi endpoint mới có test.
