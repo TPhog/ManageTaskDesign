@@ -200,8 +200,9 @@ builder.Services.AddRateLimiter(opt =>
             QueueLimit = 0,
         }));
     // Plan 13 public intake form /api/public/intake/* (07-security §4.5)
+    // (IPv6 partitioned by /64: ClientIpKey)
     opt.AddPolicy(PublicIntakeEndpoints.RateLimitPolicy, ctx => RateLimitPartition.GetFixedWindowLimiter(
-        partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        partitionKey: ClientIpKey.For(ctx.Connection.RemoteIpAddress),
         factory: _ => new FixedWindowRateLimiterOptions
         {
             PermitLimit = publicIntakePermitLimit,
@@ -210,7 +211,7 @@ builder.Services.AddRateLimiter(opt =>
         }));
     // ...and its POST, per IP per hour (one GET must not be replayable into the studio-wide daily cap)
     opt.AddPolicy(PublicIntakeEndpoints.SubmitRateLimitPolicy, ctx => RateLimitPartition.GetSlidingWindowLimiter(
-        partitionKey: ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        partitionKey: ClientIpKey.For(ctx.Connection.RemoteIpAddress),
         factory: _ => new SlidingWindowRateLimiterOptions
         {
             PermitLimit = publicIntakeSubmitPermitLimit,

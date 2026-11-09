@@ -93,7 +93,7 @@ public static class PublicIntakeEndpoints
         var dayStart = ClientRequest.DayStartUtc(today);   // BR-137: studio-wide, then per IP
         if (await db.IntakeSubmissions.CountAsync(s => s.CreatedAt >= dayStart, ct) >= IntakeSubmission.DailyLimit)
             return DailyCapReached();
-        var ip = http.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var ip = ClientIpKey.For(http.HttpContext.Connection.RemoteIpAddress);   // IPv6: the /64
         if (perIp.Count(ip, today) >= options.Value.MaxSubmissionsPerIpPerDay)
             return Results.Json(
                 new { code = "RATE_LIMITED", detail = "Bạn đã gửi nhiều yêu cầu hôm nay — vui lòng liên hệ trực tiếp với studio hoặc gửi lại vào ngày mai" },
@@ -155,13 +155,16 @@ public static class PublicIntakeEndpoints
         if (errors.Count > 0) return Results.ValidationProblem(errors);   // the token stays valid for the corrected resend
         if (!tokens.TryConsume(ticket.Id)) return FormExpired();   // a concurrent post of the same token won
 
-        var submission = IntakeSubmission.Create(contactName, contactPhone, contactEmail, template?.Id, template?.Name, answers, note);
-        db.IntakeSubmissions.Add(submission);
-        activity.Write("intake_submission", submission.Id, "intake.submitted", actorType: "CLIENT",
-            data: new { templateId = submission.TemplateId, imageCount = form.Files.Count });   // no personal data
+        // the token is spent only by a stored submission: any refusal or failure below hands it back for the resend
+        var committed = false;
+        IntakeSubmission submission;
         IReadOnlyList<ProjectFile> images = [];
         try
         {
+            submission = IntakeSubmission.Create(contactName, contactPhone, contactEmail, template?.Id, template?.Name, answers, note);
+            db.IntakeSubmissions.Add(submission);
+            activity.Write("intake_submission", submission.Id, "intake.submitted", actorType: "CLIENT",
+                data: new { templateId = submission.TemplateId, imageCount = form.Files.Count });   // no personal data
             if (form.Files.Count > 0)
             {
                 // the submission and its photos commit together; a refused photo stores nothing (BR-135)
@@ -180,6 +183,7 @@ public static class PublicIntakeEndpoints
             }
             await db.SaveChangesAsync(ct);
             await tx.CommitAsync(ct);
+            committed = true;
         }
         catch (DomainException ex)
         {
@@ -190,6 +194,10 @@ public static class PublicIntakeEndpoints
         {
             await uploader.DiscardAsync();
             throw;
+        }
+        finally
+        {
+            if (!committed) tokens.Release(ticket.Id);
         }
         perIp.Record(ip, today);
         if (images.Count > 0) await storageAlerts.EvaluateSafelyAsync(CancellationToken.None);

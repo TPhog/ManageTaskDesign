@@ -12,7 +12,8 @@ public sealed record IntakeFormTicket(string Id, double AgeSeconds);
 /// <summary>
 /// BR-138: the public form carries a token signed with ASP.NET Data Protection = "{slug}|{issuedAtUnixMs}|{id}".
 /// It proves when the form was served (minimum fill time), dies with the slug ("Tạo link mới") or after 24 h, and is
-/// accepted for ONE stored submission: the id is remembered for the token lifetime (in memory — one API instance).
+/// accepted for ONE stored submission: the id is remembered for the token lifetime (in memory — one API instance) and
+/// released again when that submission is not stored.
 /// Age is measured with IClock, so tests control it. The token is never logged.
 /// </summary>
 public sealed class IntakeFormToken(IDataProtectionProvider provider, IClock clock, IMemoryCache cache)
@@ -59,6 +60,12 @@ public sealed class IntakeFormToken(IDataProtectionProvider provider, IClock clo
             cache.Set(UsedKey(id), true, Lifetime);
             return true;
         }
+    }
+
+    /// <summary>Hands the token back when the submission it was marked for was not stored (refused photo, daily cap, error).</summary>
+    public void Release(string id)
+    {
+        lock (_gate) cache.Remove(UsedKey(id));
     }
 
     private static string UsedKey(string id) => "intake-form-token-used:" + id;

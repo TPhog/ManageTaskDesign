@@ -109,6 +109,20 @@ public class PublicIntakeAbuseTests(AppFactory factory) : IntakeTestBase(factory
     }
 
     [Fact]
+    public async Task A_photo_refused_after_the_checks_gives_the_token_back()   // re-review #1
+    {
+        var slug = await EnableIntakeAsync();
+        var anon = Anonymous();
+        var token = (await GetFormAsync(anon, slug)).GetProperty("formToken").GetString()!;
+        var notAnImage = IntakeForm(token, note: "kèm tệp lạ");
+        notAnImage.Add(new ByteArrayContent("không phải ảnh"u8.ToArray()), "files", "ghi-chu.png");
+
+        (await anon.PostAsync($"/api/public/intake/{slug}", notAnImage)).StatusCode.Should().Be(HttpStatusCode.UnsupportedMediaType);
+        (await anon.PostAsync($"/api/public/intake/{slug}", IntakeForm(token, note: "gửi lại không kèm ảnh")))
+            .StatusCode.Should().Be(HttpStatusCode.NoContent);
+    }
+
+    [Fact]
     public async Task Posts_per_ip_are_rate_limited_per_hour()   // review P13-BE #2
     {
         var slug = await EnableIntakeAsync();
