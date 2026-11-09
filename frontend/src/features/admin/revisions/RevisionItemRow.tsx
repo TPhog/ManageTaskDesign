@@ -85,7 +85,7 @@ export function RevisionItemRow({ item, projectId, deliverableId, selectable, se
               <>
                 {' · '}
                 <Link to={`/admin/projects/${projectId}?tab=deliverables`} className="text-primary underline-offset-2 hover:underline">
-                  Đã thành hạng mục: {item.createdDeliverableName ?? 'xem Deliverables'}
+                  Đã thành hạng mục: {item.createdDeliverableName ?? 'xem tab Hạng mục'}
                 </Link>
               </>
             )}

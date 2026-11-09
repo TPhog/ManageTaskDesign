@@ -137,7 +137,7 @@ export function AdditionalQuotationDialog({ projectId, revisionItemIds, open, on
                             ariaLabel={`Dịch vụ mẫu cho ${line.description}`}
                           />
                           <p className="text-xs text-muted-foreground">
-                            Khi khách chấp nhận, mục này thành một hạng mục trong tab Deliverables (có quota và bước mẫu của dịch vụ).
+                            Khi khách chấp nhận, mục này thành một hạng mục trong tab Hạng mục (có quota và bước mẫu của dịch vụ).
                           </p>
                         </div>
                       ) : (

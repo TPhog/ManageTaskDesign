@@ -18,7 +18,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>
 
 const highlights = [
-  'Quản lý khách hàng, dự án và deliverable ở một nơi',
+  'Quản lý khách hàng, dự án và hạng mục ở một nơi',
   'Theo dõi số vòng sửa theo hạn mức',
   'Báo giá kèm mã VietQR cho khách',
 ]

@@ -30,8 +30,29 @@ export interface SearchQuotation {
   total: number
 }
 
+export interface SearchTask {
+  id: string
+  projectId: string
+  title: string
+  projectName: string
+  status: 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'DONE' | 'BLOCKED'
+}
+
+export interface SearchRequest {
+  id: string
+  projectId: string
+  projectName: string
+  clientName: string
+  /** at most 120 characters, centred on the match */
+  excerpt: string
+  status: 'NEW' | 'TRIAGED' | 'DECLINED'
+}
+
 export interface SearchResult {
   clients: SearchClient[]
   projects: SearchProject[]
   quotations: SearchQuotation[]
+  /** absent when the server predates plan 14 */
+  tasks?: SearchTask[]
+  requests?: SearchRequest[]
 }

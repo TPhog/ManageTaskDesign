@@ -118,7 +118,7 @@ export function RevisionsTab({ project }: { project: ProjectDetail }) {
               <div className="w-40">
                 <QuotaMeter used={d.usedRounds} total={d.includedRounds} label="vòng" />
               </div>
-              <span className="text-xs text-muted-foreground">Vòng thêm: <MoneyText amount={d.extraRoundPrice} /></span>
+              <span className="text-xs text-muted-foreground">Giá vòng sửa thêm: <MoneyText amount={d.extraRoundPrice} /></span>
             </div>
           </header>
           {d.rounds.length === 0

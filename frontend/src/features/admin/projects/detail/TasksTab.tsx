@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { List, ListChecks, SquareKanban } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/EmptyState'
@@ -16,6 +17,19 @@ type View = 'board' | 'list'
 export function TasksTab({ project }: { project: ProjectDetail }) {
   const [view, setView] = useState<View>('board')
   const [openId, setOpenId] = useState<string | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  const wantedTask = searchParams.get('task')
+
+  // Quick search links here as ?task=<id>: open that task's drawer once, then drop the param
+  useEffect(() => {
+    if (!wantedTask) return
+    setOpenId(wantedTask)
+    setSearchParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.delete('task')
+      return next
+    }, { replace: true })
+  }, [wantedTask, setSearchParams])
   const { data, isLoading, isError } = useTaskList({ projectId: project.id })
   const tasks = data?.items ?? []
 
@@ -36,7 +50,7 @@ export function TasksTab({ project }: { project: ProjectDetail }) {
   )
 
   return (
-    <div className="rounded-xl border bg-card shadow-card">
+    <div className="min-w-0 rounded-xl border bg-card shadow-card">
       <div className="flex items-center justify-between gap-3 border-b p-4">
         <p className="text-sm text-muted-foreground">{tasks.length} công việc</p>
         <div role="group" aria-label="Chế độ xem" className="flex items-center gap-1 rounded-lg bg-muted p-1">

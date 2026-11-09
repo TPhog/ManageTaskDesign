@@ -197,7 +197,7 @@ function TriagedSummary({ detail }: { detail: RequestDetail }) {
         </div>
       ))}
       <Button asChild variant="outline" size="sm">
-        <Link to={`/admin/projects/${r.projectId}?tab=revisions`}>Mở tab Yêu cầu & Revision</Link>
+        <Link to={`/admin/projects/${r.projectId}?tab=revisions`}>Mở tab Yêu cầu & vòng sửa</Link>
       </Button>
       <AdditionalQuotationDialog
         projectId={r.projectId}

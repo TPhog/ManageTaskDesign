@@ -5,6 +5,7 @@ import { ArrowLeft, ImageOff, Sparkles, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { EmptyState } from '@/components/EmptyState'
@@ -22,8 +23,8 @@ import { StorageUsageBar } from './StorageUsageBar'
 import { CLEANUP_SUGGESTION, clampPage, ownerLabel, readStorageParams, selectedBytes, toStorageQuery } from './storage'
 import { useBulkDeleteImages, useStorageImages, useStorageUsage } from './useStorage'
 
-const selectClass =
-  'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+// Radix Select reserves '' for "no value"
+const ALL_PROJECTS = '_all'
 
 /** Spec §7 "Dung lượng": usage with markers, filterable list, multi-select delete. Nothing is deleted automatically. */
 export default function StoragePage() {
@@ -52,6 +53,8 @@ export default function StoragePage() {
       setSearch(new URLSearchParams(toStorageQuery({ ...params, page: clampPage(params.page, pageCount) })), { replace: true })
     }
   }, [list.data, params, pageCount, setSearch])
+  // images the client can currently see: deleting them also removes them from the client's progress view
+  const sharedSelected = items.some(i => selected.has(i.id) && i.visibleToClient)
   const allOnPage = items.length > 0 && items.every(i => selected.has(i.id))
 
   function update(next: StorageImageParams) {
@@ -118,30 +121,36 @@ export default function StoragePage() {
         <div className="grid gap-4 sm:grid-cols-4">
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="storage-project">Dự án</Label>
-            <select id="storage-project" className={selectClass} value={params.projectId ?? ''}
-              onChange={e => update({ projectId: e.target.value || undefined })}>
-              <option value="">Tất cả dự án</option>
-              {(projects?.items ?? []).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
+            <Select value={params.projectId ?? ALL_PROJECTS} onValueChange={v => update({ projectId: v === ALL_PROJECTS ? undefined : v })}>
+              <SelectTrigger id="storage-project"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value={ALL_PROJECTS}>Tất cả dự án</SelectItem>
+                {(projects?.items ?? []).map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="storage-age">Tải lên</Label>
-            <select id="storage-age" className={selectClass} value={params.olderThanMonths}
-              onChange={e => update({ olderThanMonths: Number(e.target.value) })}>
-              <option value={0}>Mọi lúc</option>
-              <option value={3}>Cũ hơn 3 tháng</option>
-              <option value={6}>Cũ hơn 6 tháng</option>
-              <option value={12}>Cũ hơn 12 tháng</option>
-            </select>
+            <Select value={String(params.olderThanMonths)} onValueChange={v => update({ olderThanMonths: Number(v) })}>
+              <SelectTrigger id="storage-age"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="0">Mọi lúc</SelectItem>
+                <SelectItem value="3">Cũ hơn 3 tháng</SelectItem>
+                <SelectItem value="6">Cũ hơn 6 tháng</SelectItem>
+                <SelectItem value="12">Cũ hơn 12 tháng</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="storage-sort">Sắp xếp</Label>
-            <select id="storage-sort" className={selectClass} value={params.sort}
-              onChange={e => update({ sort: e.target.value as StorageImageParams['sort'] })}>
-              <option value="size">Dung lượng lớn nhất</option>
-              <option value="oldest">Cũ nhất</option>
-              <option value="newest">Mới nhất</option>
-            </select>
+            <Select value={params.sort} onValueChange={v => update({ sort: v as StorageImageParams['sort'] })}>
+              <SelectTrigger id="storage-sort"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="size">Dung lượng lớn nhất</SelectItem>
+                <SelectItem value="oldest">Cũ nhất</SelectItem>
+                <SelectItem value="newest">Mới nhất</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -221,7 +230,7 @@ export default function StoragePage() {
         open={confirming}
         onOpenChange={setConfirming}
         title={`Xoá ${selected.size} ảnh?`}
-        description={`Giải phóng ${formatBytes(selectedBytes(items, selected))}. Ảnh và các bản xem trước bị xoá khỏi ổ lưu trữ, khách không xem được nữa. Không khôi phục được.`}
+        description={`Giải phóng ${formatBytes(selectedBytes(items, selected))}. Ảnh và các bản xem trước bị xoá khỏi ổ lưu trữ, khách không xem được nữa. Không khôi phục được.${sharedSelected ? ' Ảnh đang hiện trong Cập nhật tiến độ của khách (nếu có) cũng sẽ biến mất.' : ''}`}
         confirmLabel="Xoá vĩnh viễn"
         destructive
         pending={bulk.isPending}

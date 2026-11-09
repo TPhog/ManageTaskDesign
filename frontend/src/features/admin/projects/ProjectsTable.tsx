@@ -57,7 +57,7 @@ export function ProjectsTable({ projects, filtering, onCreate }: Props) {
             <th scope="col" className="px-4 py-3">Trạng thái</th>
             <th scope="col" className="hidden px-4 py-3 lg:table-cell">Bắt đầu</th>
             <th scope="col" className="px-4 py-3">Deadline</th>
-            <th scope="col" className="hidden px-4 py-3 text-right sm:table-cell">Deliverable</th>
+            <th scope="col" className="hidden px-4 py-3 text-right sm:table-cell">Hạng mục</th>
           </tr>
         </thead>
         <tbody className="divide-y">

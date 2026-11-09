@@ -40,7 +40,7 @@ export function QuotationsTab({ project }: { project: ProjectDetail }) {
         <EmptyState
           icon={FileText}
           title="Chưa có báo giá"
-          description="Lập báo giá từ deliverable của dự án — toàn bộ, hoặc chỉ các hạng mục đã xong."
+          description="Lập báo giá từ hạng mục của dự án — toàn bộ, hoặc chỉ các hạng mục đã xong."
           action={createButton}
         />
       ) : (

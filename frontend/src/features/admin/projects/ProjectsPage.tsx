@@ -97,7 +97,7 @@ export default function ProjectsPage() {
     <div className="space-y-6">
       <PageHeader
         title="Dự án"
-        description="Theo dõi trạng thái, deadline và số deliverable."
+        description="Theo dõi trạng thái, deadline và số hạng mục."
         actions={
           <Button onClick={() => setCreateOpen(true)}>
             <Plus aria-hidden="true" />

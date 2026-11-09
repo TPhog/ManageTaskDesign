@@ -1,4 +1,4 @@
-import type { SearchQuotation, SearchResult } from '@/lib/searchTypes'
+import type { SearchQuotation, SearchRequest, SearchResult, SearchTask } from '@/lib/searchTypes'
 
 /** Same bound as the API (SearchQuery.MinLength): shorter terms are not sent. */
 export const SEARCH_MIN_LENGTH = 2
@@ -12,7 +12,39 @@ export function canSearch(term: string): boolean {
 }
 
 export function resultCount(result: SearchResult | undefined): number {
-  return result ? result.clients.length + result.projects.length + result.quotations.length : 0
+  return result ? searchGroups(result).reduce((n, g) => n + g.count, 0) : 0
+}
+
+export type SearchGroupKey = 'clients' | 'projects' | 'quotations' | 'tasks' | 'requests'
+
+export const searchGroupLabel: Record<SearchGroupKey, string> = {
+  clients: 'Khách hàng',
+  projects: 'Dự án',
+  quotations: 'Báo giá',
+  tasks: 'Công việc',
+  requests: 'Yêu cầu',
+}
+
+/** The non-empty groups in display order; `tasks` / `requests` may be missing (older server). */
+export function searchGroups(result: SearchResult): { key: SearchGroupKey; label: string; count: number }[] {
+  const counts: Record<SearchGroupKey, number> = {
+    clients: result.clients.length,
+    projects: result.projects.length,
+    quotations: result.quotations.length,
+    tasks: result.tasks?.length ?? 0,
+    requests: result.requests?.length ?? 0,
+  }
+  return (Object.keys(searchGroupLabel) as SearchGroupKey[])
+    .filter(key => counts[key] > 0)
+    .map(key => ({ key, label: searchGroupLabel[key], count: counts[key] }))
+}
+
+export function taskSearchHref(t: Pick<SearchTask, 'id' | 'projectId'>): string {
+  return `/admin/projects/${t.projectId}?tab=tasks&task=${t.id}`
+}
+
+export function requestSearchHref(r: Pick<SearchRequest, 'id'>): string {
+  return `/admin/requests/${r.id}`
 }
 
 export function clientHref(client: { id: string }): string {

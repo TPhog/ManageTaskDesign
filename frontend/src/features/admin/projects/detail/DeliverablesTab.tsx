@@ -101,7 +101,7 @@ export function DeliverablesTab({ project }: { project: ProjectDetail }) {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-foreground">{d.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    Số lượng: {d.quantity} · Vòng thêm: <MoneyText amount={d.extraRoundPrice} />
+                    Số lượng: {d.quantity} · Giá vòng sửa thêm: <MoneyText amount={d.extraRoundPrice} />
                   </p>
                   {(d.quotedIn ?? []).length > 0 && (
                     <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">

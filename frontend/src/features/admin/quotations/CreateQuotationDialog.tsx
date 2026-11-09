@@ -95,7 +95,7 @@ export function CreateQuotationDialog({ project, open, onClose }: { project: Pro
               <input type="radio" name="quotation-mode" className="mt-1" checked={mode === 'all'} onChange={() => { setMode('all'); setAcknowledged(false) }} />
               <span>
                 <span className="block text-sm font-medium text-foreground">Toàn bộ dự án</span>
-                <span className="block text-xs text-muted-foreground">{active.length} deliverable (trừ hạng mục đã huỷ)</span>
+                <span className="block text-xs text-muted-foreground">{active.length} hạng mục (trừ hạng mục đã huỷ)</span>
               </span>
             </label>
             <label className={optionClass}>

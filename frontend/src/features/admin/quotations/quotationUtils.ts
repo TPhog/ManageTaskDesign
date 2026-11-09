@@ -77,6 +77,10 @@ export const zeroPriceRows = (rows: { unitPrice: number }[]): number[] =>
 export const zeroPriceLineNames = (rows: { description: string; unitPrice: number }[]): string[] =>
   rows.flatMap((r, i) => (r.unitPrice === 0 ? [r.description.trim() || `Dòng ${i + 1}`] : []))
 
+/** DF-24: why "Gửi báo giá" / "Lưu nháp" is disabled — one line per row without a description (1-based). */
+export const quotationSendBlockers = (rows: { description: string }[]): string[] =>
+  rows.flatMap((r, i) => (r.description.trim() === '' ? [`Dòng ${i + 1} chưa có mô tả`] : []))
+
 /** Plan 09: typed prices for deliverables without a service (blank / 0 = leave the line at 0 ₫). */
 export const deliverablePricesBody = (
   targets: Pick<Deliverable, 'id' | 'serviceId'>[], prices: Record<string, number>,

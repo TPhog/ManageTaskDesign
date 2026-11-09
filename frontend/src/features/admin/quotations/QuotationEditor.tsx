@@ -15,7 +15,7 @@ import { ServicePicker } from '@/features/admin/services/ServicePicker'
 import { api, type ApiError } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { QuotationDetail, QuotationItem, QuotationItemSource, UpdateQuotationBody } from '@/lib/quotationTypes'
-import { computeTotals, kindLabel, quotationErrorMessage, zeroPriceLineNames, zeroPriceRows } from './quotationUtils'
+import { computeTotals, kindLabel, quotationErrorMessage, quotationSendBlockers, zeroPriceLineNames, zeroPriceRows } from './quotationUtils'
 import { useDeleteQuotation, useQuotationCommand, useUpdateQuotation } from './useQuotations'
 
 const panelClass = 'rounded-xl border bg-card p-5 shadow-card'
@@ -87,6 +87,7 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
 
   const preview = computeTotals(rows, header.discountAmount, header.vatPercent, header.depositPercent)
   const invalid = header.title.trim() === '' || rows.some(r => r.description.trim() === '')
+  const blockers = [...(header.title.trim() === '' ? ['Chưa nhập tiêu đề báo giá'] : []), ...quotationSendBlockers(rows)]
   const busy = update.isPending || command.isPending || remove.isPending
   const zeroRows = zeroPriceRows(rows)
   const zeroNames = zeroPriceLineNames(rows)
@@ -305,12 +306,15 @@ export function QuotationEditor({ quotation }: { quotation: QuotationDetail }) {
             <Link to="/admin/settings" className="font-medium underline">Mở Cài đặt</Link>
           </p>
         )}
+        {blockers.length > 0 && (
+          <p id="quotation-blockers" className="text-xs text-warning">{blockers[0]}</p>
+        )}
         <div className="flex flex-col gap-2">
-          <Button onClick={() => setConfirmSend(true)} disabled={invalid || rows.length === 0 || busy}>
+          <Button onClick={() => setConfirmSend(true)} disabled={invalid || rows.length === 0 || busy} aria-describedby={blockers.length > 0 ? 'quotation-blockers' : undefined}>
             <Send aria-hidden="true" />
             Gửi báo giá
           </Button>
-          <Button variant="outline" onClick={save} disabled={invalid || busy}>Lưu nháp</Button>
+          <Button variant="outline" onClick={save} disabled={invalid || busy} aria-describedby={blockers.length > 0 ? 'quotation-blockers' : undefined}>Lưu nháp</Button>
           <Button variant="ghost" className="text-red-700 hover:bg-red-50 hover:text-red-700" onClick={() => setConfirmDelete(true)} disabled={busy}>
             <Trash2 aria-hidden="true" />
             Xóa báo giá

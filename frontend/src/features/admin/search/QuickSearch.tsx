@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { FileText, FolderKanban, Search, Users } from 'lucide-react'
+import { FileText, FolderKanban, ListChecks, MessageSquareText, Search, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Command, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -12,7 +12,8 @@ import { qk } from '@/lib/queryKeys'
 import type { SearchResult } from '@/lib/searchTypes'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import {
-  canSearch, clientHref, projectHref, quotationHref, quotationLabel, resultCount, searchTerm, shortcutLabel,
+  canSearch, clientHref, projectHref, quotationHref, quotationLabel, requestSearchHref, resultCount, searchGroupLabel, searchTerm,
+  shortcutLabel, taskSearchHref,
 } from './searchUtils'
 
 const messageClass = 'px-4 py-6 text-center text-sm text-muted-foreground'
@@ -78,10 +79,10 @@ export function QuickSearch({ open, onOpenChange }: { open: boolean; onOpenChang
       <DialogContent className="gap-0 overflow-hidden p-0 sm:max-w-xl">
         <DialogTitle className="sr-only">Tìm kiếm nhanh</DialogTitle>
         <DialogDescription className="sr-only">
-          Tìm khách hàng, dự án hoặc số báo giá. Dùng phím mũi tên để chọn, Enter để mở.
+          Tìm khách hàng, dự án, số báo giá, công việc hoặc yêu cầu. Dùng phím mũi tên để chọn, Enter để mở.
         </DialogDescription>
         <Command shouldFilter={false} label="Tìm kiếm nhanh">
-          <CommandInput maxLength={100} value={text} onValueChange={setText} placeholder="Tìm khách, dự án, số báo giá…" />
+          <CommandInput maxLength={100} value={text} onValueChange={setText} placeholder="Tìm khách, dự án, báo giá, công việc, yêu cầu…" />
           <CommandList className="max-h-[60vh]">
             {!canSearch(searchTerm(text)) ? (
               <p className={messageClass}>Nhập ít nhất 2 ký tự để tìm.</p>
@@ -97,7 +98,7 @@ export function QuickSearch({ open, onOpenChange }: { open: boolean; onOpenChang
             ) : (
               <>
                 {results.clients.length > 0 && (
-                  <CommandGroup heading="Khách hàng">
+                  <CommandGroup heading={searchGroupLabel.clients}>
                     {results.clients.map(c => (
                       <CommandItem key={c.id} value={`client-${c.id}`} onSelect={() => go(clientHref(c))}>
                         <Users aria-hidden="true" />
@@ -113,7 +114,7 @@ export function QuickSearch({ open, onOpenChange }: { open: boolean; onOpenChang
                   </CommandGroup>
                 )}
                 {results.projects.length > 0 && (
-                  <CommandGroup heading="Dự án">
+                  <CommandGroup heading={searchGroupLabel.projects}>
                     {results.projects.map(p => (
                       <CommandItem key={p.id} value={`project-${p.id}`} onSelect={() => go(projectHref(p))}>
                         <FolderKanban aria-hidden="true" />
@@ -127,7 +128,7 @@ export function QuickSearch({ open, onOpenChange }: { open: boolean; onOpenChang
                   </CommandGroup>
                 )}
                 {results.quotations.length > 0 && (
-                  <CommandGroup heading="Báo giá">
+                  <CommandGroup heading={searchGroupLabel.quotations}>
                     {results.quotations.map(q => (
                       <CommandItem key={q.id} value={`quotation-${q.id}`} onSelect={() => go(quotationHref(q))}>
                         <FileText aria-hidden="true" />
@@ -137,6 +138,34 @@ export function QuickSearch({ open, onOpenChange }: { open: boolean; onOpenChang
                         </span>
                         <span className="text-xs"><MoneyText amount={q.total} /></span>
                         <StatusBadge status={q.effectiveStatus} />
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                )}
+                {(results.tasks ?? []).length > 0 && (
+                  <CommandGroup heading={searchGroupLabel.tasks}>
+                    {(results.tasks ?? []).map(t => (
+                      <CommandItem key={t.id} value={`task-${t.id}`} onSelect={() => go(taskSearchHref(t))}>
+                        <ListChecks aria-hidden="true" />
+                        <span className="min-w-0 flex-1 truncate">
+                          {t.title}
+                          <span className="ml-2 text-xs text-muted-foreground">{t.projectName}</span>
+                        </span>
+                        <StatusBadge status={t.status} />
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                )}
+                {(results.requests ?? []).length > 0 && (
+                  <CommandGroup heading={searchGroupLabel.requests}>
+                    {(results.requests ?? []).map(r => (
+                      <CommandItem key={r.id} value={`request-${r.id}`} onSelect={() => go(requestSearchHref(r))}>
+                        <MessageSquareText aria-hidden="true" />
+                        <span className="min-w-0 flex-1 truncate">
+                          {r.excerpt}
+                          <span className="ml-2 text-xs text-muted-foreground">{r.clientName}</span>
+                        </span>
+                        <StatusBadge status={r.status} />
                       </CommandItem>
                     ))}
                   </CommandGroup>

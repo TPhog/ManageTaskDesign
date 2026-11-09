@@ -140,8 +140,8 @@ export default function ProjectDetailPage() {
         <div className="relative">
           <TabsList className="h-auto w-full justify-start overflow-x-auto sm:w-auto">
             <TabsTrigger value="overview" className={tabTrigger}>Tổng quan</TabsTrigger>
-            <TabsTrigger value="deliverables" className={tabTrigger}>Deliverables ({project.deliverables.length})</TabsTrigger>
-            <TabsTrigger value="revisions" className={tabTrigger}>Yêu cầu & Revision</TabsTrigger>
+            <TabsTrigger value="deliverables" className={tabTrigger}>Hạng mục ({project.deliverables.length})</TabsTrigger>
+            <TabsTrigger value="revisions" className={tabTrigger}>Yêu cầu & vòng sửa</TabsTrigger>
             <TabsTrigger value="brief" className={tabTrigger}>Brief</TabsTrigger>
             <TabsTrigger value="tasks" className={tabTrigger}>Công việc</TabsTrigger>
             <TabsTrigger value="quotations" className={tabTrigger}>Báo giá</TabsTrigger>

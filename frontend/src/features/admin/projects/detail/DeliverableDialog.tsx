@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { MoneyInput } from '@/components/MoneyInput'
 import {
   Dialog,
   DialogContent,
@@ -32,7 +33,7 @@ const schema = z.object({
   quantity: z.coerce.number().int().min(1, 'Tối thiểu 1'),
   serviceId: z.string(),
   includedRounds: z.coerce.number().int().min(0, 'Không được âm').max(50, 'Tối đa 50'),
-  extraRoundPrice: z.coerce.number().int().min(0, 'Không được âm'),
+  extraRoundPrice: z.number().int().min(0, 'Không được âm'),
   dueDate: z.string().optional(),
 })
 type FormValues = z.infer<typeof schema>
@@ -71,7 +72,7 @@ export function DeliverableDialog({ projectId, open, onClose, editing }: Props) 
   })
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { register, handleSubmit, reset, setValue, getValues, watch, formState: { errors } } = useForm<FormValues>({
+  const { register, control, handleSubmit, reset, setValue, getValues, watch, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema) as any,
     defaultValues: CREATE_DEFAULTS,
   })
@@ -198,7 +199,13 @@ export function DeliverableDialog({ projectId, open, onClose, editing }: Props) 
             </div>
             <div className="space-y-2">
               <Label htmlFor="deliverable-extraRoundPrice">Giá vòng sửa thêm (₫)</Label>
-              <Input id="deliverable-extraRoundPrice" type="number" min={0} step={1000} {...a11y('extraRoundPrice')} {...register('extraRoundPrice')} />
+              <Controller
+                name="extraRoundPrice"
+                control={control}
+                render={({ field }) => (
+                  <MoneyInput id="deliverable-extraRoundPrice" value={field.value ?? 0} onChange={field.onChange} onBlur={field.onBlur} ref={field.ref} {...a11y('extraRoundPrice')} />
+                )}
+              />
               {fieldError('extraRoundPrice')}
             </div>
           </div>

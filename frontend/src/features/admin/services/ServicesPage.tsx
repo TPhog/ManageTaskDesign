@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetFooter } from '@/components/ui/sheet'
+import { MoneyInput } from '@/components/MoneyInput'
 import { MoneyText } from '@/components/MoneyText'
 import { Skeleton } from '@/components/ui/skeleton'
 import { PageHeader } from '@/components/PageHeader'
@@ -35,9 +36,9 @@ interface Service {
 const schema = z.object({
   name: z.string().min(1, 'Vui lòng nhập tên dịch vụ'),
   description: z.string().nullable(),
-  basePrice: z.coerce.number().int().min(0, 'Không được âm'),
+  basePrice: z.number().int().min(0, 'Không được âm'),
   defaultIncludedRounds: z.coerce.number().int().min(0, 'Không được âm').max(50, 'Tối đa 50'),
-  extraRoundPrice: z.coerce.number().int().min(0, 'Không được âm'),
+  extraRoundPrice: z.number().int().min(0, 'Không được âm'),
 })
 type FormValues = z.infer<typeof schema>
 
@@ -56,7 +57,7 @@ export default function ServicesPage() {
   })
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { register, handleSubmit, reset, formState: { errors }, setError } = useForm<FormValues>({
+  const { register, control, handleSubmit, reset, formState: { errors }, setError } = useForm<FormValues>({
     resolver: zodResolver(schema) as any,
   })
 
@@ -177,14 +178,14 @@ export default function ServicesPage() {
             }
           />
         ) : (
-          <div className="relative overflow-x-auto">
+          <div className="relative min-w-0 max-w-full overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="whitespace-nowrap border-b bg-muted/50 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   <th scope="col" className="px-4 py-3">Tên</th>
                   <th scope="col" className="px-4 py-3 text-right">Giá cơ bản</th>
                   <th scope="col" className="hidden px-4 py-3 text-right sm:table-cell">Vòng sửa</th>
-                  <th scope="col" className="hidden px-4 py-3 text-right md:table-cell">Giá/vòng vượt</th>
+                  <th scope="col" className="hidden px-4 py-3 text-right md:table-cell">Giá vòng sửa thêm</th>
                   <th scope="col" className="hidden px-4 py-3 md:table-cell">Trạng thái</th>
                   <th scope="col" className="px-4 py-3"><span className="sr-only">Thao tác</span></th>
                 </tr>
@@ -257,7 +258,13 @@ export default function ServicesPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="service-basePrice">Giá gốc (₫)</Label>
-                <Input id="service-basePrice" type="number" min={0} step={1000} {...fieldA11y('basePrice')} {...register('basePrice')} />
+                <Controller
+                  name="basePrice"
+                  control={control}
+                  render={({ field }) => (
+                    <MoneyInput id="service-basePrice" value={field.value ?? 0} onChange={field.onChange} onBlur={field.onBlur} ref={field.ref} {...fieldA11y('basePrice')} />
+                  )}
+                />
                 {fieldError('basePrice')}
               </div>
               <div className="grid gap-5 sm:grid-cols-2">
@@ -267,8 +274,14 @@ export default function ServicesPage() {
                   {fieldError('defaultIncludedRounds')}
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="service-extraRoundPrice">Giá vòng thêm (₫)</Label>
-                  <Input id="service-extraRoundPrice" type="number" min={0} step={1000} {...fieldA11y('extraRoundPrice')} {...register('extraRoundPrice')} />
+                  <Label htmlFor="service-extraRoundPrice">Giá vòng sửa thêm (₫)</Label>
+                  <Controller
+                    name="extraRoundPrice"
+                    control={control}
+                    render={({ field }) => (
+                      <MoneyInput id="service-extraRoundPrice" value={field.value ?? 0} onChange={field.onChange} onBlur={field.onBlur} ref={field.ref} {...fieldA11y('extraRoundPrice')} />
+                    )}
+                  />
                   {fieldError('extraRoundPrice')}
                 </div>
               </div>
