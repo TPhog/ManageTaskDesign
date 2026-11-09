@@ -24,11 +24,11 @@ export function QuickSearchTrigger({ onClick }: { onClick: () => void }) {
       type="button"
       onClick={onClick}
       aria-keyshortcuts="Control+K Meta+K"
-      className="flex h-10 w-full items-center gap-2 rounded-lg border bg-background px-3 text-sm text-muted-foreground transition-colors duration-150 hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="flex h-10 w-full items-center gap-2 rounded-md border border-border-strong bg-card px-3 text-[13px] text-muted-foreground transition-colors duration-150 hover:border-foreground/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <Search className="h-4 w-4 shrink-0" aria-hidden="true" />
-      <span className="flex-1 text-left">Tìm kiếm nhanh…</span>
-      <kbd className="rounded border bg-muted px-1.5 py-0.5 font-mono text-[11px]">{shortcutLabel(navigator.platform)}</kbd>
+      <span className="min-w-0 flex-1 truncate text-left">Tìm kiếm nhanh…</span>
+      <kbd className="rounded-[6px] border border-border-strong bg-surface-sunk px-[5px] py-[3px] font-sans text-[11px] font-medium leading-none">{shortcutLabel(navigator.platform)}</kbd>
     </button>
   )
 }

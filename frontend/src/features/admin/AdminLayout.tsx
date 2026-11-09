@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { LayoutDashboard, FolderKanban, ListChecks, FileText, Users, Briefcase, Settings, LogOut, Menu } from 'lucide-react'
@@ -11,24 +11,25 @@ import { useNewRequestCount } from '@/features/admin/revisions/useRevisions'
 import { QuickSearch, QuickSearchTrigger } from '@/features/admin/search/QuickSearch'
 import { StorageBanner } from './settings/StorageBanner'
 
-const navItems = [
+const navItems: { to: string; label: string; icon: typeof LayoutDashboard; end?: boolean; group?: 'studio' }[] = [
   { to: '/admin', label: 'Tổng quan', icon: LayoutDashboard, end: true },
   { to: '/admin/requests', label: 'Yêu cầu', icon: Inbox },
   { to: '/admin/projects', label: 'Dự án', icon: FolderKanban },
   { to: '/admin/tasks', label: 'Công việc', icon: ListChecks },
   { to: '/admin/quotations', label: 'Báo giá', icon: FileText },
   { to: '/admin/clients', label: 'Khách hàng', icon: Users },
-  { to: '/admin/services', label: 'Dịch vụ', icon: Briefcase },
-  { to: '/admin/settings', label: 'Cài đặt', icon: Settings },
+  { to: '/admin/services', label: 'Dịch vụ', icon: Briefcase, group: 'studio' as const },
+  { to: '/admin/settings', label: 'Cài đặt', icon: Settings, group: 'studio' as const },
 ]
 
 function BrandMark() {
   return (
     <div className="flex items-center gap-2.5">
-      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-        FF
-      </div>
-      <span className="font-semibold tracking-tight text-foreground">FreelanceFlow</span>
+      <span aria-hidden="true" className="relative h-[34px] w-[34px] shrink-0 rounded-[10px] bg-foreground">
+        <span className="absolute right-1.5 top-1.5 h-3 w-3 rounded-full bg-highlight" />
+        <span className="absolute bottom-1.5 left-1.5 h-3 w-3 rounded-[3px] bg-background" />
+      </span>
+      <span className="font-display text-[1.0625rem] font-bold tracking-[-0.02em] text-foreground">FreelanceFlow</span>
     </div>
   )
 }
@@ -39,7 +40,7 @@ function NewRequestsBadge() {
   if (!data?.count) return null
   return (
     <span
-      className="ml-auto rounded-full bg-primary px-2 py-0.5 text-xs font-semibold tabular-nums text-primary-foreground"
+      className="ml-auto rounded-full bg-highlight px-2 py-0.5 text-xs font-semibold tabular-nums text-highlight-foreground"
       aria-label={`${data.count} yêu cầu mới`}
     >
       {data.count}
@@ -56,49 +57,51 @@ function SidebarContent({ onNavigate, onLogout, onOpenSearch, loggingOut, userna
 }) {
   return (
     <div className="flex h-full flex-col">
-      <div className="flex h-16 items-center px-5">
+      <div className="px-5 pb-2 pt-6">
         <BrandMark />
       </div>
       <div className="px-3 pb-2">
         <QuickSearchTrigger onClick={onOpenSearch} />
       </div>
-      <nav aria-label="Điều hướng chính" className="flex-1 space-y-1 px-3 py-2">
-        {navItems.map(item => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            onClick={onNavigate}
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors duration-150',
-                isActive
-                  ? 'bg-secondary text-secondary-foreground'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-              )
-            }
-          >
-            <item.icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
-            {item.label}
-            {item.to === '/admin/requests' && <NewRequestsBadge />}
-          </NavLink>
+      <nav aria-label="Điều hướng chính" className="grid flex-1 content-start gap-0.5 overflow-y-auto px-3 py-2">
+        {navItems.map((item, i) => (
+          <Fragment key={item.to}>
+            {item.group === 'studio' && navItems[i - 1]?.group !== 'studio' && (
+              <p className="kicker px-3 pb-1.5 pt-4 text-muted-foreground">Studio</p>
+            )}
+            <NavLink
+              to={item.to}
+              end={item.end}
+              onClick={onNavigate}
+              className={({ isActive }) =>
+                cn(
+                  'flex h-10 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  isActive ? 'bg-primary text-primary-foreground' : 'text-foreground hover:bg-surface-hover',
+                )
+              }
+            >
+              <item.icon className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
+              {item.label}
+              {item.to === '/admin/requests' && <NewRequestsBadge />}
+            </NavLink>
+          </Fragment>
         ))}
       </nav>
-      <div className="border-t p-3">
-        {username && (
-          <div className="mb-2 flex items-center gap-3 px-3 py-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-xs font-semibold uppercase text-muted-foreground">
-              {username.slice(0, 2)}
-            </div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-foreground">{username}</p>
-              <p className="text-xs text-muted-foreground">Designer</p>
-            </div>
+      {username && (
+        <div className="mx-3 mb-1 flex items-center gap-3 rounded-lg border bg-card p-3">
+          <div className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-full bg-highlight text-xs font-bold uppercase text-highlight-foreground">
+            {username.slice(0, 2)}
           </div>
-        )}
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-foreground">{username}</p>
+            <p className="text-xs text-muted-foreground">Designer</p>
+          </div>
+        </div>
+      )}
+      <div className="px-3 pb-3">
         <Button
           variant="ghost"
-          className="w-full justify-start text-muted-foreground hover:bg-red-50 hover:text-red-700"
+          className="w-full justify-start text-muted-foreground hover:bg-danger-soft hover:text-danger"
           onClick={onLogout}
           disabled={loggingOut}
         >
@@ -143,12 +146,12 @@ export default function AdminLayout() {
   return (
     <div className="min-h-screen bg-background">
       {/* desktop sidebar */}
-      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r bg-card lg:block">
+      <aside className="fixed inset-y-0 left-0 hidden w-60 border-r bg-background lg:block">
         <SidebarContent {...sidebarProps} />
       </aside>
 
       {/* mobile top bar */}
-      <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-card/95 px-4 backdrop-blur lg:hidden">
+      <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b bg-background/95 px-4 backdrop-blur lg:hidden">
         <Button
           variant="ghost"
           size="icon"
@@ -158,7 +161,7 @@ export default function AdminLayout() {
         >
           <Menu className="h-5 w-5" />
         </Button>
-        <span className="font-semibold text-foreground">{current?.label ?? 'FreelanceFlow'}</span>
+        <span className="font-display font-bold text-foreground">{current?.label ?? 'FreelanceFlow'}</span>
         <Button
           variant="ghost"
           size="icon"
@@ -184,7 +187,7 @@ export default function AdminLayout() {
         </SheetContent>
       </Sheet>
 
-      <main className="lg:pl-64">
+      <main className="lg:pl-60">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           <StorageBanner />
           <Outlet />

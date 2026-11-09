@@ -23,6 +23,19 @@ const highlights = [
   'Báo giá kèm mã VietQR cho khách',
 ]
 
+/** Same mark as the admin sidebar: ink square, vermilion dot, paper corner. */
+function BrandMark() {
+  return (
+    <div className="flex items-center gap-2.5">
+      <span aria-hidden="true" className="relative h-[34px] w-[34px] shrink-0 rounded-[10px] bg-foreground">
+        <span className="absolute right-1.5 top-1.5 h-3 w-3 rounded-full bg-highlight" />
+        <span className="absolute bottom-1.5 left-1.5 h-3 w-3 rounded-[3px] bg-background" />
+      </span>
+      <span className="font-display text-[1.0625rem] font-bold tracking-[-0.02em] text-foreground">FreelanceFlow</span>
+    </div>
+  )
+}
+
 export default function LoginPage() {
   const navigate = useNavigate()
   const qc = useQueryClient()
@@ -65,45 +78,32 @@ export default function LoginPage() {
   return (
     <div className="grid min-h-screen bg-background lg:grid-cols-2">
       {/* brand panel */}
-      <div className="relative hidden overflow-hidden bg-primary p-12 text-primary-foreground lg:flex lg:flex-col lg:justify-between">
-        <div
-          className="pointer-events-none absolute -right-24 -top-24 h-96 w-96 rounded-full bg-white/10"
-          aria-hidden="true"
-        />
-        <div
-          className="pointer-events-none absolute -bottom-32 -left-16 h-80 w-80 rounded-full bg-white/5"
-          aria-hidden="true"
-        />
-        <div className="relative flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-white text-sm font-bold text-primary">
-            FF
-          </div>
-          <span className="text-lg font-semibold">FreelanceFlow</span>
+      <div className="tone-inverse relative hidden overflow-hidden p-12 lg:flex lg:flex-col lg:justify-between">
+        <div className="pointer-events-none absolute right-12 top-12 h-24 w-24 rounded-full bg-highlight" aria-hidden="true" />
+        <div className="relative">
+          <BrandMark />
         </div>
         <div className="relative max-w-md">
-          <p className="text-3xl font-semibold leading-tight">Không gian làm việc gọn gàng cho designer tự do.</p>
+          <p className="font-display text-display-lg font-bold">Không gian làm việc gọn gàng cho designer tự do.</p>
           <ul className="mt-8 space-y-3">
             {highlights.map(h => (
-              <li key={h} className="flex items-start gap-3 text-sm text-white/90">
-                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <li key={h} className="flex items-start gap-3 text-sm text-on-inverse">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-on-inverse-accent" aria-hidden="true" />
                 {h}
               </li>
             ))}
           </ul>
         </div>
-        <p className="relative text-xs text-white/70">© FreelanceFlow</p>
+        <p className="relative text-xs text-on-inverse-muted">© FreelanceFlow</p>
       </div>
 
       {/* form */}
       <div className="flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center gap-2.5 lg:hidden">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-sm font-bold text-primary-foreground">
-              FF
-            </div>
-            <span className="text-lg font-semibold">FreelanceFlow</span>
+          <div className="mb-8 lg:hidden">
+            <BrandMark />
           </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">Đăng nhập</h1>
+          <h1 className="font-display text-display-lg font-bold text-foreground">Đăng nhập</h1>
           <p className="mt-1 text-sm text-muted-foreground">Chào mừng trở lại. Nhập thông tin để tiếp tục.</p>
 
           <form onSubmit={handleSubmit(data => loginMutation.mutate(data))} className="mt-8 space-y-5" noValidate>
@@ -137,7 +137,7 @@ export default function LoginPage() {
               )}
             </div>
             {errors.root && (
-              <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-700">
+              <div role="alert" className="rounded-lg border border-danger/30 bg-danger-soft px-3 py-2.5 text-sm text-danger">
                 {errors.root.message}
               </div>
             )}

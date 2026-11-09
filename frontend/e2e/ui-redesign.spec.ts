@@ -14,6 +14,16 @@ test.describe('UI redesign (P16) — Studio Bento admin', () => {
     expect(await page.evaluate(() => document.fonts.check('400 16px "Be Vietnam Pro"', 'Tổng quan'))).toBe(true)
   })
 
+  test('page titles use the display face; sidebar marks the current page in ink', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/admin/projects')
+    const h1 = page.getByRole('heading', { name: 'Dự án', level: 1 })
+    await expect(h1).toBeVisible()
+    expect(await h1.evaluate(el => getComputedStyle(el).fontFamily)).toContain('Bricolage Grotesque Variable')
+    const active = page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: 'Dự án' })
+    expect(await active.evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgb(28, 26, 23)')
+  })
+
   for (const width of WIDTHS) {
     test(`captures every admin page at ${width}px`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width, height: 900 })
