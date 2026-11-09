@@ -64,8 +64,9 @@ public class PublicIntakeTests(AppFactory factory) : IntakeTestBase(factory)
             .ActorType.Should().Be("CLIENT");
 
         var alert = (await Factory.Notifications.WaitForAsync(n => n.Title == "Khách mới gửi yêu cầu" && n.Url!.EndsWith($"/admin/intake/{saved.Id}"))).Single();
-        alert.Fields!.Should().Contain(f => f.Name == "Mẫu" && f.Value == "Menu cửa hàng");
-        alert.Fields!.Should().NotContain(f => f.Value.Contains("0909") || f.Value.Contains("lan@example.com"));
+        // decision: client name + template name only — the anonymous free text never reaches Discord (review P13-BE #3)
+        alert.Fields!.Select(f => (f.Name, f.Value)).Should().Equal(("Khách", "Chị Lan"), ("Mẫu", "Menu cửa hàng"));
+        alert.Description.Should().NotContain("Thủ Đức").And.NotContain("Quán cà phê");
     }
 
     [Fact]

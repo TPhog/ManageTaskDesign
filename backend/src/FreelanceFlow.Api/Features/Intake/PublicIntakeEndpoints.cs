@@ -1,4 +1,3 @@
-using System.Globalization;
 using FreelanceFlow.Api.Common;
 using FreelanceFlow.Api.Data;
 using FreelanceFlow.Api.Domain.Common;
@@ -182,12 +181,15 @@ public static class PublicIntakeEndpoints
         perIp.Record(ip, today);
         if (images.Count > 0) await storageAlerts.EvaluateSafelyAsync(CancellationToken.None);
 
-        await NotifyDesignerAsync(notifier, appSettings.Value, logger, submission, images.Count);
+        await NotifyDesignerAsync(notifier, appSettings.Value, logger, submission);
         return Results.NoContent();
     }
 
-    /// <summary>Discord: name + template only (no phone/e-mail to a third party); after commit, never fails the request.</summary>
-    private static async Task NotifyDesignerAsync(INotifier notifier, AppSettings app, ILogger logger, IntakeSubmission s, int imageCount)
+    /// <summary>
+    /// Discord: client name + template name ONLY (decision 2b). The anonymous free text (answers, note) never goes to the
+    /// third party — it may hold phone numbers, e-mails or markdown links. After commit; never fails the request.
+    /// </summary>
+    private static async Task NotifyDesignerAsync(INotifier notifier, AppSettings app, ILogger logger, IntakeSubmission s)
     {
         try
         {
@@ -196,13 +198,11 @@ public static class PublicIntakeEndpoints
                 new("Khách", s.ContactName),
                 new("Mẫu", s.TemplateName ?? "Yêu cầu khác"),
             };
-            if (imageCount > 0) fields.Add(new("Ảnh đính kèm", imageCount.ToString(CultureInfo.InvariantCulture)));
-            var oneLine = string.Join(' ', s.Body.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
-            var excerpt = oneLine.Length > 200 ? oneLine[..200] + "…" : oneLine;
             var url = Uri.TryCreate(app.PublicBaseUrl, UriKind.Absolute, out var baseUri)
                 ? $"{baseUri.AbsoluteUri.TrimEnd('/')}/admin/intake/{s.Id}"
                 : null;
-            await notifier.EnqueueAsync(new Notification("Khách mới gửi yêu cầu", excerpt, url, NotificationSeverity.Info, fields));
+            await notifier.EnqueueAsync(new Notification("Khách mới gửi yêu cầu", "Xem chi tiết trong hộp Khách mới.", url,
+                NotificationSeverity.Info, fields));
         }
         catch (Exception ex)
         {
