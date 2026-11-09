@@ -187,6 +187,14 @@ Caddyfile (`deploy/Caddyfile`): `handle /api/public/*` (`log_skip`) và `handle 
 - Ghi chú phát hành (round 2): Data Protection có `SetApplicationName("FreelanceFlow")` và key ring mới trên volume `keys`, nên lần deploy đầu tiên làm mọi cookie designer/portal cũ hết hiệu lực một lần — designer đăng nhập lại, khách mở lại magic link.
 - Seed designer + settings mặc định + danh sách ngân hàng khi DB trống.
 
+### Triển khai không dùng Docker
+
+Phương án thay thế cho Ubuntu 22.04/24.04 (VPS trắng): `deploy/setup-ubuntu.sh` cài .NET 9 runtime, PostgreSQL 17 (PGDG, chỉ nghe localhost, extension `unaccent`), nginx + certbot, ufw, fail2ban, systemd unit có hardening và backup hằng ngày; `deploy/deploy-windows.ps1` build SPA + publish API trên Windows rồi đẩy lên qua SSH. Cấu hình chung một file `deploy/freelanceflow.conf` (mẫu: `deploy/freelanceflow.conf.example`). Hướng dẫn: `deploy/README-deploy.md`.
+
+- nginx tương đương `deploy/Caddyfile` (header bảo mật, `no-referrer` cho `/p/*` `/f/*`, tắt access log cho `/p/*` `/f/*` `/api/public/*`), phục vụ SPA từ `/opt/freelanceflow/app/current/web`.
+- Kestrel **chỉ** nghe `127.0.0.1:5000` (bắt buộc vì `KnownProxies`/`KnownNetworks` bị xóa - xem chú thích ForwardedHeaders trong `Program.cs`); nginx đặt `X-Forwarded-For $remote_addr`.
+- Mỗi lần deploy là một thư mục release + symlink `current`, kiểm `/health`, tự rollback nếu lỗi; bí mật chỉ nằm trong `/etc/freelanceflow/freelanceflow.env` (mode 600).
+
 ### Backup
 
 - Cron trên host: `pg_dump -Fc` hằng ngày + `tar` volume `files` → thư mục backup, giữ 14 bản,

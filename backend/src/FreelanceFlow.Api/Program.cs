@@ -234,6 +234,9 @@ builder.Services.AddRateLimiter(opt =>
 // are cleared, which is safe ONLY because docker-compose.yml publishes no port for `api` (only `web`
 // is reachable from outside; `api` is on the internal compose network). If `api` ever gets a published
 // port, pin the compose subnet in KnownNetworks instead.
+// Non-Docker deployment (deploy/setup-ubuntu.sh): nginx is the one hop and sets X-Forwarded-For to
+// $remote_addr; this stays safe ONLY because Kestrel listens on 127.0.0.1 (ASPNETCORE_URLS in the env
+// file) and ufw opens just SSH/80/443. Never bind the API to 0.0.0.0 or a public interface.
 builder.Services.Configure<ForwardedHeadersOptions>(opt =>
 {
     opt.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
