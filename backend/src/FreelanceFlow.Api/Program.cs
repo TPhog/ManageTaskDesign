@@ -23,6 +23,7 @@ using FreelanceFlow.Api.Infrastructure;
 using FreelanceFlow.Api.Infrastructure.Notifications;
 using FreelanceFlow.Api.Infrastructure.Security;
 using FreelanceFlow.Api.Infrastructure.Storage;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.Identity;
@@ -66,8 +67,16 @@ builder.Services.AddHostedService<NotificationDispatcher>();
 builder.Services.AddFileStorage(builder.Configuration);
 builder.Services.AddScoped<StorageAlertService>();
 builder.Services.AddScoped<ImageUploader>();
+// Data Protection keys sign the designer/portal cookies and the public-form tokens: persisted so a restart or
+// redeploy keeps them valid (docker-compose mounts the `keys` volume at /data/keys). Tests leave the path empty.
+var dataProtection = builder.Services.AddDataProtection().SetApplicationName("FreelanceFlow");
+var keysPath = builder.Configuration["DataProtection:KeysPath"];
+if (!string.IsNullOrWhiteSpace(keysPath))
+    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(keysPath));
+else if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing"))
+    throw new InvalidOperationException("DataProtection:KeysPath must be set outside Development (docker-compose mounts /data/keys).");
+
 // Public intake form (plan 13): signed form token + minimum fill time
-builder.Services.AddDataProtection();
 builder.Services.Configure<IntakeOptions>(builder.Configuration.GetSection("PublicIntake"));
 builder.Services.AddSingleton<IntakeFormToken>();
 builder.Services.AddScoped<StorageSweeper>();
