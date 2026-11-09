@@ -35,6 +35,25 @@ describe('PortalLightbox (CF-06)', () => {
     expect(screen.getByRole('img', { name: 'Ảnh Menu' }).style.transform).toContain('scale(1)')
   })
 
+  it('zooms once per touch double tap, ignoring the dblclick the browser fires after it', () => {
+    render(<PortalLightbox images={images} index={0} onIndexChange={vi.fn()} />)
+    const img = screen.getByRole('img', { name: 'Ảnh Logo' })
+    const tap = () => {
+      fireEvent.pointerDown(img, { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 100 })
+      fireEvent.pointerUp(img, { pointerId: 1, pointerType: 'touch', clientX: 100, clientY: 100 })
+    }
+
+    tap()
+    tap()
+    expect(img.style.transform).toContain('scale(2.5)')
+    fireEvent.doubleClick(img, { clientX: 100, clientY: 100 })
+    expect(img.style.transform).toContain('scale(2.5)')
+
+    tap()
+    tap()
+    expect(img.style.transform).toContain('scale(1)')
+  })
+
   it('blocks right-click and drag on the image', () => {
     render(<PortalLightbox images={images} index={0} onIndexChange={vi.fn()} />)
     const img = screen.getByRole('img', { name: 'Ảnh Logo' })

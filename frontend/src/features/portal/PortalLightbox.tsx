@@ -22,6 +22,8 @@ export function PortalLightbox({ images, index, onIndexChange }: Props) {
   const pointers = useRef(new Map<number, Point>())
   const start = useRef<{ p: Point; view: View; dist: number } | null>(null)
   const lastTap = useRef<{ t: number; p: Point } | null>(null)
+  // A touch double tap is handled in onPointerUp; browsers then also fire a synthetic dblclick, which must not toggle again.
+  const lastPointerType = useRef<string | null>(null)
 
   // Paging resets zoom and the "preview loaded" flag (state adjusted during render, not in an effect).
   if (shownAt !== at) {
@@ -49,6 +51,7 @@ export function PortalLightbox({ images, index, onIndexChange }: Props) {
   }
 
   function onPointerDown(e: ReactPointerEvent<HTMLImageElement>) {
+    lastPointerType.current = e.pointerType
     e.currentTarget.setPointerCapture?.(e.pointerId)
     pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     const pts = [...pointers.current.values()]
@@ -108,7 +111,10 @@ export function PortalLightbox({ images, index, onIndexChange }: Props) {
                 onLoad={() => setLoaded(true)}
                 onContextMenu={block}
                 onDragStart={block}
-                onDoubleClick={e => toggleZoom({ x: e.clientX, y: e.clientY }, e.currentTarget.getBoundingClientRect())}
+                onDoubleClick={e => {
+                  if (lastPointerType.current === 'touch') return
+                  toggleZoom({ x: e.clientX, y: e.clientY }, e.currentTarget.getBoundingClientRect())
+                }}
                 onPointerDown={onPointerDown}
                 onPointerMove={onPointerMove}
                 onPointerUp={onPointerUp}
