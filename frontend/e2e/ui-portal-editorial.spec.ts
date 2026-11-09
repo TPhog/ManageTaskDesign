@@ -8,7 +8,7 @@ test.describe('UI redesign (P16) — Editorial portal', () => {
   test('editorial theme on a phone: cream paper, serif masthead, 44px targets, no sideways scroll', async ({ page, browser }, testInfo) => {
     await page.goto('/admin')
     const clientId = await createClient(page, `Editorial E2E ${Date.now()}`)
-    await createProjectForClient(page, clientId, 'Bộ nhận diện Editorial')
+    const projectId = await createProjectForClient(page, clientId, 'Bộ nhận diện Editorial')
     const url = await issuePortalLink(page, clientId)
     const { context, page: portal } = await openAsClient(browser, url)
 
@@ -28,6 +28,12 @@ test.describe('UI redesign (P16) — Editorial portal', () => {
 
     expect(await overflowPx(portal)).toBeLessThanOrEqual(0)
     await capture(portal, testInfo, 'portal-home-390')
+    for (const path of [`/portal/projects/${projectId}`, '/portal/quotations', '/portal/requests', '/portal/requests/new']) {
+      await portal.goto(path)
+      await expect(portal.getByRole('heading', { level: 1 }).first()).toBeVisible()
+      await portal.evaluate(() => document.fonts.ready)
+      expect(await overflowPx(portal), `${path} scrolls sideways at 390px`).toBeLessThanOrEqual(0)
+    }
     await portal.setViewportSize({ width: 1440, height: 900 })
     await capture(portal, testInfo, 'portal-home-1440')
     await context.close()

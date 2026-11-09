@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test'
-import { apiPost, createClient, createProjectForClient, createTask, expectToast } from './helpers'
+import { apiPost, createClient, createProjectForClient, createTask, expectToast, resetLastTaskView } from './helpers'
 import { archiveClient } from './cleanup'
 import { pickOption } from './comboboxHelpers'
 
@@ -55,6 +55,7 @@ test.describe('Lists — search, filters, pickers (QA D-06/D-07/D-18/D-21)', () 
     const projectId = await createProjectForClient(page, clientId, `E2E Task DA ${tag}`)
     await createTask(page, projectId, { title: `Phác thảo ${tag}` })
     await createTask(page, projectId, { title: `Chốt màu ${tag}` })
+    await resetLastTaskView(page)
 
     await page.goto('/admin/tasks')
     await expect(page.getByText('Công việc của mọi dự án (trừ dự án đã huỷ)')).toBeVisible()

@@ -87,3 +87,13 @@ export async function createTask(
 ): Promise<string> {
   return (await apiPost(page.request, page, `/api/admin/projects/${projectId}/tasks`, body)).id
 }
+
+/** Clear the saved "last task view" (PUT, there is no DELETE) so a bare /admin/tasks opens the default list, not a calendar left by an earlier run. Page must already be on an app URL. */
+export async function resetLastTaskView(page: Page) {
+  const config = { mode: 'list', groupBy: 'none', due: null, status: null, clientId: null, clientLabel: null, projectId: null, projectLabel: null, q: null, calendarUnit: 'month' }
+  const res = await page.request.put('/api/admin/task-views/last', {
+    data: { config },
+    headers: { 'X-CSRF-Token': await csrfToken(page), Origin: new URL(page.url()).origin },
+  })
+  expect(res.ok(), `task-views/last → ${res.status()}`).toBeTruthy()
+}

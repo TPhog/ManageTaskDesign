@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test'
+import { createProject } from './helpers'
 import { ADMIN_ROUTES, WIDTHS, capture, overflowPx } from './uiHelpers'
 
 test.describe('UI redesign (P16) — Studio Bento admin', () => {
@@ -54,8 +55,27 @@ test.describe('UI redesign (P16) — Studio Bento admin', () => {
         await page.evaluate(() => document.fonts.ready)
         const px = await overflowPx(page)
         testInfo.annotations.push({ type: `overflow-${width}`, description: `${r.name}: ${px}px` })
+        if (width === 390) expect(px, `${r.name} scrolls sideways at 390px`).toBeLessThanOrEqual(0)
         await capture(page, testInfo, `${r.name}-${width}`)
       }
     })
   }
+  test('project detail and login follow the bento look without sideways scroll', async ({ page, browser }, testInfo) => {
+    await page.goto('/admin')
+    const projectId = await createProject(page, `E2E Bento ${Date.now()}`)
+    for (const width of WIDTHS) {
+      await page.setViewportSize({ width, height: 900 })
+      await page.goto(`/admin/projects/${projectId}`)
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+      expect(await overflowPx(page)).toBeLessThanOrEqual(0)
+      await capture(page, testInfo, `project-detail-${width}`)
+    }
+    const anon = await browser.newContext({ storageState: { cookies: [], origins: [] }, viewport: { width: 390, height: 844 } })
+    const login = await anon.newPage()
+    await login.goto('/admin/login')
+    await expect(login.getByRole('heading', { name: 'Đăng nhập' })).toBeVisible()
+    expect(await overflowPx(login)).toBeLessThanOrEqual(0)
+    await capture(login, testInfo, 'login-390')
+    await anon.close()
+  })
 })

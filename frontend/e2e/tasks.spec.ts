@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
-import { createProject, createTask, expectToast, selectOption } from './helpers'
+import { createProject, createTask, expectToast, resetLastTaskView, selectOption } from './helpers'
 
 /** Today in Vietnam as YYYY-MM-DD (the app compares due dates with today(VN), BR-81). */
 function vnToday(): string {
@@ -174,6 +174,11 @@ test.describe('Keyboard drag', () => {
 })
 
 test.describe('All tasks page', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/admin')
+    await resetLastTaskView(page)
+  })
+
   test('sidebar opens the tasks page', async ({ page }) => {
     await page.goto('/admin')
     await page.getByRole('navigation', { name: 'Điều hướng chính' }).getByRole('link', { name: 'Công việc' }).click()
