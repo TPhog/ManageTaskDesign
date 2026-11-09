@@ -102,11 +102,14 @@ export default function TasksPage() {
   const views = useTaskViews()
   const saveLast = useSaveLastView()
   const restored = useRef(false)
+  // the views menu starts tracking which saved view is in use only once the restored filters are on screen
+  const [restoreDone, setRestoreDone] = useState(false)
   useEffect(() => {
     if (restored.current || !views.isFetched) return
     restored.current = true
     const last = views.data?.last
     if (last && !VIEW_KEYS.some(k => searchParams.has(k))) applyConfig(last)
+    setRestoreDone(true)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, when the saved views first arrive
   }, [views.isFetched])
   const configKey = JSON.stringify(viewConfig)
@@ -170,7 +173,7 @@ export default function TasksPage() {
             ))}
           </div>
 
-          <TaskViewsMenu current={viewConfig} onApply={applyConfig} />
+          <TaskViewsMenu current={viewConfig} onApply={applyConfig} ready={restoreDone} />
 
           {calendar ? (
             <SearchCombobox

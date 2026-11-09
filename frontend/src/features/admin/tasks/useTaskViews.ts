@@ -5,8 +5,8 @@ import { qk } from '@/lib/queryKeys'
 import type { SavedTaskView, TaskViewConfig } from '@/lib/types'
 
 function viewError(err: ApiError, fallback: string): string {
-  // 409 CONFLICT: duplicate name (case-insensitive) or the 20-view cap
-  if (err.status === 409) return 'Đã có chế độ xem trùng tên hoặc đã đủ 20 chế độ xem'
+  // 409 CONFLICT: the server says which one (duplicate name, case-insensitive, or the 20-view cap)
+  if (err.status === 409) return err.detail ?? 'Đã có chế độ xem trùng tên hoặc đã đủ 20 chế độ xem'
   return (err.errors ? Object.values(err.errors).flat()[0] : undefined) ?? err.detail ?? fallback
 }
 

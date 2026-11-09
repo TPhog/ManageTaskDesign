@@ -21,10 +21,12 @@ const rowButton =
 interface Props {
   current: TaskViewConfig
   onApply: (config: TaskViewConfig) => void
+  /** false while the page is still restoring the last view: `current` is not the real view yet */
+  ready?: boolean
 }
 
 /** Saved task-list views: apply, save the current filters under a name, update or delete one. */
-export function TaskViewsMenu({ current, onApply }: Props) {
+export function TaskViewsMenu({ current, onApply, ready = true }: Props) {
   const { data, isLoading } = useTaskViews()
   const save = useSaveTaskView()
   const update = useUpdateTaskView()
@@ -36,6 +38,9 @@ export function TaskViewsMenu({ current, onApply }: Props) {
 
   const views = data?.views ?? []
   const matching = views.find(v => sameConfig(v.config, current))
+  // The saved view in use is the last one the filters matched — picked here, or restored after a reload — so
+  // editing its filters still offers "Cập nhật" instead of only "Lưu…"
+  if (ready && matching && matching.id !== appliedId) setAppliedId(matching.id)
   // the view picked last, now edited: offer to overwrite it
   const applied = views.find(v => v.id === appliedId)
   const changed = applied && !sameConfig(applied.config, current) ? applied : null
