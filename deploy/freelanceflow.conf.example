@@ -1,0 +1,170 @@
+# =====================================================================================
+#  FreelanceFlow - file cấu hình deploy KHÔNG dùng Docker (Ubuntu 22.04 / 24.04)
+# =====================================================================================
+#  Cách dùng:
+#    1. Copy file này thành  deploy/freelanceflow.conf  (đã nằm trong .gitignore - KHÔNG commit).
+#    2. Điền các giá trị bên dưới.
+#    3. Trên máy Windows:  powershell -ExecutionPolicy Bypass -File deploy\deploy-windows.ps1 -FirstTime
+#
+#  Cú pháp (đọc bởi cả setup-ubuntu.sh lẫn deploy-windows.ps1):
+#    - Mỗi dòng một  KEY=giá_trị . Có thể bọc giá trị trong "..." hoặc '...'.
+#    - Dòng bắt đầu bằng # là chú thích. KHÔNG có biến $ITEM, không chạy lệnh, không nối chuỗi.
+#    - Giá trị không được chứa khoảng trắng, dấu nháy, dấu \ hay dấu $ (script sẽ từ chối).
+#    - Để trống = dùng mặc định ghi trong chú thích.
+#
+#  Bí mật (DB_PASSWORD, DESIGNER_PASSWORD, DISCORD_WEBHOOK_URL):
+#    - Sau lần setup đầu, chúng nằm DUY NHẤT trong /etc/freelanceflow/freelanceflow.env trên server
+#      (mode 600). Bản sao file cấu hình trên server (/etc/freelanceflow/freelanceflow.conf) bị xóa trắng
+#      3 giá trị này. Bạn có thể xóa chúng khỏi file local sau khi setup xong.
+# =====================================================================================
+
+
+# -------------------------------------------------------------------------------------
+# 1. SSH tới server (chỉ deploy-windows.ps1 dùng)
+# -------------------------------------------------------------------------------------
+# IP hoặc tên miền của server
+SSH_HOST=
+# Cổng SSH (mặc định 22). setup-ubuntu.sh cũng mở cổng này trên ufw.
+SSH_PORT=22
+# User SSH có quyền sudo (vd: ubuntu). Dùng root cũng được nhưng không khuyến khích.
+SSH_USER=ubuntu
+# Đường dẫn private key trên Windows (để trống = dùng key mặc định của OpenSSH, vd C:\Users\<bạn>\.ssh\id_ed25519)
+SSH_KEY_PATH=
+# Thư mục tạm trên server (tính từ home của SSH_USER) để upload script + gói release
+REMOTE_UPLOAD_DIR=freelanceflow-deploy
+
+
+# -------------------------------------------------------------------------------------
+# 2. Tên miền & HTTPS
+# -------------------------------------------------------------------------------------
+# Tên miền trỏ (bản ghi DNS A) về IP server, vd: app.tenban.com  (BẮT BUỘC)
+DOMAIN=
+# Email đăng ký Let's Encrypt.
+#   - Có email  -> chế độ HTTPS: nginx + certbot xin chứng chỉ, tự gia hạn, bật HSTS. ĐÂY LÀ CHẾ ĐỘ CHẠY THẬT.
+#   - Để trống  -> chế độ CHỈ HTTP để thử cài đặt lần đầu (khi DNS chưa trỏ xong). Lưu ý TRUNG THỰC:
+#       * API vẫn chạy Production và App__PublicBaseUrl vẫn là https://DOMAIN (API từ chối khởi động nếu
+#         không phải https) -> link magic-link gửi khách sẽ là https và CHƯA mở được cho tới khi bật HTTPS.
+#       * Cookie CSRF (ff_csrf) luôn có cờ Secure: mở http://DOMAIN từ Internet thì đăng nhập + XEM được,
+#         nhưng mọi thao tác GHI sẽ bị 403. Mật khẩu đi qua mạng dạng rõ -> chỉ dùng để kiểm tra nhanh.
+#       * Muốn thử ĐẦY ĐỦ ở chế độ này: mở SSH tunnel  ssh -L 8080:127.0.0.1:80 <user>@<server>
+#         rồi vào http://localhost:8080 (localhost được trình duyệt coi là an toàn; script cho phép thêm
+#         origin http://localhost:8080 chỉ trong chế độ HTTP, tự gỡ khi bật HTTPS).
+#     Khi DNS đã trỏ đúng: điền email rồi chạy lại  deploy-windows.ps1 -FirstTime  (setup chạy lại an toàn).
+LETSENCRYPT_EMAIL=
+
+
+# -------------------------------------------------------------------------------------
+# 3. Thư mục cài đặt trên server
+# -------------------------------------------------------------------------------------
+# Code ứng dụng: mỗi lần deploy là 1 thư mục  $APP_DIR/releases/<thời_gian>/{app,web}
+# và symlink  $APP_DIR/current  trỏ tới bản đang chạy. nginx phục vụ SPA từ  $APP_DIR/current/web.
+APP_DIR=/opt/freelanceflow/app
+# Ảnh upload (Storage__Local__RootPath) - nằm ngoài web root, chỉ API đọc
+FILES_DIR=/var/lib/freelanceflow/files
+# Key ring Data Protection (ký cookie đăng nhập/portal, token form khách mới). Mất thư mục này = mọi người bị đăng xuất.
+KEYS_DIR=/var/lib/freelanceflow/keys
+# Giữ lại bao nhiêu bản release cũ để rollback (mỗi bản ~26 MB sau giải nén)
+KEEP_RELEASES=5
+# Cố định (không đổi được): user hệ thống  freelanceflow  (không đăng nhập được),
+# env file  /etc/freelanceflow/freelanceflow.env  (mode 600, root:freelanceflow), service  freelanceflow.service,
+# lệnh quản trị  /usr/local/sbin/freelanceflow  (sudo freelanceflow status|deploy|backup|rollback|logs|setup)
+
+
+# -------------------------------------------------------------------------------------
+# 4. API (Kestrel)
+# -------------------------------------------------------------------------------------
+# Cổng Kestrel. API CHỈ lắng nghe 127.0.0.1 (cố định) - bắt buộc, vì API tin header X-Forwarded-For
+# của 1 hop proxy (KnownProxies đã bị xóa trong Program.cs); mở ra ngoài là cho phép giả IP.
+KESTREL_PORT=5000
+# Mức log Serilog: Verbose | Debug | Information | Warning | Error   (mặc định Information)
+LOG_LEVEL=Information
+# 0 = Workstation GC (ít RAM, hợp VPS 1-2 GB), 1 = Server GC (nhiều RAM hơn, throughput cao hơn)
+DOTNET_SERVER_GC=0
+
+
+# -------------------------------------------------------------------------------------
+# 5. PostgreSQL 17 (cài từ repo chính thức PGDG, chỉ nghe localhost)
+# -------------------------------------------------------------------------------------
+DB_NAME=freelanceflow
+DB_USER=ff
+# Để trống = tự sinh mật khẩu ngẫu nhiên mạnh lần đầu và lưu vào env file.
+# Đã có mật khẩu trong env file thì KHÔNG BAO GIỜ bị ghi đè (giá trị khác ở đây sẽ bị bỏ qua kèm cảnh báo).
+# Chỉ được dùng chữ, số và . _ ~ -
+DB_PASSWORD=
+
+
+# -------------------------------------------------------------------------------------
+# 6. Tài khoản designer ban đầu (chỉ dùng khi DB CHƯA có tài khoản nào)
+# -------------------------------------------------------------------------------------
+DESIGNER_USERNAME=designer
+# Để trống = tự sinh và IN RA MỘT LẦN ở cuối setup. Sau khi tài khoản được tạo, script tự xóa
+# Seed__* khỏi env file. Đổi mật khẩu sau đó: trong app (Cài đặt), không phải ở đây. Tối thiểu 12 ký tự (như quy định đổi mật khẩu trong app).
+DESIGNER_PASSWORD=
+
+
+# -------------------------------------------------------------------------------------
+# 7. Thông báo Discord (tùy chọn, BÍ MẬT)
+# -------------------------------------------------------------------------------------
+# URL webhook Discord (https://discord.com/api/webhooks/...).
+#   - Để trống = giữ nguyên giá trị đang có trên server (hoặc tắt nếu chưa có).
+#   - Ghi  none  = xóa webhook (tắt thông báo).
+DISCORD_WEBHOOK_URL=
+
+
+# -------------------------------------------------------------------------------------
+# 8. Lưu trữ ảnh & upload
+# -------------------------------------------------------------------------------------
+# Hạn mức ảnh (byte). Mặc định 10 GB = 10737418240. Upload bị chặn ở 90 %, Discord cảnh báo ở 70/85/90/95 %.
+# Vì sao 10 GB với ổ 50 GB: OS + gói ~6 GB, PostgreSQL ~1-2 GB, ảnh 10 GB, bản sao lưu ảnh (snapshot
+# hard-link, chỉ tốn thêm phần ảnh đã xóa trong thời gian giữ) tới ~10 GB, dump DB + 5 release + journal
+# + swap ~5 GB  ->  ~32 GB, còn dư ~18 GB. Lên 20 GB thì ảnh + backup ảnh đã ~40 GB: quá sát.
+STORAGE_QUOTA_BYTES=10737418240
+# Dung lượng tối đa 1 ảnh (MB). nginx tự tính client_max_body_size theo giá trị này
+# (form khách mới: 3 ảnh x MAX_UPLOAD_MB + 1 MB; admin 220 MB; portal 101 MB).
+MAX_UPLOAD_MB=20
+
+
+# -------------------------------------------------------------------------------------
+# 9. Giới hạn tần suất (rate limit) - tính theo IP thật của khách
+# -------------------------------------------------------------------------------------
+# Đăng nhập designer: số lần/phút/IP
+RATE_LIMIT_LOGIN_PER_MINUTE=5
+# Form khách mới /f/{slug}: số lần ĐỌC/phút/IP
+RATE_LIMIT_PUBLIC_INTAKE_PER_MINUTE=10
+# Form khách mới: số lần GỬI/giờ/IP (cửa sổ trượt)
+RATE_LIMIT_PUBLIC_INTAKE_SUBMIT_PER_HOUR=5
+# Số hồ sơ khách mới được lưu/ngày (giờ VN)/IP. Trần 30 hồ sơ/ngày cho cả studio là cố định.
+# Lưu ý CGNAT: khách dùng 4G có thể chung 1 IP - đừng đặt quá thấp.
+PUBLIC_INTAKE_MAX_SUBMISSIONS_PER_IP_PER_DAY=5
+
+
+# -------------------------------------------------------------------------------------
+# 10. Sao lưu (local, hằng ngày, systemd timer)
+# -------------------------------------------------------------------------------------
+# Thư mục backup: db/<thời_gian>.dump (pg_dump -Fc) + files/<thời_gian>/ (ảnh + key ring, snapshot hard-link)
+BACKUP_DIR=/var/backups/freelanceflow
+# Giữ bao nhiêu ngày (bản mới nhất luôn được giữ)
+BACKUP_RETENTION_DAYS=14
+# Giờ chạy hằng ngày (giờ server = TIMEZONE), HH:MM
+BACKUP_TIME=02:30
+# Lưu ý: backup nằm CÙNG ổ đĩa với dữ liệu -> chống lỗi thao tác / migration hỏng, KHÔNG chống hỏng ổ.
+# Nên chép thêm ra ngoài (rclone tới Google Drive / R2...) - xem README-deploy.md.
+
+
+# -------------------------------------------------------------------------------------
+# 11. Hệ thống
+# -------------------------------------------------------------------------------------
+TIMEZONE=Asia/Ho_Chi_Minh
+# Tạo swapfile (MB) nếu server CHƯA có swap và RAM < 4 GB. 0 = không tạo. Mặc định 2048.
+SWAP_SIZE_MB=2048
+# Giới hạn dung lượng journald (log hệ thống + log API) để không đầy ổ
+JOURNAL_MAX_USE=1G
+
+
+# -------------------------------------------------------------------------------------
+# 12. Siết SSH (tùy chọn, mặc định TẮT) - yes | no
+# -------------------------------------------------------------------------------------
+# Tắt đăng nhập bằng mật khẩu (chỉ SSH key). Script từ chối nếu user sudo chưa có ~/.ssh/authorized_keys.
+SSH_DISABLE_PASSWORD_AUTH=no
+# Cấm đăng nhập SSH bằng root. Script từ chối nếu bạn đang chạy setup với tư cách root qua SSH.
+SSH_DISABLE_ROOT_LOGIN=no

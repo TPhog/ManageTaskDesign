@@ -29,3 +29,7 @@ dist/
 
 # Local image storage in Development (Storage:Local:RootPath = ./data/files under the API content root)
 backend/src/FreelanceFlow.Api/data/
+
+# Non-Docker deploy (deploy/README-deploy.md): the real config holds secrets; .build is the local build output
+deploy/freelanceflow.conf
+deploy/.build/

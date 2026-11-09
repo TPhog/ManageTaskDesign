@@ -1,0 +1,3 @@
+# Scripts that run on Linux must keep LF even with core.autocrlf=true (bash rejects CRLF)
+*.sh text eol=lf
+deploy/*.conf.example text eol=lf
