@@ -28,6 +28,7 @@
   session portal; SPA đọc và gửi header `X-CSRF-Token`; middleware so sánh constant-time.
 - Kèm kiểm tra `Origin`/`Referer` = `App__PublicBaseUrl` cho POST/PUT/PATCH/DELETE.
 - Không có endpoint thay đổi dữ liệu bằng GET.
+- **Ngoại lệ có chủ đích:** tiền tố `/api/public/*` (form khách mới, §4.5) không kiểm CSRF - ẩn danh, không có phiên để giả mạo, và trang `/f/*` dùng `Referrer-Policy: no-referrer` nên trình duyệt gửi `Origin: null`. Mọi endpoint dưới `/api/public` **phải** giữ ẩn danh và không đọc `HttpContext.User` (có chú thích GUARD trong `CsrfMiddleware`).
 
 ## 4. Client Portal — magic link
 
@@ -66,6 +67,7 @@ URL        = {PublicBaseUrl}/p/{token}
 - Trang `/p/*`: `Referrer-Policy: no-referrer`, không tải tài nguyên bên thứ ba (tránh rò token qua Referer).
 - Reverse proxy **không log** path `/p/*` đầy đủ (Caddy: `log` filter hoặc ghi `uri` đã che).
 - Serilog: không log body `POST /api/portal/session`.
+- Trang `/f/*` (form khách mới): `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex`; Caddy `log_skip` cho cả `/f/*` và `/api/public/*` (path chứa slug) - `deploy/Caddyfile`; Vite dev server đặt `Referrer-Policy` cho `/p/*` và `/f/*`. Slug ở môi trường Development có thể xuất hiện trong log request của ASP.NET (production chỉ log Warning trở lên).
 
 ### 4.4 Phân quyền dữ liệu (bắt buộc)
 
@@ -79,12 +81,27 @@ URL        = {PublicBaseUrl}/p/{token}
 - Test integration bắt buộc cho **mọi** endpoint Portal: khách B gọi với id tài nguyên của khách A → 404 (09-test-plan §4).
 - **Lệnh ghi của khách (Plan 12):** `POST /api/portal/quotations/{id}/accept` và `.../payment-notice`, `POST /api/portal/deliverables/{id}/approve` đều cần CSRF (§3), scope theo `PortalPrincipal.ClientId` (ngoài phạm vi → `404`), idempotent, và **chỉ ghi các cột `client_*` / `client_decision`** - không đổi `status`, `payment_status` hay tiền (BR-01, BR-76/77). Ghi chú của khách ≤ 500 ký tự được lưu nhưng **không** đi vào log hay `activity_logs.data` (chỉ `hasNote`); Discord cắt còn 200 ký tự. Trigger `fn_quotation_locked` là fail-closed: chỉ whitelist đúng 4 cột `client_*` mới (04 §2), mọi cột nội dung khác vẫn bị khóa.
 
+### 4.5 Form công khai cho khách mới `/f/{slug}` (Plan 13)
+
+- Endpoint: `GET`/`POST /api/public/intake/{slug}` - `AllowAnonymous` có chủ đích. Handler **không** đọc `HttpContext.User` và không inject `PortalPrincipal`: cookie `ff_admin`/`ff_portal` đi kèm bị bỏ qua (test `Designer_cookie_is_ignored…`).
+- Slug 128-bit ngẫu nhiên (`RandomNumberGenerator`), không phải bí mật tuyệt đối (designer đăng công khai) nên lưu nguyên văn; "Tạo link mới" thay slug. Slug sai / form tắt → cùng một `404`. Activity không ghi slug.
+- Giới hạn (BR-137):
+  - rate limit theo IP (IPv6 theo /64, `ClientIpKey`): `GET` 10/phút (`RateLimit:PublicIntakePerMinute`, Development 120) và `POST` 5/giờ cửa sổ trượt (`RateLimit:PublicIntakeSubmitPerHour`, Development 60) → `429`;
+  - trần **30 hồ sơ lưu/ngày VN cho cả studio** (đếm lại dưới `pg_advisory_xact_lock` trong transaction ghi) và **5 hồ sơ lưu/ngày VN/IP** (`PublicIntake:MaxSubmissionsPerIpPerDay`, đếm trong bộ nhớ) → `429 RATE_LIMITED`;
+  - body ≤ `App:MaxUploadMb × 3 + 1` MB (`ImageLimits.PublicIntakeBodyBytes`, mặc định 61 MB) → `413`; ≤ 3 ảnh, kiểm magic bytes như §5 → `415`;
+  - kho ≥ **80 %** → từ chối ảnh `507 STORAGE_FULL`, vẫn nhận phần chữ; câu ảnh bắt buộc thành tuỳ chọn (BR-131, BR-135).
+- Chống bot (BR-138): honeypot `website` + thời gian điền tối thiểu `PublicIntake:MinFillSeconds` (3 s) đo bằng `formToken` = Data Protection `Protect("{slug}|{issuedAtUnixMs}|{id}")`, purpose `FreelanceFlow.PublicIntake.FormToken.v1`, hiệu lực 24 h, **dùng một lần** cho một hồ sơ được lưu (id đã dùng nằm trong bộ nhớ, trả lại khi hồ sơ không được lưu). Bot nhận `204` giống người thật và không có dòng nào được ghi.
+- **Data Protection keys phải được lưu bền:** `DataProtection:KeysPath` (production `/data/keys`, volume `keys`; Development `./data/keys`). API **từ chối khởi động** ngoài Development/Testing nếu thiếu cấu hình này. Nếu key ring mất, mọi cookie đăng nhập/portal và biểu mẫu đang mở mất hiệu lực (khách nhận `FORM_EXPIRED` và biểu mẫu tự tải lại token).
+- Không echo: POST thành công `204` rỗng; lỗi validation chỉ có thông điệp theo trường. GET chỉ trả `displayName`, `contactPhone`, `contactEmail` của studio + mẫu đang bật (không `serviceId`, `designType`, ngân hàng, dữ liệu khách); `Cache-Control: no-store`.
+- Không log body, tên, SĐT, email, slug, `formToken`, địa chỉ IP (chỉ dùng làm khoá trong bộ nhớ). Activity `intake.submitted` chỉ có `templateId`, `imageCount`. Discord chỉ nhận **tên khách + tên mẫu** (không SĐT/email/câu trả lời/ghi chú).
+- Cổng quản trị: hộp Khách mới và mẫu yêu cầu chỉ dành cho designer (`/api/admin/*`).
+
 ## 5. Upload file
 
 | Kiểm tra | Giá trị |
 |---|---|
 | Kích thước | ≤ 20 MB/file (Kestrel `MaxRequestBodySize` 220 MB cho 10 file); proxy cùng giới hạn |
-| Số file | ≤ 5/request (portal, Plan 12), ≤ 3 ảnh (form khách mới, §4.5), ≤ 20 (admin) |
+| Số file | ≤ 5/request (portal, Plan 12), ≤ 3 ảnh (form khách mới, §4.5, BR-135), ≤ 20 (admin) |
 | Định dạng cho khách upload | `jpg, jpeg, png, webp, gif, pdf` |
 | Định dạng cho designer upload | trên + `zip, ai, psd, fig, eps, svg, mp4` |
 | Kiểm tra | Phần mở rộng **và** magic bytes khớp; MIME từ server, không tin header client |
@@ -138,6 +155,10 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 - [ ] Test isolation Portal pass 100%.
 - [ ] Rate limit login & portal session hoạt động (thử thủ công).
 - [ ] Upload file `.html`, `.svg` (từ portal), file đổi đuôi → bị từ chối.
+- [ ] `/f/*` có `Referrer-Policy: no-referrer` + `X-Robots-Tag: noindex`; Caddy `log_skip` cho `/f/*` và `/api/public/*`.
+- [ ] `DataProtection__KeysPath` trỏ vào volume bền (`/data/keys`); đã kiểm tra cookie còn hiệu lực sau khi restart API.
+- [ ] `RateLimit__PublicIntakeSubmitPerHour` và `PublicIntake__MaxSubmissionsPerIpPerDay` đặt cho production (mặc định 5 và 5); `RateLimit__PublicIntakePerMinute` mặc định 10.
+- [ ] Form khách mới tắt nếu không dùng.
 - [ ] Không thấy token portal trong log proxy/app.
 - [ ] Backup chạy và restore thử thành công.
 - [ ] `dotnet list package --vulnerable` và `npm audit` không có lỗi High/Critical.

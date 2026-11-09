@@ -33,6 +33,12 @@ erDiagram
     quotations ||--o| quotations : "previous_version_id"
     projects ||--o{ files : has
     client_requests ||--o{ files : attachments
+    request_templates }o--o| services : "service_id (nullable)"
+    client_requests }o--o| request_templates : "template_id (nullable)"
+    intake_submissions }o--o| request_templates : "template_id (nullable)"
+    intake_submissions }o--o| clients : "converted_client_id"
+    intake_submissions }o--o| projects : "converted_project_id"
+    intake_submissions ||--o{ files : "owner_type = INTAKE_SUBMISSION"
     quotations }o--o| files : "evidence_file_id"
     activity_logs }o--|| projects : "project_id (nullable)"
 ```
@@ -75,6 +81,8 @@ CREATE TABLE settings (
     default_terms            text NOT NULL DEFAULT '',
     digest_enabled           boolean NOT NULL DEFAULT true,          -- P11 BR-94
     digest_hour_vn           int NOT NULL DEFAULT 8 CHECK (digest_hour_vn BETWEEN 0 AND 23),
+    intake_enabled           boolean NOT NULL DEFAULT false,         -- P13 BR-133: form khách mới /f/{slug}
+    intake_slug              text,                                   -- 22 ký tự base64url (128-bit), giữ nguyên khi tắt/bật
     portal_response_time     varchar(60) NOT NULL DEFAULT 'trong 24 giờ',  -- P12: "Nhà thiết kế thường phản hồi …" (1-60 ký tự, trống → mặc định)
     updated_at               timestamptz NOT NULL
 );
@@ -207,6 +215,13 @@ CREATE TABLE client_requests (
     CHECK (status <> 'DECLINED' OR decline_reason IS NOT NULL),
     CHECK (created_by <> 'CLIENT' OR source = 'PORTAL')
 );
+-- P13 (migration 20261113090000_AddRequestTemplatesAndIntake): yêu cầu theo mẫu (BR-132)
+ALTER TABLE client_requests ADD COLUMN template_id   uuid REFERENCES request_templates(id) ON DELETE SET NULL;
+ALTER TABLE client_requests ADD COLUMN template_name text;                                   -- snapshot
+ALTER TABLE client_requests ADD COLUMN answers       jsonb NOT NULL DEFAULT '[]'::jsonb;     -- [{key,label,type,display}]
+ALTER TABLE client_requests ADD CONSTRAINT ck_requests_answers CHECK (jsonb_typeof(answers) = 'array');
+CREATE INDEX "IX_client_requests_template_id" ON client_requests (template_id);
+
 CREATE INDEX ix_requests_status ON client_requests (status, created_at DESC);
 CREATE INDEX ix_requests_project ON client_requests (project_id);
 
@@ -400,6 +415,48 @@ END $$ LANGUAGE plpgsql;
 CREATE TRIGGER quotation_items_locked BEFORE INSERT OR UPDATE OR DELETE ON quotation_items
   FOR EACH ROW EXECUTE FUNCTION trg_quotation_items_locked();
 
+-- ============ Mẫu yêu cầu & form khách mới (P13, migration 20261113090000_AddRequestTemplatesAndIntake) ============
+CREATE TABLE request_templates (
+    id           uuid PRIMARY KEY,
+    name         text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 100),
+    description  text NOT NULL DEFAULT '' CHECK (char_length(description) <= 500),
+    design_type  text NOT NULL CHECK (design_type IN ('LOGO','BANNER','POSTER','BRANDING','UI_UX','SOCIAL_MEDIA','PACKAGING','PRINT','OTHER')),
+    service_id   uuid REFERENCES services(id) ON DELETE SET NULL,
+    fields       jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(fields) = 'array' AND jsonb_array_length(fields) <= 30),
+    active       boolean NOT NULL,
+    sort_order   int NOT NULL,
+    created_at   timestamptz NOT NULL,
+    updated_at   timestamptz NOT NULL
+);
+CREATE INDEX ix_request_templates_order ON request_templates (sort_order, created_at);
+
+CREATE TABLE intake_submissions (
+    id                    uuid PRIMARY KEY,
+    template_id           uuid REFERENCES request_templates(id) ON DELETE SET NULL,
+    template_name         text,                                                  -- snapshot
+    contact_name          text NOT NULL CHECK (char_length(contact_name) BETWEEN 1 AND 100),
+    contact_phone         text NOT NULL CHECK (char_length(contact_phone) BETWEEN 1 AND 20),
+    contact_email         text CHECK (contact_email IS NULL OR char_length(contact_email) <= 200),
+    answers               jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(answers) = 'array'),
+    note                  text NOT NULL DEFAULT '' CHECK (char_length(note) <= 2000),
+    body                  text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 10000),   -- văn bản render
+    status                text NOT NULL DEFAULT 'NEW' CHECK (status IN ('NEW','CONVERTED','REJECTED')),
+    reject_reason         text CHECK (reject_reason IS NULL OR char_length(reject_reason) <= 500),
+    converted_client_id   uuid REFERENCES clients(id),
+    converted_project_id  uuid REFERENCES projects(id),
+    converted_at          timestamptz,
+    rejected_at           timestamptz,
+    created_at            timestamptz NOT NULL,
+    updated_at            timestamptz NOT NULL,
+    CONSTRAINT ck_intake_converted CHECK ((status = 'CONVERTED') = (converted_client_id IS NOT NULL AND converted_project_id IS NOT NULL AND converted_at IS NOT NULL)),
+    CONSTRAINT ck_intake_rejected  CHECK ((status = 'REJECTED') = (rejected_at IS NOT NULL))
+);
+CREATE INDEX ix_intake_status ON intake_submissions (status, created_at DESC);
+
+ALTER TABLE settings ADD CONSTRAINT ck_settings_intake_slug    CHECK (intake_slug IS NULL OR intake_slug ~ '^[A-Za-z0-9_-]{22}$');
+ALTER TABLE settings ADD CONSTRAINT ck_settings_intake_enabled CHECK (NOT intake_enabled OR intake_slug IS NOT NULL);
+CREATE UNIQUE INDEX ux_settings_intake_slug ON settings (intake_slug);
+
 -- ============ Files ============
 CREATE TABLE files (
     id                 uuid PRIMARY KEY,
@@ -426,6 +483,13 @@ ALTER TABLE files ADD COLUMN original_deleted_at timestamptz;                   
 ALTER TABLE files ADD CONSTRAINT ck_files_preview_alias
   CHECK (NOT preview_is_original OR (uploaded_by = 'CLIENT' AND original_deleted_at IS NULL));
 CREATE INDEX ix_files_project_sha256 ON files (project_id, sha256) WHERE deleted_at IS NULL;  -- cảnh báo ảnh trùng
+-- P13: ảnh hồ sơ khách mới
+ALTER TABLE files DROP CONSTRAINT ck_files_owner_type;
+ALTER TABLE files ADD CONSTRAINT ck_files_owner_type
+  CHECK (owner_type IS NULL OR owner_type IN ('TASK','PROGRESS_UPDATE','CLIENT_REQUEST','DELIVERABLE','INTAKE_SUBMISSION'));
+ALTER TABLE files ADD CONSTRAINT ck_files_image_project   -- ảnh INTAKE_SUBMISSION chưa có dự án tới khi chuyển đổi (BR-85, BR-136)
+  CHECK (owner_type IS NULL OR owner_type = 'INTAKE_SUBMISSION' OR project_id IS NOT NULL);
+ALTER TABLE files ADD CONSTRAINT ck_files_intake_request CHECK (owner_type IS DISTINCT FROM 'INTAKE_SUBMISSION' OR request_id IS NULL);
 -- size_bytes của ảnh = tổng các biến thể ĐANG lưu (ảnh khách: original + thumb; sau BR-89: preview + thumb).
 
 ALTER TABLE quotations ADD CONSTRAINT fk_quotations_evidence FOREIGN KEY (evidence_file_id) REFERENCES files(id);
@@ -467,6 +531,8 @@ CREATE TRIGGER activity_append_only BEFORE UPDATE OR DELETE ON activity_logs
 | BR-61 không đổi billing khi đã báo giá | `RevisionItem.ChangeBilling` |
 | Chuyển trạng thái hợp lệ | `Project.ChangeStatus`, `Quotation.*` |
 | `deliverable_id` của round/request/task thuộc cùng `project_id` | Handler validate |
+| Cấu trúc `request_templates.fields` và câu trả lời `answers` (BR-130/131) | Domain `TemplateFieldRules`, `TemplateAnswers` - DB chỉ kiểm là mảng jsonb (`fields` ≤ 30 phần tử) |
+| Trần 30 hồ sơ/ngày, 5/ngày/IP, token form dùng một lần (BR-137/138) | Handler công khai (đếm lại dưới advisory lock; đếm IP và token đã dùng nằm trong bộ nhớ) |
 
 ## 4. Truy vấn tham chiếu
 
@@ -536,5 +602,6 @@ UPDATE quotation_sequences SET last_seq = last_seq + 1 WHERE year = @year RETURN
   LPBank 970449, Nam A Bank 970428, Cake by VPBank 546034, Timo 963388). **Kiểm tra lại với danh sách
   chính thức của NAPAS/VietQR trước khi go-live.**
 - `settings` id = 1 với giá trị mặc định.
+- 6 mẫu yêu cầu (Banner quảng cáo, Poster, Menu cửa hàng, Banner sự kiện / chương trình, Bài đăng mạng xã hội, Logo) - `RequestTemplatePresets`, seed **một lần** trong migration `20261113090000_AddRequestTemplatesAndIntake` (kích thước gợi ý: 1080×1080, 1200×628, 1080×1920, A4, A3, 60×160 cm…); sau đó designer sửa/xoá.
 - `services` mẫu: Logo (2.000.000, 3 vòng, 200.000/vòng), Banner (500.000, 2, 100.000),
   Poster (800.000, 2, 150.000), UI Screen (700.000, 2, 150.000).

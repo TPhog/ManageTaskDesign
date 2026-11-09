@@ -124,7 +124,7 @@ Các resource có `rowVersion` (xmin, kiểu `uint`) trong response. Lệnh upda
 | GET | `/api/admin/requests?status=NEW&projectId=&page=` | Item kèm `client`, `project`, `attachments[]` |
 | GET | `/api/admin/requests/new-count` | `{ count }` cho badge |
 | POST | `/api/admin/projects/{id}/requests` | Designer tạo hộ (multipart: `content`, `source`, `deliverableId?`, `files[]`) |
-| GET | `/api/admin/requests/{id}` | |
+| GET | `/api/admin/requests/{id}` | Request có thêm `templateId`, `templateName`, `answers: [{ key, label, type, display }]` (P13; rỗng nếu gửi tự do) |
 | POST | `/api/admin/requests/{id}/triage` | xem 3.7.1 |
 | POST | `/api/admin/requests/{id}/decline` | `{ reason }` |
 
@@ -332,6 +332,51 @@ Tất cả dưới `/api/admin/*`, cookie `Designer`; POST/PUT/PATCH/DELETE cầ
 | GET/PUT | `/api/admin/settings/digest` | Nhắc việc hằng ngày (BR-94): GET trả `{ enabled, hourVn, channelConfigured }`; PUT nhận `{ enabled, hourVn }`, `hourVn` ngoài 0..23 → `400` (`errors.hourVn`); `channelConfigured` chỉ cho biết đã có Discord webhook hay chưa, không trả URL; ghi activity `settings.digest_updated`; policy `DesignerOnly` |
 | GET/PUT | `/api/admin/settings/watermark` | Cấu hình watermark ảnh (`enabled`, `text`, `opacityPercent`); policy `DesignerOnly` |
 
+### 3.14 Mẫu yêu cầu & khách mới (Plan 13)
+
+Tất cả dưới `/api/admin/*`, cookie `Designer`, CSRF cho ghi.
+
+**Mẫu yêu cầu** (BR-130)
+
+| Method | Path | Ghi chú |
+|---|---|---|
+| GET | `/api/admin/request-templates` | Mọi mẫu (cả ẩn), theo `sortOrder`: `AdminRequestTemplate { id, name, description, designType, serviceId, serviceName, active, sortOrder, fields: TemplateField[], rowVersion, createdAt, updatedAt }` |
+| GET | `/api/admin/request-templates/{id}` | |
+| POST | `/api/admin/request-templates` | `{ name, description?, designType, serviceId?, active?, fields }` → `201`; > 50 mẫu / > 30 câu / mã câu trùng-sai dạng / lựa chọn thiếu → `400` theo trường |
+| PUT | `/api/admin/request-templates/{id}` | như POST + `rowVersion`; lệch → `409 CONCURRENCY_CONFLICT` |
+| DELETE | `/api/admin/request-templates/{id}` | Xoá cứng; yêu cầu/hồ sơ cũ giữ snapshot |
+| POST | `/api/admin/request-templates/reorder` | `{ ids: Guid[] }` - thứ tự mới |
+
+```ts
+type TemplateField = {
+  key: string                       // ^[a-z0-9_]{1,40}$, duy nhất trong mẫu
+  label: string                     // ≤ 120
+  type: 'SHORT_TEXT' | 'LONG_TEXT' | 'SINGLE_CHOICE' | 'MULTI_CHOICE' | 'SIZE' | 'DATE' | 'NUMBER' | 'IMAGES'
+  required: boolean
+  help: string | null               // ≤ 300
+  options: string[]                 // SINGLE/MULTI_CHOICE: 1-20; SIZE: 0-20 kích thước có sẵn
+}
+```
+
+**Form khách mới** (BR-133)
+
+| Method | Path | Ghi chú |
+|---|---|---|
+| GET | `/api/admin/settings/intake` | `{ enabled, slug, url }` (`url` = `{App:PublicBaseUrl}/f/{slug}`; null khi chưa từng bật) |
+| PUT | `/api/admin/settings/intake` | `{ enabled }` - lần bật đầu tạo slug; activity `settings.intake_updated` (không ghi slug) |
+| POST | `/api/admin/settings/intake/regenerate` | Slug mới, link cũ và biểu mẫu đang mở vô hiệu; activity `settings.intake_link_regenerated` |
+
+**Hộp "Khách mới"** (BR-134..137)
+
+| Method | Path | Ghi chú |
+|---|---|---|
+| GET | `/api/admin/intake?status=NEW&page=&pageSize=` | `status` ∈ `NEW` (mặc định) / `CONVERTED` / `REJECTED`; item `{ id, createdAt, status, contactName, contactPhone, contactEmail, templateName, excerpt, imageCount }` |
+| GET | `/api/admin/intake/new-count` | `{ count }` cho badge |
+| GET | `/api/admin/intake/{id}` | `IntakeDetail`: item + `answers`, `note`, `body`, `images[] { id, width, height, sizeBytes, thumbUrl, previewUrl, originalUrl }`, gợi ý (`suggestedDesignType`, `suggestedServiceId/Name`, `suggestedDueDate`), `matchingClients[]` (trùng 9 số cuối SĐT hoặc email), `rejectReason`, `convertedClientId/ProjectId`, `rowVersion` |
+| POST | `/api/admin/intake/{id}/convert` | `{ existingClientId? \| clientName, projectName, designType, dueDate?, serviceId?, deliverableName?, rowVersion }` → `200 { clientId, projectId, deliverableId }`. `400` theo trường; `404` khách có sẵn không còn ACTIVE; `409` hồ sơ không còn NEW / `CONCURRENCY_CONFLICT` |
+| POST | `/api/admin/intake/{id}/reject` | `{ reason?(≤500), rowVersion }` → `200 IntakeDetail`; `409` như trên |
+| DELETE | `/api/admin/intake/{id}` | `204`; ảnh xoá mềm; hồ sơ CONVERTED hoặc vừa bị chuyển đổi đồng thời → `409` |
+
 ## 4. Portal API
 
 Mọi endpoint lấy `clientId` **từ session**, không nhận `clientId` từ client.
@@ -357,8 +402,18 @@ Mọi endpoint lấy `clientId` **từ session**, không nhận `clientId` từ 
 | GET | `/api/portal/projects/{id}/images` | Ảnh dự án được chia sẻ cho khách (scope theo `clientId`) |
 | GET | `/api/portal/images/{id}/{variant}` | Stream ảnh `preview`/`thumb`; ảnh khách gửi lưu một bản nên `preview` là chính ảnh khách gửi; ngoài scope → 404. `Cache-Control: private, max-age=600` (ẩn/xóa/đăng xuất phải có hiệu lực sớm trên máy dùng chung); ETag là validator duy nhất |
 | POST | `/api/portal/deliverables/{id}/approve` | Khách duyệt hạng mục `AWAITING_CLIENT`; ngoài scope → `404`; đang có việc sửa mở → `409 CHANGE_REQUEST_OPEN` (BR-97); đã duyệt → `200` idempotent; không còn chờ duyệt → `409 INVALID_TRANSITION` |
-| GET | `/api/portal/requests?projectId=` | `[{ id, createdAt, content, status, declineReason, attachments }]` |
-| POST | `/api/portal/projects/{id}/requests` | multipart `content`, `deliverableId?`, `files[]` (≤ 5, ≤ 20MB/file) — BR-53/54 |
+| GET | `/api/portal/request-templates` | Mẫu **đang dùng**, theo thứ tự: `[{ id, name, description, fields }]` - không `serviceId`/`designType`/`active` (dữ liệu chung của studio, không theo khách) |
+| GET | `/api/portal/requests?projectId=` | `[{ id, createdAt, content, status, declineReason, attachments, templateName }]` |
+| POST | `/api/portal/projects/{id}/requests` | multipart `content`, `deliverableId?`, `files[]` (≤ 5, ≤ 20MB/file), **`templateId?` + `answers?` (JSON `{ [key]: giá trị }`)** - BR-53/54, BR-131/132. Có `templateId`: `content` là ghi chú thêm (≤ 2000) và server render văn bản (≤ 5000); không trả lời gì → `400 errors.answers` |
+
+### 4.1 Public API (ẩn danh, Plan 13)
+
+Không cookie, không CSRF (ngoại lệ duy nhất: tiền tố `/api/public/*`, 07-security §3), `AllowAnonymous`. Rate limit: `GET` 10/phút/IP (`RateLimit:PublicIntakePerMinute`), `POST` 5/giờ/IP (`RateLimit:PublicIntakeSubmitPerHour`, thay chính sách GET), IPv6 theo /64 → `429`.
+
+| Method | Path | Ghi chú |
+|---|---|---|
+| GET | `/api/public/intake/{slug}` | `{ studio: { displayName, contactPhone, contactEmail }, templates: [{ id, name, description, fields }], maxImages, maxUploadMb, formToken }`. `maxImages` = 3, hoặc `0` khi kho ≥ 80 % (chỉ nhận chữ). Header `Cache-Control: no-store`, `X-Robots-Tag: noindex`. Slug sai / form tắt → cùng một `404` |
+| POST | `/api/public/intake/{slug}` | multipart: `contactName`, `contactPhone`, `contactEmail?`, `templateId?`, `answers?` (JSON), `note?`, `files[]` (≤ 3 JPEG/PNG/WebP), `formToken`, `website` (honeypot, để trống). Thành công `204` rỗng (không echo). Lỗi: `400` validation theo trường (`contactName`, `contactPhone`, `contactEmail`, `templateId`, `note`, `files`, `answers`, `answers.<mã>`) - token vẫn dùng được; `400 FORM_EXPIRED`; `404`; `413` body > `App:MaxUploadMb × 3 + 1` MB; `415` sai định dạng ảnh; `429 RATE_LIMITED` (trần 30/ngày studio hoặc 5/ngày/IP) hoặc `429` của rate limiter; `507 STORAGE_FULL` khi gửi ảnh lúc kho ≥ 80 % (gửi lại không kèm ảnh). Bot (honeypot / quá nhanh) cũng nhận `204` nhưng không lưu |
 
 Portal **không** có endpoint nào trả: tasks, internal_notes, services, settings ngân hàng ngoài snapshot,
 dữ liệu khách khác.

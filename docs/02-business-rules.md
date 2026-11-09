@@ -162,6 +162,8 @@ NEW ──► TRIAGED
 | BR-53 | Khách gửi request chỉ cho dự án của mình và dự án ở DRAFT/QUOTED/IN_PROGRESS/ON_HOLD. |
 | BR-54 | Rate limit: tối đa 20 request/khách/ngày. |
 
+Yêu cầu có thể gửi **theo mẫu** (BR-131/132, §13): nội dung lưu là văn bản render từ câu trả lời; triage/decline như trên.
+
 Màn "Đã gửi yêu cầu" trên Portal hiện "Nhà thiết kế thường phản hồi {`settings.portal_response_time`}" — designer đặt ở Cài đặt › Khách hàng & Portal; tối đa 60 ký tự, bỏ trống = mặc định "trong 24 giờ" (`GET /api/portal/me` → `designer.responseTime`). Ảnh đính kèm request từ Portal tối đa **5** ảnh/lần gửi.
 
 ## 7. Revision Item — Work status
@@ -275,7 +277,7 @@ Cả hai hành động chỉ ghi các cột `client_*` của báo giá nên đư
 
 | ID | Rule |
 |---|---|
-| BR-85 | File gắn với dự án (bắt buộc), deliverable/request/quotation (tùy chọn). |
+| BR-85 | File gắn với dự án (bắt buộc), deliverable/request/quotation (tùy chọn). **Ngoại lệ:** ảnh hồ sơ khách mới (`owner_type = INTAKE_SUBMISSION`) chưa có dự án tới khi chuyển đổi (BR-135). |
 | BR-86 | Xóa file = xóa mềm (`deleted_at`) rồi xóa object ngay sau commit. Object còn sót (xóa lỗi, row đã xóa, biến thể thừa, object không có row > 24 h, file ghi dở > 24 h) được job đối soát hằng ngày (`StorageSweeper`) dọn; job chỉ ghi `storage.reconciled` khi có phát hiện/thay đổi, và mỗi bước độc lập (một bước lỗi không dừng các bước khác). Key không đúng dạng ảnh không bao giờ bị xóa. Quota luôn tính từ DB. |
 | BR-87 | File là `evidence_file_id` của báo giá ACCEPTED không xóa được. |
 | BR-88 | Xóa task xóa luôn ảnh của task (xóa mềm cùng transaction, object xóa sau commit); ảnh là `evidence_file_id` của báo giá (BR-87) được giữ lại, `task.deleted` ghi `imagesDeleted`/`imagesKept`. Upload ảnh vào task khóa dòng task (share lock) nên không chạy chồng với xóa task. |
@@ -322,3 +324,22 @@ Activity được ghi `visible_to_client = true` cho các action sau (kèm `clie
 | deliverable.client_approved | "Khách đã duyệt Logo" |
 | quotation.payment_status_changed | "Đã nhận tiền cọc cho BG-2026-0007" |
 | file.shared | "Đã chia sẻ file: logo_v3.png" |
+
+## 13. Mẫu yêu cầu & form khách mới (Plan 13)
+
+```text
+Hồ sơ khách mới:  NEW ──► CONVERTED   (designer bấm "Tạo khách & dự án")
+                    └───► REJECTED    (lý do nội bộ, tuỳ chọn)
+```
+
+| ID | Rule |
+|---|---|
+| BR-130 | Mẫu yêu cầu do designer quản lý (≤ 50 mẫu): tên 1–100, mô tả ≤ 500, loại thiết kế (tập `projects.design_type`), dịch vụ tuỳ chọn (phải đang hiện khi gắn), ≤ 30 câu hỏi. Loại câu (`SHORT_TEXT`, `LONG_TEXT`, `SINGLE_CHOICE`, `MULTI_CHOICE`, `SIZE`, `DATE`, `NUMBER`, `IMAGES`): lựa chọn 1–20 mục (≤ 100 ký tự/mục); `SIZE` = 0–20 kích thước có sẵn + luôn có nhập tuỳ chỉnh; `IMAGES` ≤ 1 câu/mẫu. Mã câu `^[a-z0-9_]{1,40}$` duy nhất, nhãn ≤ 120, gợi ý ≤ 300. Mẫu ẩn (`active = false`) không hiện cho khách. Xoá mẫu = xoá cứng (yêu cầu/hồ sơ cũ giữ snapshot). 6 mẫu có sẵn (Banner quảng cáo, Poster, Menu cửa hàng, Banner sự kiện / chương trình, Bài đăng mạng xã hội, Logo) được seed **một lần** trong migration; sau đó designer sửa/xoá tuỳ ý. |
+| BR-131 | Server chấm lại mọi câu trả lời (không tin form): câu bắt buộc phải có; lựa chọn phải thuộc danh sách; kích thước = một kích thước có sẵn hoặc rộng × cao > 0 (≤ 100 000) với đơn vị `px`/`mm`/`cm`/`m`; ngày dạng `yyyy-MM-dd` và ≥ hôm nay (VN); số nguyên 0…10¹²; chữ ngắn ≤ 200, chữ dài ≤ 2000; câu ảnh bắt buộc cần ≥ 1 ảnh - **trừ khi** kho đang từ chối ảnh (BR-135: ≥ 80 % dung lượng) thì câu `IMAGES` bắt buộc trở thành tuỳ chọn. Mã lạ bị bỏ qua; câu tuỳ chọn bỏ trống không vào snapshot; lỗi trả theo từng câu (`errors["answers.<mã>"]`). **Không trả lời gì** (không câu nào, không ảnh, không ghi chú) → `400` `errors.answers` = "Trả lời ít nhất một câu hỏi hoặc viết ghi chú thêm" (cả Portal lẫn form công khai); JSON hỏng/quá 64 000 ký tự → `errors.answers`. |
+| BR-132 | Yêu cầu/hồ sơ theo mẫu lưu **snapshot** (`template_name`, `answers` = mảng `{key, label, type, display}`) và **văn bản render** ("Mẫu: …", "- Nhãn: giá trị", "Ghi chú thêm"). Portal: văn bản ≤ 5000, ghi chú ≤ 2000. Sửa/xoá mẫu không đổi yêu cầu cũ. Mẫu `active=false` hoặc đã xoá mà khách vẫn gửi → `400` `errors.templateId`. |
+| BR-133 | Form khách mới tắt mặc định. Bật lần đầu tạo slug ngẫu nhiên 128-bit (22 ký tự base64url); tắt/bật giữ slug; "Tạo link mới" thay slug - link cũ và biểu mẫu đang mở theo link cũ hết hiệu lực ngay. Slug sai và form tắt trả cùng một `404`. Link công khai là `{App:PublicBaseUrl}/f/{slug}`; khi bật, `GET /api/portal/me` trả nó ở `designer.intakeUrl` (Portal hiện "Đặt thiết kế mới"), khi tắt là `null`. |
+| BR-134 | Hồ sơ khách mới: tên 1–100, SĐT/Zalo (≤ 20 ký tự `0-9 + . ( ) -`, ≥ 8 chữ số), email tuỳ chọn (≤ 200); chọn mẫu (trả lời theo BR-131) hoặc tự mô tả (ghi chú bắt buộc, ≤ 2000); văn bản render ≤ 10 000. Trạng thái NEW. Discord báo designer **chỉ** tên khách + tên mẫu ("Yêu cầu khác" khi không chọn mẫu) kèm link tới hộp Khách mới - câu trả lời, ghi chú, SĐT, email không bao giờ rời hệ thống. |
+| BR-135 | Ảnh hồ sơ khách mới: ≤ 3 ảnh JPEG/PNG/WebP, ≤ `App:MaxUploadMb` (20 MB)/ảnh, không watermark, tính vào hạn mức. Người gửi ẩn danh bị **từ chối ảnh khi dung lượng ≥ 80 %** (`507 STORAGE_FULL`; `GET` trả `maxImages = 0` và form ẩn câu ảnh); phần chữ vẫn luôn gửi được. (Designer tự upload vẫn chặn ở 90 % - BR-86.) Ảnh không thuộc dự án nào tới khi chuyển đổi; xoá hồ sơ = xoá mềm ảnh. |
+| BR-136 | Chuyển đổi (chỉ NEW, một transaction): khách mới (SĐT/email từ hồ sơ, kênh "Form khách mới") **hoặc** một khách ACTIVE có sẵn; dự án DRAFT (loại thiết kế, hạn); brief v1 DRAFT = văn bản render; hạng mục từ dịch vụ đã chọn (số vòng + giá vòng thêm của dịch vụ; bước công việc mẫu áp dụng khi "Bắt đầu dự án"); ảnh gắn vào dự án. Gợi ý khách trùng: cùng 9 chữ số cuối SĐT hoặc cùng email - không tự gộp. Hồ sơ CONVERTED không xoá được. Chuyển/từ chối/xoá một hồ sơ đã bị xử lý bởi thao tác khác (kể cả đua nhau) → `409` (`INVALID_TRANSITION` hoặc `CONCURRENCY_CONFLICT`), không để lại dòng nào. |
+| BR-137 | Giới hạn số hồ sơ **được lưu** (đếm theo ngày VN): tối đa **30 mỗi ngày cho cả studio** (đếm lại dưới `pg_advisory_xact_lock` ngay trong transaction ghi nên không vượt khi gửi đồng thời) → `429 RATE_LIMITED`; và tối đa **5 mỗi ngày cho mỗi địa chỉ IP** (`PublicIntake:MaxSubmissionsPerIpPerDay`; IPv6 tính theo tiền tố /64; đếm trong bộ nhớ, khởi động lại thì đếm lại từ 0) → `429 RATE_LIMITED`. Cộng thêm giới hạn tốc độ `POST` 5 lần/giờ/IP (`RateLimit:PublicIntakeSubmitPerHour`, cửa sổ trượt) và `GET` 10 lần/phút/IP (`RateLimit:PublicIntakePerMinute`) → `429` của rate limiter. |
+| BR-138 | Chống bot, không lưu gì: ô ẩn `website` có giá trị, hoặc gửi sớm hơn `PublicIntake:MinFillSeconds` (3 giây) sau khi biểu mẫu được phát hành → trả `204` như thành công nhưng **không lưu**. `formToken` là token ký bằng Data Protection, hiệu lực **24 giờ**, **dùng một lần cho một hồ sơ được lưu**: dùng lại, token hỏng, của link cũ hoặc quá hạn → `400 FORM_EXPIRED` ("tải lại trang"); token được trả lại khi hồ sơ không được lưu (lỗi validation, ảnh bị từ chối, chạm trần ngày, lỗi hệ thống) để gửi lại bản sửa. Token đã dùng được nhớ trong bộ nhớ (một instance API). |

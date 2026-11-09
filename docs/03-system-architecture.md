@@ -146,8 +146,13 @@ Client(Portal)        API                         DB                     Designe
 | `Seed__DesignerUsername` | `me@example.com` | Chỉ dùng lần đầu khi chưa có tài khoản |
 | `Seed__DesignerPassword` | (secret) | Chỉ dùng lần đầu; xóa khỏi env sau khi seed |
 | `ASPNETCORE_ENVIRONMENT` | `Production` | |
+| `DataProtection__KeysPath` | `/data/keys` | Thư mục key ring Data Protection (ký cookie đăng nhập/portal và token form khách mới). **Bắt buộc ngoài Development/Testing** - API không khởi động nếu thiếu; đường dẫn tương đối tính từ content root. Phải nằm trên volume bền (`keys`) |
+| `RateLimit__PublicIntakeSubmitPerHour` | `5` | `POST /api/public/intake/{slug}` tối đa N lần/giờ/IP (cửa sổ trượt, IPv6 theo /64) → `429` |
+| `RateLimit__PublicIntakePerMinute` | `10` | `GET /api/public/intake/{slug}` tối đa N lần/phút/IP |
+| `PublicIntake__MaxSubmissionsPerIpPerDay` | `5` | Hồ sơ khách mới được lưu tối đa N/ngày VN/IP (đếm trong bộ nhớ) → `429 RATE_LIMITED`. Trần 30 hồ sơ/ngày cho cả studio là cố định (BR-137) |
+| `PublicIntake__MinFillSeconds` | `3` | Gửi form sớm hơn N giây sau khi tải → bị bỏ qua âm thầm (BR-138) |
 
-Data Protection keys (ký cookie) lưu vào volume `/data/keys` để cookie sống qua restart.
+Data Protection keys (ký cookie và token form khách mới) lưu vào volume `/data/keys` (`DataProtection__KeysPath`) để cookie và biểu mẫu đang mở sống qua restart; thiếu cấu hình này ngoài Development thì API từ chối khởi động (07-security §4.5).
 
 Image `api` chạy bằng user `appuser` (uid/gid 1001); `/data/files` và `/data/keys` được tạo sẵn và thuộc user này nên volume mới tự đúng quyền. **Volume đã tồn tại từ trước** (root-owned) cần chạy một lần: `docker compose run --rm --user root --entrypoint chown api -R 1001:1001 /data`. Nếu thư mục ảnh không ghi được, API sẽ dừng ngay khi khởi động với thông báo rõ ràng.
 
@@ -174,7 +179,7 @@ services:
 volumes: { pgdata: {}, files: {}, keys: {}, caddy_data: {} }
 ```
 
-Caddyfile: `handle /api/* { reverse_proxy api:8080 }`, còn lại `try_files {path} /index.html` + `file_server`.
+Caddyfile (`deploy/Caddyfile`): `handle /api/public/*` (`log_skip`) và `handle /api/*` → `reverse_proxy api:8080`; `handle /p/*` (magic link) và `handle /f/*` (form khách mới) đều `log_skip` + `Referrer-Policy: no-referrer` rồi trả `index.html` (`/f/*` thêm `X-Robots-Tag: noindex`) vì path chứa token/slug (07-security §4.3, §4.5); còn lại `try_files {path} /index.html` + `file_server`. Rate limit theo IP thật nhờ tin đúng một hop `X-Forwarded-For` từ Caddy, nên service `api` **không** được publish cổng ra ngoài.
 
 - API chạy migration khi khởi động (`db.Database.MigrateAsync()`) — chấp nhận được với single instance.
 - Seed designer + settings mặc định + danh sách ngân hàng khi DB trống.

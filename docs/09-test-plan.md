@@ -143,6 +143,32 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
 | AC-CF8 | Mobile 390px | Mở trang dự án/báo giá | Không cuộn ngang, không nút nổi che nội dung, nút chính ≥ 44px, lightbox phủ toàn màn hình | `portal-lightbox.test.tsx`, `portal-payment-block.test.tsx`, e2e `portal-round2.spec.ts` |
 | AC-CF9 | Trigger khóa báo giá SENT | UPDATE bốn cột `client_*` / UPDATE `total` | cột `client_*` đổi được; `total`/`snapshot` bị `quotation_locked` | `PortalClientStatementLockTests`, `QuotationLockMigrationTests` |
 
+### AC-TPL — Mẫu yêu cầu (BR-130..132)
+
+| ID | Tiêu chí | Test |
+|---|---|---|
+| AC-TPL1 | Migration seed đúng 6 mẫu (Banner quảng cáo, Poster, Menu cửa hàng, Banner sự kiện / chương trình, Bài đăng mạng xã hội, Logo) với kích thước 1080×1080, 1200×628, 1080×1920, A4, A3, 60×160 cm | `RequestTemplateSchemaTests`, `RequestTemplateFieldTests`, `RequestTemplatesAdminTests` |
+| AC-TPL2 | Designer tạo/sửa/sắp xếp/xoá mẫu, gắn dịch vụ; sửa chồng → 409 | `RequestTemplatesAdminTests`, e2e `request-templates.spec.ts` |
+| AC-TPL3 | Portal chỉ thấy mẫu đang dùng, không thấy `serviceId`/`designType`/`active` | `PortalTemplateRequestTests`, `PortalIsolationTests` |
+| AC-TPL4 | Yêu cầu theo mẫu lưu văn bản render + câu trả lời; hộp Yêu cầu hiện bảng câu trả lời; Discord có "Mẫu" | `PortalTemplateRequestTests`, e2e `portal-template-request.spec.ts` |
+| AC-TPL5 | Câu trả lời sai/thiếu báo theo từng câu (server + client cùng thông điệp); không trả lời gì → `errors.answers`; câu ảnh bắt buộc là tuỳ chọn khi kho từ chối ảnh | `TemplateAnswersTests`, `requestTemplates.test.ts`, `PortalTemplateRequestTests` |
+| AC-TPL6 | Xoá mẫu không đổi yêu cầu cũ | `RequestTemplateSchemaTests` |
+
+### AC-INT — Form khách mới (BR-133..138)
+
+| ID | Tiêu chí | Test |
+|---|---|---|
+| AC-INT1 | Form tắt mặc định; bật tạo link `/f/{slug}`; tắt → 404; bật lại giữ link; slug không vào activity; `/api/portal/me` có `designer.intakeUrl` khi bật, `null` khi tắt | `IntakeLinkSettingsTests`, `PortalIntakeLinkTests` |
+| AC-INT2 | "Tạo link mới" → link cũ 404, biểu mẫu của link cũ → `FORM_EXPIRED` | `IntakeLinkSettingsTests`, `PublicIntakeAbuseTests` |
+| AC-INT3 | GET công khai chỉ có liên hệ studio + mẫu đang dùng; `no-store`, `noindex`; trang `/f/*` `no-referrer` | `PublicIntakeTests`, e2e `public-intake.spec.ts` |
+| AC-INT4 | Gửi hợp lệ → `204` rỗng; hồ sơ NEW + ảnh `INTAKE_SUBMISSION` không dự án; Discord chỉ tên khách + tên mẫu | `PublicIntakeTests` |
+| AC-INT5 | Honeypot / điền quá nhanh → `204` không lưu; token sai/hết hạn/của link cũ/đã dùng → `FORM_EXPIRED`; token được trả lại khi hồ sơ không được lưu | `PublicIntakeAbuseTests` |
+| AC-INT6 | `POST` 5/giờ/IP (`429`), 5 hồ sơ/ngày/IP và trần 30/ngày studio (`429 RATE_LIMITED`; IPv6 theo /64), body > `MaxUploadMb × 3 + 1` MB (`413`), kho ≥ 80 % từ chối ảnh (`507`) nhưng nhận chữ; cookie designer bị bỏ qua, không cần CSRF | `PublicIntakeAbuseTests`, `PublicIntakeDailyCapTests`, `PublicIntakeTests` |
+| AC-INT7 | Hộp Khách mới: danh sách, badge, chi tiết (câu trả lời, ảnh, khách trùng SĐT/email) | `IntakeInboxTests`, e2e `intake.spec.ts` |
+| AC-INT8 | Từ chối giữ lý do nội bộ và chặn chuyển đổi; xoá hồ sơ xoá mềm ảnh; xoá đua với chuyển đổi → `409` không mất dữ liệu | `IntakeInboxTests`, e2e `intake.spec.ts` |
+| AC-INT9 | Một lần bấm tạo khách + dự án DRAFT + brief v1 + hạng mục từ dịch vụ + gắn ảnh; khách có sẵn không bị nhân đôi; lần 2 / bản cũ → 409 | `IntakeConvertTests`, e2e `intake.spec.ts` |
+| AC-INT10 | API từ chối khởi động ngoài Development/Testing khi thiếu `DataProtection:KeysPath`; hai host dùng chung thư mục key đọc được token của nhau | `DataProtectionKeysTests` |
+
 ## 3. Luồng E2E (Playwright)
 
 1. **Onboarding:** đăng nhập → cấu hình ngân hàng → tạo dịch vụ → tạo khách → tạo link portal.
@@ -157,6 +183,7 @@ khách **A** (dự án A1 có deliverable Logo 3 vòng, Banner 2 vòng) và khá
 7. **Báo giá phát sinh có giá (P09, `quotation-pricing.spec.ts`):** định giá báo giá phát sinh qua dialog → chấp nhận → hạng mục mới trong Deliverables (AC-Q9, AC-Q11); giá deliverable không dịch vụ + Chọn từ dịch vụ + xác nhận 0 ₫ (AC-B20, AC-B21).
 8. **Dung lượng ảnh (P10, `storage-optimization.spec.ts`):** upload ảnh trùng → cảnh báo; Cài đặt › Dung lượng › Theo dự án; xóa task → ảnh của task mất; xem trước xóa bản gốc của dự án đã hoàn thành (AC-STO9).
 9. **Portal vòng 2 (P12):** khách đồng ý báo giá + báo đã chuyển cọc, designer thấy hai bước xác nhận và ghi chú của khách (AC-CF1, CF3, CF4; `portal-quotation-request.spec.ts` › "client agrees to a sent quotation …"); một giọng trạng thái duyệt qua Duyệt và Yêu cầu sửa kèm ảnh, thời gian phản hồi, không nút nổi (AC-CF5..8; `portal-round2.spec.ts`). Chữ trên các spec `portal*.spec.ts` theo bảng thuật ngữ Portal (08 §3.4).
+10. **Mẫu yêu cầu & khách mới (P13):** khách mới điền Poster qua `/f/{slug}` (có kịch bản `FORM_EXPIRED` không mất chữ đã gõ) rồi cảm ơn (`public-intake.spec.ts`); designer chuyển hồ sơ thành khách + dự án + brief hoặc từ chối/xoá (`intake.spec.ts`); khách portal gửi Poster theo mẫu và designer thấy bảng câu trả lời (`portal-template-request.spec.ts`); designer tạo/sửa/xoá mẫu và quản lý link (`request-templates.spec.ts`). Spec công khai dùng 1 lượt/IP/ngày trong trần 5 (BR-137) - chạy > 5 lần/ngày trên cùng máy dev sẽ nhận `429`.
 
 ## 4. Test cô lập Portal (bắt buộc, tự động sinh)
 
@@ -174,6 +201,7 @@ Thêm:
 - Portal response không chứa khóa JSON `internalNotes`, `notes`, `scopeOverrideReason` (test snapshot schema).
 - Portal bị tắt / khách archived / token version cũ → 401.
 - Request portal không có header CSRF → 403.
+- Route mới `GET /api/portal/request-templates` (P13) có trong `RouteTable` - dữ liệu chung của studio, không có tài nguyên theo khách. `/api/public/*` nằm ngoài `/api/portal` và được kiểm riêng (AC-INT3..6).
 - Route Portal ghi mới của P12 có trong bảng isolation (`RouteTable`): `POST /api/portal/quotations/{id}/accept` và `.../payment-notice` (khách B với id báo giá của A → 404, không đổi cột `client_*` của A); `POST /api/portal/deliverables/{id}/approve` cũng vậy.
 
 Triển khai: một test `[Theory]` lấy danh sách route từ `EndpointDataSource`, lọc prefix `/api/portal`,
