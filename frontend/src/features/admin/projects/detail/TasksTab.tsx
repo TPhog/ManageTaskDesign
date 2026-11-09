@@ -1,18 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { List, ListChecks, SquareKanban } from 'lucide-react'
+import { CalendarDays, List, ListChecks, SquareKanban } from 'lucide-react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { EmptyState } from '@/components/EmptyState'
 import { cn } from '@/lib/utils'
 import type { ProjectDetail } from '@/lib/types'
 import { QuickCreateTask } from '@/features/admin/tasks/QuickCreateTask'
 import { TaskBoard } from '@/features/admin/tasks/TaskBoard'
+import { TaskCalendar } from '@/features/admin/tasks/TaskCalendar'
 import { TaskDrawer } from '@/features/admin/tasks/TaskDrawer'
 import { TaskTable } from '@/features/admin/tasks/TaskTable'
 import { compareForList } from '@/features/admin/tasks/taskUtils'
 import { useTaskList } from '@/features/admin/tasks/useTasks'
 
-type View = 'board' | 'list'
+type View = 'board' | 'list' | 'calendar'
 
 export function TasksTab({ project }: { project: ProjectDetail }) {
   const [view, setView] = useState<View>('board')
@@ -56,10 +57,13 @@ export function TasksTab({ project }: { project: ProjectDetail }) {
         <div role="group" aria-label="Chế độ xem" className="flex items-center gap-1 rounded-lg bg-muted p-1">
           {viewButton('board', 'Bảng', SquareKanban)}
           {viewButton('list', 'Danh sách', List)}
+          {viewButton('calendar', 'Lịch', CalendarDays)}
         </div>
       </div>
 
-      {isLoading ? (
+      {view === 'calendar' ? (
+        <TaskCalendar projectId={project.id} onOpen={setOpenId} readOnly={project.status === 'CANCELLED'} />
+      ) : isLoading ? (
         <div className="flex gap-3 p-4">
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-64 w-64 shrink-0 rounded-xl" />)}
         </div>

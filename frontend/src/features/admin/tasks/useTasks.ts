@@ -7,6 +7,7 @@ import type {
   PagedResult,
   TaskDetail,
   TaskListItem,
+  TaskListPage,
   TaskListParams,
   TaskNote,
   TaskStatus,
@@ -22,6 +23,7 @@ function toQuery(params: TaskListParams): string {
   if (params.due) search.set('due', params.due)
   if (params.q) search.set('q', params.q)
   if (params.clientId) search.set('clientId', params.clientId)
+  if (params.groupBy) search.set('groupBy', params.groupBy)
   return search.toString()
 }
 
@@ -36,6 +38,7 @@ function onTaskSaved(qc: QueryClient, task: TaskDetail | undefined) {
   // plan 06b: task status feeds deliverable progress and the project flow (both under qk.projects.all)
   return Promise.all([
     qc.invalidateQueries({ queryKey: qk.tasks.lists }),
+    qc.invalidateQueries({ queryKey: qk.tasks.calendarAll }),
     qc.invalidateQueries({ queryKey: qk.projects.all }),
     qc.invalidateQueries({ queryKey: qk.dashboard }),
   ])
@@ -44,7 +47,7 @@ function onTaskSaved(qc: QueryClient, task: TaskDetail | undefined) {
 export function useTaskList(params: TaskListParams) {
   return useQuery({
     queryKey: qk.tasks.list(params),
-    queryFn: () => api.get<PagedResult<TaskListItem>>(`/admin/tasks?${toQuery(params)}`),
+    queryFn: () => api.get<TaskListPage>(`/admin/tasks?${toQuery(params)}`),
   })
 }
 
@@ -133,6 +136,7 @@ export function useMoveTask() {
     onSettled: () =>
       Promise.all([
         qc.invalidateQueries({ queryKey: qk.tasks.lists }),
+        qc.invalidateQueries({ queryKey: qk.tasks.calendarAll }),
         qc.invalidateQueries({ queryKey: qk.projects.all }),
         qc.invalidateQueries({ queryKey: qk.dashboard }),
       ]),
@@ -151,6 +155,7 @@ export function useDeleteTask() {
       invalidateImageQueries(qc)
       qc.invalidateQueries({ queryKey: qk.projects.all })
       qc.invalidateQueries({ queryKey: qk.dashboard })
+      qc.invalidateQueries({ queryKey: qk.tasks.calendarAll })
       return qc.invalidateQueries({ queryKey: qk.tasks.lists })
     },
     onError: (err: ApiError) => toast.error(errorText(err, 'Không thể xoá công việc')),

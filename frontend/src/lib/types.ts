@@ -159,6 +159,16 @@ export interface TaskListItem {
   updatedAt: string
   hasDescription: boolean
   notesCount: number
+  /** P15: the task has a repeat rule */
+  isRecurring: boolean
+  linksCount: number
+  /** P15: set only while BLOCKED */
+  blockedReason: string | null
+  blockedByTaskId: string | null
+  blockedByTitle: string | null
+  blockedByDone: boolean
+  /** P15: group of the row when the list is requested with groupBy; null otherwise */
+  groupKey: string | null
 }
 
 export interface ChecklistItem {
@@ -191,6 +201,14 @@ export interface TaskDetail {
   /** Set when the task was created from a revision item */
   revisionItemId?: string | null
   notesCount: number
+  /** P15 */
+  recurrence: Recurrence | null
+  recurrenceSourceId: string | null
+  links: ExternalLink[]
+  /** null unless the task is BLOCKED */
+  blocked: BlockedInfo | null
+  /** the next copy spawned from this task when it was marked DONE */
+  nextOccurrence: { id: string; dueDate: string | null } | null
 }
 
 /** GET /admin/tasks/{id}/notes item — designer-only */
@@ -211,6 +229,8 @@ export interface TaskListParams {
   page?: number
   /** default 100 (Kanban loads a whole project) */
   pageSize?: number
+  /** P15: server orders by group and returns `groups` */
+  groupBy?: TaskGroupBy
 }
 
 /** PUT /admin/tasks/{id} body */
@@ -222,7 +242,32 @@ export interface TaskUpdateInput {
   startDate: string | null
   dueDate: string | null
   deliverableId: string | null
+  /** P15: omitted = keep; kind 'NONE' clears the rule */
+  recurrence?: RecurrenceInput
+  /** P15: omitted = keep; [] clears */
+  links?: ExternalLink[]
+  /** P15: applied only when the resulting status is BLOCKED */
+  blocked?: { reason: string | null; byTaskId: string | null }
 }
+
+// ---- P15: Lark-style task upgrades ----
+export interface ExternalLink { title: string; url: string; visibleToClient: boolean }
+export type RecurrenceKind = 'DAILY' | 'WEEKLY' | 'MONTHLY'
+/** weekdays: bitmask Mon=1 … Sun=64 (WEEKLY only); monthDay 1..31 (MONTHLY only) */
+export interface Recurrence { kind: RecurrenceKind; weekdays: number; monthDay: number | null; until: string | null }
+/** Write shape: kind 'NONE' = not recurring */
+export type RecurrenceInput = Omit<Recurrence, 'kind'> & { kind: RecurrenceKind | 'NONE' }
+export interface BlockedInfo { reason: string | null; byTaskId: string | null; byTaskTitle: string | null; byTaskDone: boolean }
+
+export type TaskGroupBy = 'project' | 'deliverable' | 'due' | 'priority' | 'status'
+export interface TaskGroup { key: string; label: string; count: number }
+/** GET /admin/tasks: `groups` is [] without groupBy; `truncated` = more than 5000 rows matched a grouped query */
+export type TaskListPage = PagedResult<TaskListItem> & { groups: TaskGroup[]; truncated: boolean }
+
+export interface CalendarTask { id: string; projectId: string; projectName: string; title: string; status: TaskStatus; priority: TaskPriority; startDate: string | null; dueDate: string | null; isOverdue: boolean }
+export interface CalendarMarker { kind: 'DELIVERABLE' | 'PROJECT'; id: string; projectId: string; projectName: string; title: string; date: string; status: string }
+/** GET /admin/tasks/calendar; `truncated` = more than 500 tasks matched, only the first 500 are returned */
+export interface CalendarData { tasks: CalendarTask[]; markers: CalendarMarker[]; truncated: boolean }
 
 /** GET/PUT /admin/settings/digest: daily Discord digest on/off + VN hour */
 export interface DigestSettings {

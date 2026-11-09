@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { ListChecks, Search } from 'lucide-react'
+import { CalendarDays, List, ListChecks, Search } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
 import { EmptyState } from '@/components/EmptyState'
 import { Pagination } from '@/components/Pagination'
@@ -9,10 +9,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useClientOptions } from '@/lib/pickers'
+import { useClientOptions, useProjectOptions } from '@/lib/pickers'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { cn } from '@/lib/utils'
 import type { TaskDueFilter, TaskListParams } from '@/lib/types'
+import { TaskCalendar } from './TaskCalendar'
 import { TaskDrawer } from './TaskDrawer'
 import { TaskTable } from './TaskTable'
 import { TASK_STATUSES, taskStatusLabel } from './taskUtils'
@@ -40,15 +41,20 @@ export default function TasksPage() {
   const [clientLabel, setClientLabel] = useState('')
   const [clientSearch, setClientSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [projectId, setProjectId] = useState('')
+  const [projectLabel, setProjectLabel] = useState('')
+  const [projectSearch, setProjectSearch] = useState('')
   const q = useDebouncedValue(qInput.trim())
   const clients = useClientOptions(clientSearch, true, true)
+  const calendar = searchParams.get('view') === 'calendar'
+  const projects = useProjectOptions(projectSearch, calendar)
 
   // due/status live in the URL so a filtered view can be linked to directly (e.g. /admin/tasks?due=overdue)
   const current = quickFilters.find(f => f.value === searchParams.get('due')) ?? quickFilters[3]
   const statusParam = searchParams.get('status')
   const status = TASK_STATUSES.find(s => s === statusParam)
 
-  function setFilter(key: 'due' | 'status', value: string | undefined) {
+  function setFilter(key: 'due' | 'status' | 'view', value: string | undefined) {
     const next = new URLSearchParams(searchParams)
     if (value) next.set(key, value)
     else next.delete(key)
@@ -82,88 +88,133 @@ export default function TasksPage() {
 
       <div className="rounded-xl border bg-card shadow-card">
         <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:flex-wrap lg:items-center">
-          <div role="group" aria-label="Lọc nhanh" className="flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1">
-            {quickFilters.map(f => (
+          <div role="group" aria-label="Chế độ xem" className="flex w-fit items-center gap-1 rounded-lg bg-muted p-1">
+            {([['list', 'Danh sách', List], ['calendar', 'Lịch', CalendarDays]] as const).map(([mode, label, Icon]) => (
               <button
-                key={f.value}
+                key={mode}
                 type="button"
-                aria-pressed={current.value === f.value}
-                onClick={() => setFilter('due', f.value === 'all' ? undefined : f.value)}
+                aria-pressed={calendar === (mode === 'calendar')}
+                onClick={() => setFilter('view', mode === 'calendar' ? 'calendar' : undefined)}
                 className={cn(
                   'inline-flex min-h-10 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8',
-                  current.value === f.value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                  calendar === (mode === 'calendar') ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
-                {f.label}
-                <span className="rounded-full bg-background/70 px-1.5 text-xs tabular-nums">{counts[f.value] ?? '…'}</span>
+                <Icon className="h-4 w-4" aria-hidden="true" />
+                {label}
               </button>
             ))}
           </div>
 
-          <div className="relative w-full lg:max-w-xs">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-            <Input
-              aria-label="Tìm công việc"
-              placeholder="Tiêu đề hoặc tên dự án…"
-              value={qInput}
-              onChange={e => { setQInput(e.target.value); setPage(1) }}
-              className="pl-9"
+          {calendar ? (
+            <SearchCombobox
+              id="tasks-project-filter"
+              ariaLabel="Lọc theo dự án"
+              className="lg:w-64"
+              value={projectId}
+              selectedLabel={projectLabel}
+              options={projects.options}
+              loading={projects.loading}
+              search={projectSearch}
+              onSearchChange={setProjectSearch}
+              onSelect={o => { setProjectId(o?.value ?? ''); setProjectLabel(o?.label ?? '') }}
+              placeholder="Tất cả dự án"
+              clearLabel="Tất cả dự án"
+              searchPlaceholder="Tìm dự án…"
+              emptyText="Không có dự án khớp"
             />
-          </div>
+          ) : (
+            <>
+              <div role="group" aria-label="Lọc nhanh" className="flex flex-wrap items-center gap-1 rounded-lg bg-muted p-1">
+                {quickFilters.map(f => (
+                  <button
+                    key={f.value}
+                    type="button"
+                    aria-pressed={current.value === f.value}
+                    onClick={() => setFilter('due', f.value === 'all' ? undefined : f.value)}
+                    className={cn(
+                      'inline-flex min-h-10 items-center gap-1.5 rounded-md px-3 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8',
+                      current.value === f.value ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {f.label}
+                    <span className="rounded-full bg-background/70 px-1.5 text-xs tabular-nums">{counts[f.value] ?? '…'}</span>
+                  </button>
+                ))}
+              </div>
 
-          <Select value={status ?? ALL_STATUSES} onValueChange={v => setFilter('status', v === ALL_STATUSES ? undefined : v)}>
-            <SelectTrigger className="w-full lg:w-48" aria-label="Lọc theo trạng thái">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={ALL_STATUSES}>Tất cả trạng thái</SelectItem>
-              {TASK_STATUSES.map(s => <SelectItem key={s} value={s}>{taskStatusLabel[s]}</SelectItem>)}
-            </SelectContent>
-          </Select>
+              <div className="relative w-full lg:max-w-xs">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+                <Input
+                  aria-label="Tìm công việc"
+                  placeholder="Tiêu đề hoặc tên dự án…"
+                  value={qInput}
+                  onChange={e => { setQInput(e.target.value); setPage(1) }}
+                  className="pl-9"
+                />
+              </div>
 
-          <SearchCombobox
-            id="tasks-client-filter"
-            ariaLabel="Lọc theo khách"
-            className="lg:w-56"
-            value={clientId}
-            selectedLabel={clientLabel}
-            options={clients.options}
-            loading={clients.loading}
-            search={clientSearch}
-            onSearchChange={setClientSearch}
-            onSelect={o => { setClientId(o?.value ?? ''); setClientLabel(o?.label ?? ''); setPage(1) }}
-            placeholder="Tất cả khách hàng"
-            clearLabel="Tất cả khách hàng"
-            searchPlaceholder="Tìm khách…"
-            emptyText="Không có khách khớp"
-          />
+              <Select value={status ?? ALL_STATUSES} onValueChange={v => setFilter('status', v === ALL_STATUSES ? undefined : v)}>
+                <SelectTrigger className="w-full lg:w-48" aria-label="Lọc theo trạng thái">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={ALL_STATUSES}>Tất cả trạng thái</SelectItem>
+                  {TASK_STATUSES.map(s => <SelectItem key={s} value={s}>{taskStatusLabel[s]}</SelectItem>)}
+                </SelectContent>
+              </Select>
 
-          {data && <p className="text-sm tabular-nums text-muted-foreground lg:ml-auto">{data.total} công việc</p>}
+              <SearchCombobox
+                id="tasks-client-filter"
+                ariaLabel="Lọc theo khách"
+                className="lg:w-56"
+                value={clientId}
+                selectedLabel={clientLabel}
+                options={clients.options}
+                loading={clients.loading}
+                search={clientSearch}
+                onSearchChange={setClientSearch}
+                onSelect={o => { setClientId(o?.value ?? ''); setClientLabel(o?.label ?? ''); setPage(1) }}
+                placeholder="Tất cả khách hàng"
+                clearLabel="Tất cả khách hàng"
+                searchPlaceholder="Tìm khách…"
+                emptyText="Không có khách khớp"
+              />
+
+              {data && <p className="text-sm tabular-nums text-muted-foreground lg:ml-auto">{data.total} công việc</p>}
+            </>
+          )}
         </div>
 
-        {isLoading ? (
-          <div className="space-y-2 p-4">
-            {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-11 w-full" />)}
-          </div>
-        ) : isError ? (
-          <EmptyState icon={ListChecks} title="Không tải được công việc" description="Vui lòng tải lại trang." />
-        ) : tasks.length === 0 ? (
-          <EmptyState
-            icon={ListChecks}
-            title={filtering ? 'Không có công việc khớp bộ lọc' : current.emptyTitle}
-            description={filtering ? 'Thử từ khoá khác hoặc bỏ lọc khách.' : current.emptyText}
-            action={
-              current.value === 'all' && !filtering ? (
-                <Button asChild variant="outline">
-                  <Link to="/admin/projects">Đến danh sách dự án</Link>
-                </Button>
-              ) : undefined
-            }
-          />
+        {calendar ? (
+          <TaskCalendar projectId={projectId || undefined} onOpen={setOpenId} />
         ) : (
-          <TaskTable tasks={tasks} onOpen={setOpenId} showProject />
+          <>
+            {isLoading ? (
+              <div className="space-y-2 p-4">
+                {Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-11 w-full" />)}
+              </div>
+            ) : isError ? (
+              <EmptyState icon={ListChecks} title="Không tải được công việc" description="Vui lòng tải lại trang." />
+            ) : tasks.length === 0 ? (
+              <EmptyState
+                icon={ListChecks}
+                title={filtering ? 'Không có công việc khớp bộ lọc' : current.emptyTitle}
+                description={filtering ? 'Thử từ khoá khác hoặc bỏ lọc khách.' : current.emptyText}
+                action={
+                  current.value === 'all' && !filtering ? (
+                    <Button asChild variant="outline">
+                      <Link to="/admin/projects">Đến danh sách dự án</Link>
+                    </Button>
+                  ) : undefined
+                }
+              />
+            ) : (
+              <TaskTable tasks={tasks} onOpen={setOpenId} showProject />
+            )}
+            <Pagination page={page} pageSize={PAGE_SIZE} total={data?.total ?? 0} onPageChange={setPage} itemLabel="công việc" />
+          </>
         )}
-        <Pagination page={page} pageSize={PAGE_SIZE} total={data?.total ?? 0} onPageChange={setPage} itemLabel="công việc" />
       </div>
 
       <TaskDrawer taskId={openId} onClose={() => setOpenId(null)} />
