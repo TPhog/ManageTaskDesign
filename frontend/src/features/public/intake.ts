@@ -40,9 +40,10 @@ export function intakeErrorMessage(err: unknown): string {
   const e = (err ?? {}) as Partial<ApiError>
   if (isFormExpired(err)) return 'Biểu mẫu đã hết hạn. Trang vừa được tải lại — bạn bấm Gửi thêm lần nữa nhé.'
   if (e.status === 429) {
-    return e.code === 'RATE_LIMITED'
-      ? 'Hôm nay studio đã nhận nhiều yêu cầu — bạn vui lòng liên hệ trực tiếp hoặc gửi lại vào ngày mai.'
-      : 'Bạn gửi hơi nhanh — vui lòng đợi một phút rồi thử lại.'
+    // RATE_LIMITED = a daily cap; its detail says which one (this sender's or the studio's) in plain words
+    if (e.code === 'RATE_LIMITED') return e.detail?.trim() || 'Hôm nay studio đã nhận nhiều yêu cầu — bạn vui lòng liên hệ trực tiếp hoặc gửi lại vào ngày mai.'
+    // bodiless 429 = the per-IP limiter of 5 sends per sliding hour
+    return 'Bạn đã gửi nhiều lần — vui lòng thử lại sau ít phút (chậm nhất 1 giờ).'
   }
   if (isStorageFull(err)) return 'Hiện chưa nhận thêm ảnh được — bạn bỏ ảnh ra rồi gửi lại, hoặc gửi ảnh qua Zalo cho studio.'
   if (e.status === 413 || e.status === 415) return imageErrorMessage(err, 'client')
