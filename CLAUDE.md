@@ -78,10 +78,11 @@ src/FreelanceFlow.Api/
 - Không dùng Repository pattern / MediatR / CQRS. DbContext dùng trực tiếp (single-user app).
 - Truy vấn đọc: projection `Select(x => new Dto {...})` + `AsNoTracking()`.
 
-### Hai nhóm endpoint
+### Ba nhóm endpoint
 
 - `/api/admin/*` — Designer (cookie scheme `Designer`)
 - `/api/portal/*` — Khách (cookie scheme `Portal`; `clientId` chỉ được lấy từ `PortalPrincipal`, **không** từ route/body)
+- `/api/public/*` — Ẩn danh (form khách mới `/f/{slug}`, P13): `AllowAnonymous`, **không** CSRF, **không bao giờ** đọc `HttpContext.User`; bắt buộc rate limit có tên (`RateLimit:*`), giới hạn kích thước, honeypot, không echo dữ liệu; route mới phải thêm vào `PublicRouteGuardTests` + docs/07 §4.5
 
 ### Frontend
 
@@ -123,7 +124,7 @@ src/
 
 ### Security
 - Không log portal token, mật khẩu, body upload.
-- Portal SPA: `Referrer-Policy: no-referrer` cho trang `/p/*`.
+- Portal SPA: `Referrer-Policy: no-referrer` cho trang `/p/*` và form khách mới `/f/*` (Caddy + Vite dev); header bảo mật toàn site ở `deploy/Caddyfile` (docs/07 §6).
 - Magic link: token 256-bit, chỉ lưu SHA-256 hash, kiểm bằng `CryptographicOperations.FixedTimeEquals`.
 
 ## Debug pointers
