@@ -24,7 +24,7 @@ Admin tối ưu desktop (≥ 1280px) nhưng dùng được trên tablet; Portal 
 
 ### 2.1 Bố cục
 
-Sidebar: **Tổng quan** · **Yêu cầu** (badge NEW) · **Dự án** · **Công việc** · **Báo giá** · **Khách hàng** ·
+Sidebar: **Tổng quan** · **Yêu cầu** (badge NEW) · **Khách mới** (badge NEW, P13) · **Dự án** · **Công việc** · **Báo giá** · **Khách hàng** ·
 **Dịch vụ** · **Cài đặt**. Header: tìm kiếm nhanh (khách/dự án/số báo giá), nút "+ Tạo" (Dự án/Khách/Báo giá/Task).
 
 ### 2.2 Danh sách màn hình
@@ -34,6 +34,7 @@ Sidebar: **Tổng quan** · **Yêu cầu** (badge NEW) · **Dự án** · **Côn
 | `/admin/login` | Đăng nhập | Email, mật khẩu | Đăng nhập |
 | `/admin` | Tổng quan | 3 khối cũ (DSH-01..04): **Cần xử lý** (Việc cần làm), **Dự án**, **Tiền** + biểu đồ 6 tháng. P11 thêm các khối (region có tên): **Bắt đầu thiết lập** (checklist 6 mục, chỉ khi chưa xong/chưa ẩn), **Lịch làm việc 7 ngày** (nhóm **Quá hạn** nổi bật, mỗi ngày một nhóm, tick xong có Hoàn tác, tiêu đề mở TaskDrawer), **Sức khỏe dự án** (tiến độ, hạn, quota, huy hiệu rủi ro, tối đa 12 dòng), **Tiền đã thu và công nợ** (chọn tháng/quý/năm, so kỳ trước, công nợ có tuổi nợ, Copy nhắc thanh toán, mở báo giá và QR), **Hoạt động của khách**, **Dung lượng ảnh** (link tới Dung lượng). Ở 390px mọi bảng/thanh có bản chữ và không tràn ngang | Click từng chỉ số → danh sách đã lọc |
 | `/admin/requests` | Hộp thư yêu cầu | Tab NEW / Đã xử lý / Từ chối; card: khách, dự án, nội dung, ảnh thumbnail, thời gian | Mở triage |
+| `/admin/intake`, `/admin/intake/:id` | Khách mới (P13) | Tab Mới / Đã chuyển / Đã từ chối; mỗi dòng: tên, SĐT, tên mẫu, trích đoạn, số ảnh. Chi tiết (sheet): bảng câu trả lời theo mẫu, ghi chú, ảnh khách gửi, gợi ý khách trùng SĐT/email. Empty state có link "Mở Cài đặt" → `?tab=portal` để bật form | "Tạo khách & dự án" (dialog điền sẵn tên dự án "{mẫu} — {tên khách}", loại, dịch vụ, hạn; hoặc chọn khách có sẵn), "Từ chối" (lý do nội bộ), "Xoá"; thao tác bị đua → toast + tải lại (409) |
 | `/admin/requests/:id` | Triage | Trái: nội dung + file gốc. Phải: trình tạo round — chọn deliverable, thêm item (mô tả, type), hiển thị **billing gợi ý + lý do**, cho đổi | "Lưu & tạo round", "Từ chối", sau khi lưu: "Tạo báo giá phát sinh" nếu có CHARGEABLE |
 | `/admin/projects` | Danh sách dự án | Bảng: tên, khách, loại, trạng thái, deadline (đỏ nếu quá), tiến độ deliverable, chờ thu | Lọc, sort, tạo |
 | `/admin/projects/:id` | Chi tiết dự án | Header: tên, khách, `StatusBadge`, nút đổi trạng thái, link "Xem như khách" | Tabs ↓ |
@@ -50,6 +51,8 @@ Sidebar: **Tổng quan** · **Yêu cầu** (badge NEW) · **Dự án** · **Côn
 | `/admin/quotations` | Tất cả báo giá | Lọc trạng thái hiệu lực, thanh toán, khách | |
 | `/admin/clients` | Khách hàng | Bảng: tên, công ty, SĐT, số dự án, đã chốt, chờ thu, portal on/off | Tạo, tìm |
 | `/admin/clients/:id` | Chi tiết khách | Thông tin, dự án, tiền, timeline; khối **Portal**: trạng thái, ngày tạo link | **Tạo link** → dialog hiển thị URL + nút Copy + cảnh báo "Link chỉ hiển thị 1 lần; tạo link mới sẽ vô hiệu link cũ"; Bật/Tắt portal |
+| `/admin/settings/request-templates`, `…/new`, `…/:id` | Mẫu yêu cầu (P13) | Danh sách mẫu (cả ẩn) có sắp xếp; trình sửa: thông tin mẫu (tên, mô tả, loại thiết kế, dịch vụ, hiện/ẩn), tối đa 30 câu hỏi (8 loại, bắt buộc, gợi ý, lựa chọn), "Xem trước như khách thấy" theo thời gian thực | Tạo, sửa, xoá, sắp xếp; link quay lại → Cài đặt `?tab=portal` |
+| `/f/:slug` (công khai, không đăng nhập) | Form khách mới (P13) | Giao diện Editorial như Portal, mobile-first: I. "Bạn cần thiết kế gì?" (chọn mẫu hoặc "Yêu cầu khác"), II. câu hỏi của mẫu / mô tả, III. thông tin liên hệ (tên, SĐT/Zalo, email) + tối đa 3 ảnh; ô honeypot ẩn khỏi người dùng. Link tắt/sai → "Link không còn hoạt động". Hết hạn token (`FORM_EXPIRED`) → tự tải lại token, giữ nguyên câu trả lời. Kho ≥ 80 % → ẩn câu ảnh, 507 → nút "Gửi không kèm ảnh". Gửi xong: thẻ "Đã gửi yêu cầu" nhận focus + "Gửi yêu cầu khác" | Gửi yêu cầu |
 | `/admin/services` | Dịch vụ | Bảng giá | CRUD, ẩn/hiện |
 | `/admin/settings` | Cài đặt | Hồ sơ, ngân hàng (select tìm kiếm theo tên/BIN) + **QR thử** 10.000 ₫ để designer tự quét kiểm tra, mặc định báo giá, **Nhắc việc hằng ngày** (bật/tắt, giờ gửi giờ VN, cảnh báo khi chưa có Discord webhook), đổi mật khẩu | Lưu |
 
