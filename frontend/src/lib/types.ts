@@ -269,6 +269,21 @@ export interface CalendarMarker { kind: 'DELIVERABLE' | 'PROJECT'; id: string; p
 /** GET /admin/tasks/calendar; `truncated` = more than 500 tasks matched, only the first 500 are returned */
 export interface CalendarData { tasks: CalendarTask[]; markers: CalendarMarker[]; truncated: boolean }
 
+/** Saved task-list view (GET/POST/PUT /admin/task-views); labels only redisplay the picked client/project */
+export interface TaskViewConfig {
+  mode: 'list' | 'calendar'
+  groupBy: 'none' | TaskGroupBy
+  due: TaskDueFilter | null
+  status: TaskStatus | null
+  clientId: string | null
+  clientLabel: string | null
+  projectId: string | null
+  projectLabel: string | null
+  q: string | null
+  calendarUnit: 'month' | 'week'
+}
+export interface SavedTaskView { id: string; name: string; config: TaskViewConfig; sortOrder: number }
+
 /** GET/PUT /admin/settings/digest: daily Discord digest on/off + VN hour */
 export interface DigestSettings {
   enabled: boolean

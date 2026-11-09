@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { CalendarDays, List, ListChecks, Search } from 'lucide-react'
 import { PageHeader } from '@/components/PageHeader'
@@ -12,12 +12,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useClientOptions, useProjectOptions } from '@/lib/pickers'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { cn } from '@/lib/utils'
-import type { TaskDueFilter, TaskListParams } from '@/lib/types'
+import type { TaskDueFilter, TaskListParams, TaskViewConfig } from '@/lib/types'
 import { TaskCalendar } from './TaskCalendar'
 import { TaskDrawer } from './TaskDrawer'
 import { TaskTable } from './TaskTable'
-import { TASK_STATUSES, taskStatusLabel } from './taskUtils'
+import { TaskViewsMenu } from './TaskViewsMenu'
+import type { CalendarUnit } from './calendarUtils'
+import { TASK_GROUP_BYS, TASK_STATUSES, configToSearch, taskGroupByLabel, taskStatusLabel } from './taskUtils'
 import { useTaskCount, useTaskList } from './useTasks'
+import { useSaveLastView, useTaskViews } from './useTaskViews'
 
 type QuickFilter = TaskDueFilter | 'all'
 
@@ -32,6 +35,9 @@ const quickFilters: { value: QuickFilter; label: string; emptyTitle: string; emp
 
 // Radix Select reserves '' for "no value"
 const ALL_STATUSES = '_all'
+const NO_GROUPING = 'none'
+/** URL keys that make up a view; any of them in the URL means "show this", so the last view is not restored */
+const VIEW_KEYS = ['view', 'due', 'status', 'groupBy']
 
 export default function TasksPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -44,6 +50,7 @@ export default function TasksPage() {
   const [projectId, setProjectId] = useState('')
   const [projectLabel, setProjectLabel] = useState('')
   const [projectSearch, setProjectSearch] = useState('')
+  const [calendarUnit, setCalendarUnit] = useState<CalendarUnit>('month')
   const q = useDebouncedValue(qInput.trim())
   const clients = useClientOptions(clientSearch, true, true)
   const calendar = searchParams.get('view') === 'calendar'
@@ -53,8 +60,55 @@ export default function TasksPage() {
   const current = quickFilters.find(f => f.value === searchParams.get('due')) ?? quickFilters[3]
   const statusParam = searchParams.get('status')
   const status = TASK_STATUSES.find(s => s === statusParam)
+  const groupByParam = searchParams.get('groupBy')
+  const groupBy = TASK_GROUP_BYS.find(g => g === groupByParam)
 
-  function setFilter(key: 'due' | 'status' | 'view', value: string | undefined) {
+  // P15 D3: everything a saved view holds — URL filters plus the local search/client/project/calendar state
+  const viewConfig: TaskViewConfig = {
+    mode: calendar ? 'calendar' : 'list',
+    groupBy: groupBy ?? NO_GROUPING,
+    due: current.value === 'all' ? null : current.value,
+    status: status ?? null,
+    clientId: clientId || null,
+    clientLabel: clientLabel || null,
+    projectId: projectId || null,
+    projectLabel: projectLabel || null,
+    q: q || null,
+    calendarUnit,
+  }
+
+  function applyConfig(c: TaskViewConfig) {
+    setSearchParams(configToSearch(c), { replace: true })
+    setQInput(c.q ?? '')
+    setClientId(c.clientId ?? '')
+    setClientLabel(c.clientLabel ?? '')
+    setProjectId(c.projectId ?? '')
+    setProjectLabel(c.projectLabel ?? '')
+    setCalendarUnit(c.calendarUnit ?? 'month')
+    setPage(1)
+  }
+
+  // Remember the last view: restore it once when the page opens without view filters in the URL, and only then
+  // start saving (otherwise the defaults would overwrite it before it was read)
+  const views = useTaskViews()
+  const saveLast = useSaveLastView()
+  const restored = useRef(false)
+  useEffect(() => {
+    if (restored.current || !views.isFetched) return
+    restored.current = true
+    const last = views.data?.last
+    if (last && !VIEW_KEYS.some(k => searchParams.has(k))) applyConfig(last)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, when the saved views first arrive
+  }, [views.isFetched])
+  const configKey = JSON.stringify(viewConfig)
+  useEffect(() => {
+    if (!restored.current) return
+    const timer = setTimeout(() => saveLast.mutate(JSON.parse(configKey) as TaskViewConfig), 800)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the mutation object changes every render; the config is the trigger
+  }, [configKey, views.isFetched])
+
+  function setFilter(key: 'due' | 'status' | 'view' | 'groupBy', value: string | undefined) {
     const next = new URLSearchParams(searchParams)
     if (value) next.set(key, value)
     else next.delete(key)
@@ -77,6 +131,7 @@ export default function TasksPage() {
 
   const params: TaskListParams = { ...base, page, pageSize: PAGE_SIZE }
   if (current.value !== 'all') params.due = current.value
+  if (groupBy) params.groupBy = groupBy
 
   const { data, isLoading, isError } = useTaskList(params)
   const tasks = data?.items ?? []
@@ -105,6 +160,8 @@ export default function TasksPage() {
               </button>
             ))}
           </div>
+
+          <TaskViewsMenu current={viewConfig} onApply={applyConfig} />
 
           {calendar ? (
             <SearchCombobox
@@ -164,6 +221,16 @@ export default function TasksPage() {
                 </SelectContent>
               </Select>
 
+              <Select value={groupBy ?? NO_GROUPING} onValueChange={v => setFilter('groupBy', v === NO_GROUPING ? undefined : v)}>
+                <SelectTrigger className="w-full lg:w-44" aria-label="Nhóm theo">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NO_GROUPING}>{taskGroupByLabel.none}</SelectItem>
+                  {TASK_GROUP_BYS.map(g => <SelectItem key={g} value={g}>Nhóm theo {taskGroupByLabel[g].toLowerCase()}</SelectItem>)}
+                </SelectContent>
+              </Select>
+
               <SearchCombobox
                 id="tasks-client-filter"
                 ariaLabel="Lọc theo khách"
@@ -187,7 +254,7 @@ export default function TasksPage() {
         </div>
 
         {calendar ? (
-          <TaskCalendar projectId={projectId || undefined} onOpen={setOpenId} />
+          <TaskCalendar projectId={projectId || undefined} onOpen={setOpenId} unit={calendarUnit} onUnitChange={setCalendarUnit} />
         ) : (
           <>
             {isLoading ? (
@@ -210,7 +277,14 @@ export default function TasksPage() {
                 }
               />
             ) : (
-              <TaskTable tasks={tasks} onOpen={setOpenId} showProject />
+              <>
+                {data?.truncated && (
+                  <p role="status" className="border-b bg-warning-soft px-4 py-2 text-sm text-foreground">
+                    Có hơn 5000 công việc khớp bộ lọc nên chỉ 5000 việc được nhóm (ưu tiên việc chưa xong). Thu hẹp bộ lọc để xem đủ.
+                  </p>
+                )}
+                <TaskTable tasks={tasks} onOpen={setOpenId} showProject groups={data?.groups} />
+              </>
             )}
             <Pagination page={page} pageSize={PAGE_SIZE} total={data?.total ?? 0} onPageChange={setPage} itemLabel="công việc" />
           </>

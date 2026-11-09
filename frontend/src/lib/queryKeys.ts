@@ -37,6 +37,8 @@ export const qk = {
     calendar: (from: string, to: string, projectId?: string) => ['tasks', 'calendar', from, to, projectId ?? ''] as const,
   },
 
+  taskViews: ['task-views'] as const,
+
   // Under 'projects' on purpose: every existing invalidateQueries(qk.projects.all) also refreshes the flow
   flow: {
     project:      (projectId: string) => ['projects', projectId, 'flow']          as const,

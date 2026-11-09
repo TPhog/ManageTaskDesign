@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { TaskListItem, TaskPriority, TaskStatus } from '@/lib/types'
+import type { TaskGroupBy, TaskListItem, TaskPriority, TaskStatus, TaskViewConfig } from '@/lib/types'
 
 /** Both dates set and the due date lies before the start date ('YYYY-MM-DD' strings compare as dates). */
 export const dueBeforeStart = (start: string, due: string): boolean => !!start && !!due && due < start
@@ -134,4 +134,52 @@ export function planMove(
 /** List view order: board column order, then position inside the column. */
 export function compareForList(a: BoardTask, b: BoardTask): number {
   return TASK_STATUSES.indexOf(a.status) - TASK_STATUSES.indexOf(b.status) || a.sortOrder - b.sortOrder
+}
+
+// ---- P15: group-by and saved views ----
+
+export const TASK_GROUP_BYS: TaskGroupBy[] = ['project', 'deliverable', 'due', 'priority', 'status']
+
+export const taskGroupByLabel: Record<TaskGroupBy | 'none', string> = {
+  none: 'Không nhóm',
+  project: 'Dự án',
+  deliverable: 'Hạng mục',
+  due: 'Hạn',
+  priority: 'Ưu tiên',
+  status: 'Trạng thái',
+}
+
+export const DEFAULT_VIEW_CONFIG: TaskViewConfig = {
+  mode: 'list',
+  groupBy: 'none',
+  due: null,
+  status: null,
+  clientId: null,
+  clientLabel: null,
+  projectId: null,
+  projectLabel: null,
+  q: null,
+  calendarUnit: 'month',
+}
+
+/** Same filters, grouping and mode; the display labels (client/project names) are ignored. */
+export function sameConfig(a: TaskViewConfig, b: TaskViewConfig): boolean {
+  return a.mode === b.mode
+    && a.groupBy === b.groupBy
+    && (a.due ?? null) === (b.due ?? null)
+    && (a.status ?? null) === (b.status ?? null)
+    && (a.clientId ?? null) === (b.clientId ?? null)
+    && (a.projectId ?? null) === (b.projectId ?? null)
+    && (a.q ?? null) === (b.q ?? null)
+    && (a.calendarUnit ?? 'month') === (b.calendarUnit ?? 'month')
+}
+
+/** The URL part of a view (view/due/status/groupBy); default values are left out. */
+export function configToSearch(c: TaskViewConfig): URLSearchParams {
+  const s = new URLSearchParams()
+  if (c.mode === 'calendar') s.set('view', 'calendar')
+  if (c.due) s.set('due', c.due)
+  if (c.status) s.set('status', c.status)
+  if (c.groupBy !== 'none') s.set('groupBy', c.groupBy)
+  return s
 }
