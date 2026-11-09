@@ -10,6 +10,7 @@
 --   psql "$DEV_DATABASE_URL" -v target_percent=95 -v quota_bytes=1073741824 -f backend/tools/seed-storage-usage.sql
 --
 --   target_percent  bắt buộc, 1..100: mức sử dụng cần đạt (đã tính cả dung lượng ảnh đang có)
+--   dev_db          tuỳ chọn, mặc định freelanceflow: script thoát nếu current_database() khác tên này
 --   quota_bytes     tuỳ chọn, mặc định 10737418240 (10 GiB = Storage:QuotaBytes trong appsettings.json)
 --
 -- Mỗi dòng giả có tên "seed-storage-N.webp", sha256 ngẫu nhiên, thuộc dự án cũ nhất và là ảnh "Cập nhật tiến độ".
@@ -25,6 +26,18 @@
 \if :{?quota_bytes}
 \else
   \set quota_bytes 10737418240
+\endif
+
+-- Guard: refuse to run anywhere but the dev database (override only with -v dev_db=<name> for another dev DB).
+\if :{?dev_db}
+\else
+  \set dev_db freelanceflow
+\endif
+SELECT (current_database() = :'dev_db') AS is_dev_db \gset
+\if :is_dev_db
+\else
+  \echo 'Từ chối: database hiện tại không phải' :dev_db '- script chỉ dùng cho DB dev.'
+  \quit
 \endif
 
 BEGIN;

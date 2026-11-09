@@ -28,8 +28,8 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} />
-      {/* bottom-right: toasts stay out of the way of the page header and top actions */}
-      <Toaster richColors position="bottom-right" />
+      {/* bottom-right (DF-21), lifted so toasts clear sticky primary buttons; on mobile they sit above the bottom action bar */}
+      <Toaster richColors position="bottom-right" offset={{ bottom: 88, right: 24 }} mobileOffset={{ bottom: 96, left: 12, right: 12 }} visibleToasts={3} />
     </QueryClientProvider>
   </StrictMode>,
 )
