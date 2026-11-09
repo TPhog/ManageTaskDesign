@@ -1,6 +1,7 @@
 import {
   addDays,
   compareForList,
+  deleteWarnings,
   dueInfo,
   planMove,
   sortOrderBetween,
@@ -100,5 +101,27 @@ describe('compareForList', () => {
       { id: 'a', status: 'TODO', sortOrder: 1024 },
     ]
     expect(rows.sort(compareForList).map(r => r.id)).toEqual(['a', 'c', 'd'])
+  })
+})
+
+describe('deleteWarnings (R2 M8)', () => {
+  const rule = { kind: 'WEEKLY', weekdays: 1, monthDay: null, until: null } as const
+  const plain = { recurrence: null, nextOccurrence: null, blockingCount: 0 }
+
+  it('says nothing extra for a plain task without images', () => {
+    expect(deleteWarnings(plain, 0)).toEqual([])
+  })
+
+  it('warns that deleting the current occurrence of a recurring task ends the series', () => {
+    expect(deleteWarnings({ ...plain, recurrence: rule }, 0)).toEqual(['Đây là việc lặp lại: xoá sẽ dừng chuỗi, không tạo lần tiếp theo.'])
+    // already spawned its next copy: the series goes on without it
+    expect(deleteWarnings({ ...plain, recurrence: rule, nextOccurrence: { id: 't2', dueDate: null } }, 0)).toEqual([])
+  })
+
+  it('lists images and the tasks it blocks', () => {
+    expect(deleteWarnings({ ...plain, blockingCount: 2 }, 3)).toEqual([
+      '3 ảnh của công việc cũng bị xoá vĩnh viễn (trừ ảnh là chứng từ báo giá).',
+      '2 công việc đang bị chặn bởi việc này vẫn ở trạng thái “Bị chặn” — nhớ bỏ chặn khi cần.',
+    ])
   })
 })

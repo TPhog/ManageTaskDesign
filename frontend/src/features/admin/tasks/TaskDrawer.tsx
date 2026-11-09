@@ -25,7 +25,7 @@ import { recurrenceUntilError } from './recurrenceUtils'
 import { useTaskImages } from '@/features/admin/images/useImages'
 import { TaskImages } from './TaskImages'
 import { TaskNotes } from './TaskNotes'
-import { TASK_PRIORITIES, TASK_STATUSES, taskFormSchema, taskPriorityLabel, taskStatusLabel, todayVn } from './taskUtils'
+import { TASK_PRIORITIES, TASK_STATUSES, deleteWarnings, taskFormSchema, taskPriorityLabel, taskStatusLabel, todayVn } from './taskUtils'
 import { useDirtyMap, useReportDirty } from './useDirtyMap'
 import { useDeleteTask, useTask, useUpdateTask } from './useTasks'
 
@@ -136,6 +136,7 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
   const remove = useDeleteTask()
   const [confirmDelete, setConfirmDelete] = useState(false)
   const imageCount = useTaskImages(task.id).data?.length ?? 0
+  const warnings = deleteWarnings(task, imageCount)
 
   const { data: project } = useQuery({
     queryKey: qk.projects.detail(task.projectId),
@@ -309,10 +310,10 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
         {confirmDelete ? (
           <div className="space-y-1.5">
-            {imageCount > 0 && (
-              <p id="task-delete-images-warning" className="text-xs text-muted-foreground">
-                {`${imageCount} ảnh của công việc cũng bị xoá vĩnh viễn (trừ ảnh là chứng từ báo giá).`}
-              </p>
+            {warnings.length > 0 && (
+              <div id="task-delete-warnings" className="space-y-1 text-xs text-muted-foreground">
+                {warnings.map(w => <p key={w}>{w}</p>)}
+              </div>
             )}
             <div className="flex items-center gap-2">
               <Button
@@ -320,7 +321,7 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
                 variant="destructive"
                 size="sm"
                 disabled={remove.isPending}
-                aria-describedby={imageCount > 0 ? 'task-delete-images-warning' : undefined}
+                aria-describedby={warnings.length > 0 ? 'task-delete-warnings' : undefined}
                 onClick={() => remove.mutate(task.id, { onSuccess: onDeleted })}
               >
                 Xác nhận xoá

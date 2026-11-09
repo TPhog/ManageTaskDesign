@@ -105,6 +105,25 @@ public class TaskBlockedTests(AppFactory factory) : TaskTestBase(factory)
     }
 
     [Fact]
+    public async Task Deleting_a_blocker_tells_the_dependent_without_a_reason_why_it_is_still_blocked()   // R2 M8
+    {
+        await LoginAsync();
+        var projectId = await CreateProjectAsync();
+        var blocker = (await CreateTaskAsync(projectId, new { title = "Chờ logo" })).GetProperty("id").GetGuid();
+        var id = (await CreateTaskAsync(projectId, new { title = "A" })).GetProperty("id").GetGuid();
+        await Client.PutAsJsonAsync($"/api/admin/tasks/{id}", new { title = "A", status = "BLOCKED", blocked = new { reason = (string?)null, byTaskId = blocker } });
+        (await Client.GetFromJsonAsync<JsonElement>($"/api/admin/tasks/{blocker}")).GetProperty("blockingCount").GetInt32()
+            .Should().Be(1, "the delete confirmation warns about it");
+
+        (await Client.DeleteAsync($"/api/admin/tasks/{blocker}")).StatusCode.Should().Be(HttpStatusCode.NoContent);
+
+        var detail = await Client.GetFromJsonAsync<JsonElement>($"/api/admin/tasks/{id}");
+        detail.GetProperty("status").GetString().Should().Be("BLOCKED", "the designer decides when to unblock (BR-01)");
+        detail.GetProperty("blocked").GetProperty("reason").GetString().Should().Be("Việc chặn “Chờ logo” đã bị xoá");
+        detail.GetProperty("blocked").GetProperty("byTaskId").ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
     public async Task List_item_exposes_blocker_title_and_done_flag()
     {
         await LoginAsync();

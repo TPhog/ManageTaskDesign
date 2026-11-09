@@ -211,6 +211,8 @@ export interface TaskDetail {
   blocked: BlockedInfo | null
   /** the next copy spawned from this task when it was marked DONE */
   nextOccurrence: { id: string; dueDate: string | null } | null
+  /** R2: BLOCKED tasks that this one blocks */
+  blockingCount: number
 }
 
 /** GET /admin/tasks/{id}/notes item — designer-only */

@@ -60,7 +60,8 @@ public record TaskDetailDto(
     Guid? RecurrenceSourceId,
     IReadOnlyList<ExternalLinkDto> Links,
     BlockedInfoDto? Blocked,          // null unless BLOCKED
-    NextOccurrenceDto? NextOccurrence);
+    NextOccurrenceDto? NextOccurrence,
+    int BlockingCount);               // R2 M8: BLOCKED tasks this one blocks (the delete confirmation warns)
 
 public record CreateTaskRequest(
     string? Title,

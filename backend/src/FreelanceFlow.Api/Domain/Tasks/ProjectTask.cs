@@ -195,6 +195,16 @@ public class ProjectTask : IAuditable
     }
 
     /// <summary>
+    /// R2 M8: the blocking task was deleted (the FK would only null the link). The task stays BLOCKED - the designer
+    /// unblocks it (BR-01) - but without its own reason it would show no cause, so the reason says what happened.
+    /// </summary>
+    public void BlockerDeleted(string blockerTitle)
+    {
+        BlockedByTaskId = null;
+        BlockedReason ??= $"Việc chặn “{blockerTitle}” đã bị xoá";
+    }
+
+    /// <summary>
     /// P15 D4 (BR-01: a consequence of the designer's DONE command). Once per task: base = max(due, today VN); the new
     /// TODO task is due on the rule's next date after base and keeps the start→due gap. Copies title, description,
     /// priority, deliverable, links, rule and the checklist (unchecked); never notes, images, revision item or blocked data.

@@ -364,11 +364,13 @@ public static class TasksEndpoints
         var images = await taskImages.Where(f => !db.Quotations.Any(q => q.EvidenceFileId == f.Id)).ToListAsync();
         var kept = await taskImages.CountAsync() - images.Count;
         var clientId = await ClientIdOfAsync(db, task.ProjectId);
+        var dependents = await db.Tasks.Where(t => t.BlockedByTaskId == id).ToListAsync();
+        foreach (var dependent in dependents) dependent.BlockerDeleted(task.Title);
 
         db.Tasks.Remove(task);
         await ImageDeletion.MarkDeletedAsync(db, activity, clock, images, bulk: false, CancellationToken.None);
         activity.Write("task", task.Id, "task.deleted", clientId: clientId, projectId: task.ProjectId,
-            data: new { title = task.Title, imagesDeleted = images.Count, imagesKept = kept });
+            data: new { title = task.Title, imagesDeleted = images.Count, imagesKept = kept, blockedDependents = dependents.Count });
 
         await db.SaveChangesAsync();
         await tx.CommitAsync();
@@ -524,6 +526,7 @@ public static class TasksEndpoints
             .OrderBy(t => t.CreatedAt).ThenBy(t => t.Id)
             .Select(t => new NextOccurrenceDto(t.Id, t.DueDate))
             .FirstOrDefaultAsync();
+        var blockingCount = await db.Tasks.CountAsync(t => t.BlockedByTaskId == id && t.Status == "BLOCKED");
         var rule = task.Recurrence();
 
         return new TaskDetailDto(
@@ -553,7 +556,8 @@ public static class TasksEndpoints
             task.RecurrenceSourceId,
             task.Links().Select(l => new ExternalLinkDto(l.Title, l.Url, l.VisibleToClient)).ToList(),
             blocked,
-            nextOccurrence);
+            nextOccurrence,
+            blockingCount);
     }
 
     /// <summary>

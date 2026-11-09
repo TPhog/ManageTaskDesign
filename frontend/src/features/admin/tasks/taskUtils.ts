@@ -1,5 +1,20 @@
 import { z } from 'zod'
-import type { TaskGroupBy, TaskListItem, TaskPriority, TaskStatus, TaskViewConfig } from '@/lib/types'
+import type { TaskDetail, TaskGroupBy, TaskListItem, TaskPriority, TaskStatus, TaskViewConfig } from '@/lib/types'
+
+/**
+ * R2 M8: what else a delete does, shown in the confirmation. A recurring task that has not spawned its next copy is the
+ * series' current occurrence: deleting it ends the series. Tasks it blocks stay BLOCKED (the designer unblocks them).
+ */
+export function deleteWarnings(
+  task: Pick<TaskDetail, 'recurrence' | 'nextOccurrence' | 'blockingCount'>, imageCount: number,
+): string[] {
+  const warnings: string[] = []
+  if (imageCount > 0) warnings.push(`${imageCount} ảnh của công việc cũng bị xoá vĩnh viễn (trừ ảnh là chứng từ báo giá).`)
+  if (task.recurrence && !task.nextOccurrence) warnings.push('Đây là việc lặp lại: xoá sẽ dừng chuỗi, không tạo lần tiếp theo.')
+  if (task.blockingCount > 0)
+    warnings.push(`${task.blockingCount} công việc đang bị chặn bởi việc này vẫn ở trạng thái “Bị chặn” — nhớ bỏ chặn khi cần.`)
+  return warnings
+}
 
 /** Both dates set and the due date lies before the start date ('YYYY-MM-DD' strings compare as dates). */
 export const dueBeforeStart = (start: string, due: string): boolean => !!start && !!due && due < start
