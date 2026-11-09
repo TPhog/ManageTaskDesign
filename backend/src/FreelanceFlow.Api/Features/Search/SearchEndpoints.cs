@@ -11,7 +11,8 @@ public static class SearchEndpoints
         app.MapGroup("/api/admin").RequireAuthorization().MapGet("search", Search);
 
     /// <summary>
-    /// docs/08 §2.1 header quick search: clients (name / company / phone), projects (name), quotations (number / title).
+    /// docs/08 §2.1 header quick search: clients (name / company / phone), projects (name), quotations (number / title),
+    /// tasks (title) and client requests (content, newest first) — P14 DF-26.
     /// Each group matches only its own columns (a client's name never returns its projects). Case- and accent-insensitive
     /// via ILIKE + unaccent (migration AddUnaccentExtension); prefix matches rank first; at most 5 rows per group.
     /// </summary>
@@ -77,6 +78,32 @@ public static class SearchEndpoints
                 r.ProjectName, r.ClientName, r.Quotation.EffectiveStatus(today), r.Quotation.Total))
             .ToList();
 
-        return Results.Ok(new SearchResultDto(clients, projects, quotations));
+        var tasks = await (
+                from t in db.Tasks.AsNoTracking()
+                join p in db.Projects.AsNoTracking() on t.ProjectId equals p.Id
+                where EF.Functions.ILike(EF.Functions.Unaccent(t.Title), EF.Functions.Unaccent(contains), esc)
+                select new { Task = t, ProjectName = p.Name })
+            .OrderBy(x => EF.Functions.ILike(EF.Functions.Unaccent(x.Task.Title), EF.Functions.Unaccent(prefix), esc) ? 0 : 1)
+            .ThenBy(x => x.Task.Title)
+            .Take(limit)
+            .Select(x => new SearchTaskDto(x.Task.Id, x.Task.ProjectId, x.Task.Title, x.ProjectName, x.Task.Status))
+            .ToListAsync();
+
+        var requestRows = await (
+                from r in db.ClientRequests.AsNoTracking()
+                join p in db.Projects.AsNoTracking() on r.ProjectId equals p.Id
+                join c in db.Clients.AsNoTracking() on p.ClientId equals c.Id
+                where EF.Functions.ILike(EF.Functions.Unaccent(r.Content), EF.Functions.Unaccent(contains), esc)
+                orderby r.CreatedAt descending
+                select new { r.Id, r.ProjectId, ProjectName = p.Name, ClientName = c.Name, r.Content, r.Status })
+            .Take(limit)
+            .ToListAsync();
+        var requests = requestRows
+            .Select(r => new SearchRequestDto(r.Id, r.ProjectId, r.ProjectName, r.ClientName,
+                r.Content.Length > SearchRequestDto.ExcerptLength ? r.Content[..SearchRequestDto.ExcerptLength] : r.Content,
+                r.Status))
+            .ToList();
+
+        return Results.Ok(new SearchResultDto(clients, projects, quotations, tasks, requests));
     }
 }

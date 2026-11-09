@@ -34,6 +34,62 @@ public class SearchTests(AppFactory factory) : IntegrationTestBase(factory)
     }
 
     [Fact]
+    public async Task Search_short_term_returns_all_groups_empty()   // P14 DF-26
+    {
+        await LoginAsync();
+        var res = await SearchAsync("a");
+        foreach (var g in new[] { "clients", "projects", "quotations", "tasks", "requests" })
+            res.GetProperty(g).GetArrayLength().Should().Be(0);
+    }
+
+    [Fact]
+    public async Task Search_finds_tasks_by_title_ignoring_accents()   // P14 DF-26
+    {
+        await LoginAsync();
+        var tok = Token();
+        var projectId = await CreateProjectAsync(await CreateClientAsync($"Khách {tok}"), $"Cà phê Sương Mai {tok}");
+        var created = await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/tasks", new { title = $"Phác thảo logo {tok}" });
+        created.EnsureSuccessStatusCode();
+        var taskId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("id").GetGuid();
+
+        var res = await SearchAsync($"phac thao logo {tok}");
+
+        var tasks = res.GetProperty("tasks").EnumerateArray().ToList();
+        tasks.Should().ContainSingle();
+        tasks[0].GetProperty("id").GetGuid().Should().Be(taskId);
+        tasks[0].GetProperty("projectId").GetGuid().Should().Be(projectId);
+        tasks[0].GetProperty("title").GetString().Should().Be($"Phác thảo logo {tok}");
+        tasks[0].GetProperty("projectName").GetString().Should().Be($"Cà phê Sương Mai {tok}");
+        tasks[0].GetProperty("status").GetString().Should().Be("TODO");
+        Ids(res, "projects").Should().BeEmpty();   // the project's name does not contain the task's words
+    }
+
+    [Fact]
+    public async Task Search_finds_client_requests_by_content_with_an_excerpt()   // P14 DF-26
+    {
+        await LoginAsync();
+        var tok = Token();
+        var clientId = await CreateClientAsync($"Khách yêu cầu {tok}");
+        var projectId = await CreateProjectAsync(clientId, $"Dự án yêu cầu {tok}");
+        var content = $"Đổi màu logo sang xanh lá {tok} " + new string('x', 200);
+        var created = await Client.PostAsJsonAsync($"/api/admin/projects/{projectId}/requests", new { content, source = "ZALO" });
+        created.EnsureSuccessStatusCode();
+        var requestId = (await created.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("request").GetProperty("id").GetGuid();
+
+        var res = await SearchAsync($"xanh la {tok}");
+
+        var requests = res.GetProperty("requests").EnumerateArray().ToList();
+        requests.Should().ContainSingle();
+        var hit = requests[0];
+        hit.GetProperty("id").GetGuid().Should().Be(requestId);
+        hit.GetProperty("projectId").GetGuid().Should().Be(projectId);
+        hit.GetProperty("projectName").GetString().Should().Be($"Dự án yêu cầu {tok}");
+        hit.GetProperty("clientName").GetString().Should().Be($"Khách yêu cầu {tok}");
+        hit.GetProperty("status").GetString().Should().Be("NEW");
+        hit.GetProperty("excerpt").GetString().Should().Be(content[..120]).And.Contain(tok);
+    }
+
+    [Fact]
     public async Task Too_long_query_is_rejected()
     {
         await LoginAsync();
