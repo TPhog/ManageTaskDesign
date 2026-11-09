@@ -1,6 +1,6 @@
 import { ArrowDown, ArrowUp, ChevronsUp, Equal, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { TaskPriority, TaskStatus } from '@/lib/types'
+import type { TaskListItem, TaskPriority, TaskStatus } from '@/lib/types'
 import { dueInfo, taskPriorityLabel, type DueTone } from './taskUtils'
 
 const priorityStyle: Record<TaskPriority, [string, LucideIcon]> = {
@@ -33,4 +33,17 @@ const toneClass: Record<DueTone, string> = {
 export function DueText({ dueDate, status, today }: { dueDate: string | null; status: TaskStatus; today: string }) {
   const { label, tone } = dueInfo(dueDate, status, today)
   return <span className={cn('whitespace-nowrap text-xs tabular-nums', toneClass[tone])}>{label}</span>
+}
+
+/** P15: "Bị chặn: <reason> · chờ "<blocker>" · đã xong" under a BLOCKED card / row title. */
+export function BlockedLine({ task, className }: {
+  task: Pick<TaskListItem, 'blockedReason' | 'blockedByTitle' | 'blockedByDone'>
+  className?: string
+}) {
+  return (
+    <p className={cn('break-words text-xs text-warning', className)}>
+      <span className="font-medium">Bị chặn:</span> {task.blockedReason ?? 'chưa ghi lý do'}
+      {task.blockedByTitle && <> · chờ “{task.blockedByTitle}”{task.blockedByDone && ' · đã xong'}</>}
+    </p>
+  )
 }

@@ -19,7 +19,9 @@ import { Label } from '@/components/ui/label'
 import { DateInput } from '@/components/DateInput'
 import { SearchCombobox } from '@/components/SearchCombobox'
 import { api, type ApiError } from '@/lib/api'
-import type { Deliverable } from '@/lib/types'
+import { qk } from '@/lib/queryKeys'
+import type { Deliverable, ExternalLink } from '@/lib/types'
+import { LinkListEditor } from '@/features/admin/tasks/LinkListEditor'
 
 // Radix Select reserves '' for "no value"
 const NO_SERVICE = '_none'
@@ -222,7 +224,46 @@ export function DeliverableDialog({ projectId, open, onClose, editing }: Props) 
             </Button>
           </DialogFooter>
         </form>
+        {editing ? (
+          <DeliverableLinks key={editing.id} deliverable={editing} />
+        ) : (
+          <p className="border-t pt-4 text-xs text-muted-foreground">Lưu hạng mục trước rồi mới thêm liên kết.</p>
+        )}
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** P15 D6: links of a deliverable, saved on their own (PUT …/links); flagged ones show on the client portal. */
+function DeliverableLinks({ deliverable }: { deliverable: Deliverable }) {
+  const qc = useQueryClient()
+  // `saved` is the server's list: the dialog's `deliverable` prop is a snapshot taken when it opened
+  const [saved, setSaved] = useState<ExternalLink[]>(deliverable.links ?? [])
+  const [links, setLinks] = useState<ExternalLink[]>(saved)
+  const dirty = JSON.stringify(links) !== JSON.stringify(saved)
+  const save = useMutation({
+    mutationFn: () => api.put<{ links: ExternalLink[] }>(`/admin/deliverables/${deliverable.id}/links`, { links }),
+    onSuccess: res => {
+      setSaved(res.links)
+      setLinks(res.links)
+      toast.success('Đã lưu liên kết')
+      return qc.invalidateQueries({ queryKey: qk.projects.all })
+    },
+    onError: (err: ApiError) => toast.error((err.errors ? Object.values(err.errors).flat()[0] : undefined) ?? err.detail ?? 'Không thể lưu liên kết'),
+  })
+
+  return (
+    <section aria-labelledby="deliverable-links-title" className="space-y-3 border-t pt-4">
+      <div>
+        <h3 id="deliverable-links-title" className="text-sm font-semibold text-foreground">Liên kết</h3>
+        <p className="text-xs text-muted-foreground">File Figma, thư mục Drive… Đánh dấu “Khách xem được” để khách thấy trong cổng khách hàng.</p>
+      </div>
+      <LinkListEditor value={links} onChange={setLinks} allowClientVisible disabled={save.isPending} />
+      <div className="flex justify-end">
+        <Button type="button" variant="outline" disabled={!dirty || save.isPending} onClick={() => save.mutate()}>
+          {save.isPending ? 'Đang lưu…' : 'Lưu liên kết'}
+        </Button>
+      </div>
+    </section>
   )
 }

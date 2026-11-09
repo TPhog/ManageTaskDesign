@@ -17,7 +17,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { FileText, GripVertical, ListChecks, MessageSquare, MoreHorizontal } from 'lucide-react'
+import { FileText, GripVertical, Link2, ListChecks, MessageSquare, MoreHorizontal, Repeat } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -28,7 +28,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { TaskListItem, TaskStatus } from '@/lib/types'
 import { QuickCreateTask } from './QuickCreateTask'
-import { DueText, PriorityBadge } from './TaskMeta'
+import { BlockedLine, DueText, PriorityBadge } from './TaskMeta'
 import { COLUMN_PREFIX, TASK_STATUSES, columnId, columnTasks, planMove, taskStatusLabel, todayVn } from './taskUtils'
 import { useMoveTask } from './useTasks'
 
@@ -49,7 +49,7 @@ interface Props {
 }
 
 export function TaskBoard({ projectId, tasks, onOpen }: Props) {
-  const move = useMoveTask()
+  const move = useMoveTask({ onNeedBlockedReason: onOpen })
   const [activeId, setActiveId] = useState<string | null>(null)
   const sensors = useSensors(
     // 5px threshold: a plain click on the card still opens the drawer
@@ -266,7 +266,20 @@ function CardBody({ task, today, onOpen, handle, menu }: CardBodyProps) {
             <span className="sr-only"> ghi chú</span>
           </span>
         )}
+        {task.isRecurring && (
+          <span role="img" title="Công việc lặp lại" aria-label="Công việc lặp lại" className="inline-flex items-center text-muted-foreground">
+            <Repeat className="h-3.5 w-3.5" aria-hidden="true" />
+          </span>
+        )}
+        {task.linksCount > 0 && (
+          <span title={`${task.linksCount} liên kết`} className="inline-flex items-center gap-1 text-xs tabular-nums text-muted-foreground">
+            <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
+            {task.linksCount}
+            <span className="sr-only"> liên kết</span>
+          </span>
+        )}
       </div>
+      {task.status === 'BLOCKED' && <BlockedLine task={task} className="mt-2" />}
       {task.deliverableName && <p className="mt-2 truncate text-xs text-muted-foreground">{task.deliverableName}</p>}
     </div>
   )

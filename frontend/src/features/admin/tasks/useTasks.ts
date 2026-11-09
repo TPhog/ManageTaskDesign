@@ -3,6 +3,7 @@ import { toast } from 'sonner'
 import { api, type ApiError } from '@/lib/api'
 import { qk } from '@/lib/queryKeys'
 import { invalidateImageQueries } from '@/features/admin/images/useImages'
+import { formatDate } from '@/lib/format'
 import type {
   PagedResult,
   TaskDetail,
@@ -30,6 +31,33 @@ function toQuery(params: TaskListParams): string {
 function errorText(err: ApiError, fallback: string): string {
   const fieldError = err.errors ? Object.values(err.errors).flat()[0] : undefined
   return fieldError ?? err.detail ?? fallback
+}
+
+/** P15: a move/update to DONE spawned the next copy of a recurring task */
+function spawnedText(task: TaskDetail, prevStatus: TaskStatus | undefined): string | null {
+  if (task.status !== 'DONE' || prevStatus === 'DONE' || !task.nextOccurrence) return null
+  const due = task.nextOccurrence.dueDate
+  return `Đã tạo công việc kế tiếp (${due ? `hạn ${formatDate(due)}` : 'chưa có hạn'})`
+}
+
+/** Status the task had before a write, from whatever cache holds it (drawer detail or a list row). */
+function cachedStatus(qc: QueryClient, id: string): TaskStatus | undefined {
+  const detail = qc.getQueryData<TaskDetail>(qk.tasks.detail(id))
+  if (detail) return detail.status
+  for (const [, data] of qc.getQueriesData<PagedResult<TaskListItem>>({ queryKey: qk.tasks.lists })) {
+    const row = data?.items?.find(t => t.id === id)
+    if (row) return row.status
+  }
+  return undefined
+}
+
+/** 409 CONCURRENCY_CONFLICT: the task changed elsewhere — reload it instead of keeping a stale copy. */
+function onConcurrencyConflict(qc: QueryClient, id: string, err: ApiError): boolean {
+  if (err.code !== 'CONCURRENCY_CONFLICT') return false
+  toast.error('Công việc vừa được cập nhật ở nơi khác — đã tải lại bản mới nhất')
+  void qc.invalidateQueries({ queryKey: qk.tasks.detail(id) })
+  void qc.invalidateQueries({ queryKey: qk.tasks.lists })
+  return true
 }
 
 /** Every task write returns the fresh TaskDetail: store it, then refresh the lists that show the task. */
@@ -99,21 +127,26 @@ export function useUpdateTask(id: string) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: TaskUpdateInput) => api.put<TaskDetail>(`/admin/tasks/${id}`, body),
-    onSuccess: task => {
-      toast.success('Đã lưu công việc')
+    onMutate: () => ({ prevStatus: cachedStatus(qc, id) }),
+    onSuccess: (task, _body, ctx) => {
+      toast.success(spawnedText(task, ctx?.prevStatus) ?? 'Đã lưu công việc')
       return onTaskSaved(qc, task)
     },
-    onError: (err: ApiError) => toast.error(errorText(err, 'Không thể lưu công việc')),
+    onError: (err: ApiError) => {
+      if (!onConcurrencyConflict(qc, id, err)) toast.error(errorText(err, 'Không thể lưu công việc'))
+    },
   })
 }
 
-export function useMoveTask() {
+/** `onNeedBlockedReason`: a card dropped into BLOCKED without a reason offers to open the drawer for it. */
+export function useMoveTask(opts?: { onNeedBlockedReason?: (taskId: string) => void }) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: ({ id, status, sortOrder }: { id: string; status: TaskStatus; sortOrder: number }) =>
       api.post<TaskDetail>(`/admin/tasks/${id}/move`, { status, sortOrder }),
     // Optimistic: the card stays where it was dropped while the request runs
     onMutate: async ({ id, status, sortOrder }) => {
+      const prevStatus = cachedStatus(qc, id)
       await qc.cancelQueries({ queryKey: qk.tasks.lists })
       const snapshots = qc.getQueriesData<PagedResult<TaskListItem>>({ queryKey: qk.tasks.lists })
       for (const [key, data] of snapshots) {
@@ -123,14 +156,21 @@ export function useMoveTask() {
           items: data.items.map(t => (t.id === id ? { ...t, status, sortOrder } : t)),
         })
       }
-      return { snapshots }
+      return { snapshots, prevStatus }
     },
-    onError: (err: ApiError, _vars, ctx) => {
+    onError: (err: ApiError, vars, ctx) => {
       for (const [key, data] of ctx?.snapshots ?? []) qc.setQueryData(key, data)
-      toast.error(errorText(err, 'Không thể di chuyển công việc'))
+      if (!onConcurrencyConflict(qc, vars.id, err)) toast.error(errorText(err, 'Không thể di chuyển công việc'))
     },
-    onSuccess: task => {
-      if (task) qc.setQueryData(qk.tasks.detail(task.id), task)
+    onSuccess: (task, _vars, ctx) => {
+      if (!task) return
+      qc.setQueryData(qk.tasks.detail(task.id), task)
+      const spawned = spawnedText(task, ctx?.prevStatus)
+      if (spawned) toast.success(spawned)
+      const onNeedReason = opts?.onNeedBlockedReason
+      if (task.status === 'BLOCKED' && ctx?.prevStatus !== 'BLOCKED' && !task.blocked?.reason && onNeedReason) {
+        toast('Đã chuyển sang Bị chặn', { action: { label: 'Thêm lý do', onClick: () => onNeedReason(task.id) } })
+      }
     },
     // Refetch the lists either way so the cache never keeps a card in a position the server rejected
     onSettled: () =>

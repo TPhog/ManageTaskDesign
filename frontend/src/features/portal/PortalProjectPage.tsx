@@ -14,6 +14,7 @@ import { EditorialSection, Kicker } from './kit/editorial'
 import { designTypeLabel, portalProjectStatus } from './labels'
 import { ProgressBar } from './ProgressBar'
 import { DeliverableReview } from './DeliverableReview'
+import { PortalDeliverableLinks } from './PortalDeliverableLinks'
 import { deliveredText, remainingRoundsText } from './progress'
 import { deliverableBadge } from './review'
 import { PortalQuotationList } from './PortalQuotationList'
@@ -158,6 +159,7 @@ export default function PortalProjectPage() {
                     {d.dueDate && ` · Hạn ${formatDate(d.dueDate)}`}
                   </p>
                   <DeliverableReview projectId={project.id} projectStatus={project.status} deliverable={d} />
+                  <PortalDeliverableLinks links={d.links ?? []} />
                 </li>
               )
             })}

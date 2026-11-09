@@ -1,9 +1,9 @@
 import { Fragment } from 'react'
 import { Link } from 'react-router-dom'
-import { ListChecks } from 'lucide-react'
+import { Link2, ListChecks, Repeat } from 'lucide-react'
 import { StatusBadge } from '@/components/StatusBadge'
 import type { TaskGroup, TaskListItem } from '@/lib/types'
-import { DueText, PriorityBadge } from './TaskMeta'
+import { BlockedLine, DueText, PriorityBadge } from './TaskMeta'
 import { taskStatusLabel, todayVn } from './taskUtils'
 
 interface Props {
@@ -54,6 +54,18 @@ export function TaskTable({ tasks, onOpen, showProject = false, groups }: Props)
                   >
                     {t.title}
                   </button>
+                  {t.isRecurring && (
+                    <span role="img" title="Công việc lặp lại" aria-label="Công việc lặp lại" className="ml-1.5 inline-flex align-middle text-muted-foreground">
+                      <Repeat className="h-3.5 w-3.5" aria-hidden="true" />
+                    </span>
+                  )}
+                  {t.linksCount > 0 && (
+                    <span role="img" title={`${t.linksCount} liên kết`} aria-label={`${t.linksCount} liên kết`} className="ml-1.5 inline-flex items-center gap-0.5 align-middle text-xs tabular-nums text-muted-foreground">
+                      <Link2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      {t.linksCount}
+                    </span>
+                  )}
+                  {t.status === 'BLOCKED' && <BlockedLine task={t} className="mt-0.5" />}
                 </td>
                 {showProject && (
                   <td className="hidden px-4 py-3 md:table-cell">

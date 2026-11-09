@@ -78,6 +78,8 @@ export interface PortalDeliverable {
   reviewState: PortalReviewState
   /** a NEW request or an unfinished revision item is open for this deliverable */
   hasOpenChangeRequest: boolean
+  /** P15: only the links the designer marked "khách xem được" (no flag). Optional so older fixtures keep compiling */
+  links?: { title: string; url: string }[]
 }
 
 /** POST /api/portal/deliverables/{id}/approve */

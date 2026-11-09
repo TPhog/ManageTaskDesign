@@ -13,11 +13,14 @@ import { MarkdownField } from './MarkdownField'
 import { Skeleton } from '@/components/ui/skeleton'
 import { DateInput } from '@/components/DateInput'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import type { z } from 'zod'
+import { z } from 'zod'
 import { api, type ApiError } from '@/lib/api'
 import { qk } from '@/lib/queryKeys'
-import type { ProjectDetail, TaskDetail } from '@/lib/types'
+import type { ProjectDetail, Recurrence, RecurrenceInput, TaskDetail } from '@/lib/types'
 import { TaskChecklist } from './TaskChecklist'
+import { LinkListEditor } from './LinkListEditor'
+import { NO_BLOCKER, TaskBlockedField } from './TaskBlockedField'
+import { TaskRecurrenceField } from './TaskRecurrenceField'
 import { useTaskImages } from '@/features/admin/images/useImages'
 import { TaskImages } from './TaskImages'
 import { TaskNotes } from './TaskNotes'
@@ -28,7 +31,25 @@ import { useDeleteTask, useTask, useUpdateTask } from './useTasks'
 // Radix Select reserves '' for "no value"
 const NO_DELIVERABLE = '_none'
 
-type FormValues = z.infer<typeof taskFormSchema>
+// P15: repeat rule, external links and the blocked reason ride along with the main task form
+const schema = taskFormSchema.and(z.object({
+  links: z.array(z.object({ title: z.string(), url: z.string(), visibleToClient: z.boolean() })).max(10),
+  recurrence: z.object({
+    kind: z.enum(['NONE', 'DAILY', 'WEEKLY', 'MONTHLY']),
+    weekdays: z.number(),
+    monthDay: z.number().nullable(),
+    until: z.string(),
+  }),
+  blockedReason: z.string().max(500, 'Tối đa 500 ký tự'),
+  blockedByTaskId: z.string(),
+}))
+
+type FormValues = z.infer<typeof schema>
+
+const NO_RECURRENCE: FormValues['recurrence'] = { kind: 'NONE', weekdays: 0, monthDay: null, until: '' }
+const toFormRecurrence = (r: Recurrence | null): FormValues['recurrence'] => (r ? { ...r, until: r.until ?? '' } : NO_RECURRENCE)
+const fromFormRecurrence = (r: FormValues['recurrence']): Recurrence | null =>
+  r.kind === 'NONE' ? null : { kind: r.kind, weekdays: r.weekdays, monthDay: r.monthDay, until: r.until || null }
 
 interface Props {
   /** null = closed */
@@ -123,7 +144,7 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const { register, handleSubmit, watch, setValue, setError, trigger, formState: { errors, isDirty } } = useForm<FormValues>({
-    resolver: zodResolver(taskFormSchema) as any,
+    resolver: zodResolver(schema) as any,
     defaultValues: {
       title: task.title,
       description: task.description,
@@ -132,12 +153,21 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
       startDate: task.startDate ?? '',
       dueDate: task.dueDate ?? '',
       deliverableId: task.deliverableId ?? NO_DELIVERABLE,
+      links: task.links ?? [],
+      recurrence: toFormRecurrence(task.recurrence ?? null),
+      blockedReason: task.blocked?.reason ?? '',
+      blockedByTaskId: task.blocked?.byTaskId ?? NO_BLOCKER,
     },
   })
+  // server-side errors of the P15 fields (400 errors.recurrence / links / blocked.*)
+  const [extraErrors, setExtraErrors] = useState<Record<string, string>>({})
 
   useReportDirty(isDirty, onDirtyChange)
 
   function onSubmit(v: FormValues) {
+    const rule = fromFormRecurrence(v.recurrence)
+    const recurrence: RecurrenceInput = rule ?? { kind: 'NONE', weekdays: 0, monthDay: null, until: null }
+    setExtraErrors({})
     update.mutate({
       title: v.title,
       description: v.description,
@@ -146,11 +176,21 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
       startDate: v.startDate || null,
       dueDate: v.dueDate || null,
       deliverableId: v.deliverableId === NO_DELIVERABLE ? null : v.deliverableId,
+      links: v.links,
+      recurrence,
+      blocked: v.status === 'BLOCKED'
+        ? { reason: v.blockedReason.trim() || null, byTaskId: v.blockedByTaskId === NO_BLOCKER ? null : v.blockedByTaskId }
+        : undefined,
     }, {
       // the server enforces the same rule (400 errors.dueDate): show it on the field too
       onError: err => {
-        const message = (err as ApiError).errors?.dueDate?.[0]
+        const errors = (err as ApiError).errors ?? {}
+        const message = errors.dueDate?.[0]
         if (message) setError('dueDate', { message })
+        const pick = (prefix: string) => Object.entries(errors).find(([k]) => k === prefix || k.startsWith(`${prefix}.`) || k.startsWith(`${prefix}[`))?.[1]?.[0]
+        setExtraErrors(Object.fromEntries(
+          (['recurrence', 'links', 'blocked'] as const).flatMap(k => { const m = pick(k); return m ? [[k, m]] : [] }),
+        ))
       },
     })
   }
@@ -216,6 +256,37 @@ function TaskForm({ task, onDeleted, onDirtyChange }: { task: TaskDetail; onDele
             {deliverables.map(d => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
           </SelectContent>
         </Select>
+      </div>
+
+      {watch('status') === 'BLOCKED' && (
+        <div className="space-y-1.5">
+          <TaskBlockedField
+            projectId={task.projectId}
+            taskId={task.id}
+            value={{ reason: watch('blockedReason'), byTaskId: watch('blockedByTaskId') === NO_BLOCKER ? null : watch('blockedByTaskId') }}
+            onChange={b => {
+              setValue('blockedReason', b.reason, { shouldDirty: true })
+              setValue('blockedByTaskId', b.byTaskId ?? NO_BLOCKER, { shouldDirty: true })
+            }}
+          />
+          {extraErrors.blocked && <p role="alert" className="text-sm text-destructive">{extraErrors.blocked}</p>}
+        </div>
+      )}
+
+      <div className="space-y-1.5">
+        <TaskRecurrenceField
+          value={fromFormRecurrence(watch('recurrence'))}
+          onChange={r => setValue('recurrence', toFormRecurrence(r), { shouldDirty: true })}
+          nextOccurrence={task.nextOccurrence}
+          baseDate={watch('dueDate') || null}
+        />
+        {extraErrors.recurrence && <p role="alert" className="text-sm text-destructive">{extraErrors.recurrence}</p>}
+      </div>
+
+      <div className="space-y-2">
+        <Label asChild><span>Liên kết ngoài</span></Label>
+        <LinkListEditor value={watch('links')} onChange={v => setValue('links', v, { shouldDirty: true })} />
+        {extraErrors.links && <p role="alert" className="text-sm text-destructive">{extraErrors.links}</p>}
       </div>
 
       <MarkdownField

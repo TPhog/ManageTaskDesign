@@ -52,6 +52,8 @@ export interface Deliverable {
   /** 'APPROVED' once the client pressed "Duyệt" on the portal; cleared when it leaves IN_REVIEW */
   clientDecision: 'APPROVED' | null
   clientDecisionAt: string | null
+  /** P15: external links; visibleToClient ones reach the portal. Optional so older fixtures keep compiling */
+  links?: ExternalLink[]
 }
 
 export interface Brief {
