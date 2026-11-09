@@ -224,7 +224,7 @@ public static class ProjectFlow
             b.Act(FlowActionKinds.RecordDeposit,
                 unpaid.DepositPercent > 0 ? "Đánh dấu đã nhận cọc" : "Đánh dấu đã nhận thanh toán",
                 new FlowTarget(QuotationId: unpaid.Id));
-            b.Act(FlowActionKinds.CopyPaymentReminder, "Sao chép tin nhắn thanh toán", new FlowTarget(QuotationId: unpaid.Id));
+            b.Act(FlowActionKinds.CopyPaymentReminder, "Sao chép tin nhắn nhắc thanh toán", new FlowTarget(QuotationId: unpaid.Id));
         }
         if (f.OverdueTasks > 0)
             b.Warn(FlowWarningKinds.TasksOverdue, $"{f.OverdueTasks} công việc quá hạn", FlowSeverities.Warning);
@@ -332,7 +332,7 @@ public static class ProjectFlow
         var due = f.Quotations.Where(q => Outstanding(q) > 0).OrderBy(q => q.CreatedAt).ToList();
         if (due.Count == 0) return;
         b.Warn(FlowWarningKinds.BalanceDue, $"Khách còn nợ {RevisionQuota.Vnd(due.Sum(Outstanding))}", FlowSeverities.Warning);
-        b.Act(FlowActionKinds.CopyPaymentReminder, "Sao chép tin nhắn thanh toán", new FlowTarget(QuotationId: due[0].Id));
+        b.Act(FlowActionKinds.CopyPaymentReminder, "Sao chép tin nhắn nhắc thanh toán", new FlowTarget(QuotationId: due[0].Id));
     }
 
     private static string Ref(FlowQuotation q) => q.Number is null ? "nháp" : $"{q.Number} (v{q.Version})";

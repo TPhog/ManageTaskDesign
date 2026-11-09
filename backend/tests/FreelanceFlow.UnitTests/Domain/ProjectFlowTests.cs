@@ -266,7 +266,7 @@ public class ProjectFlowTests
 
         s.Stage.Should().Be("CLOSE");
         StepStatuses(s).Should().Equal("done", "done", "done", "done", "done");
-        s.Actions.Should().Equal(new FlowAction("COPY_PAYMENT_REMINDER", "Sao chép tin nhắn thanh toán", true,
+        s.Actions.Should().Equal(new FlowAction("COPY_PAYMENT_REMINDER", "Sao chép tin nhắn nhắc thanh toán", true,
             new FlowTarget(QuotationId: accepted.Id)));
         s.Warnings.Should().Equal(new FlowWarning("BALANCE_DUE", "Khách còn nợ 2.000.000 ₫", "warning"));
     }
@@ -389,14 +389,14 @@ public class ProjectFlowTests
     }
 
     [Fact]
-    public void Unpaid_deposit_offers_record_deposit_before_the_reminder_with_the_fixed_typo()
+    public void Unpaid_deposit_offers_record_deposit_before_the_reminder_with_the_fixed_label()
     {
         var accepted = Q("ACCEPTED", depositPercent: 30);
         var s = Eval(Facts("IN_PROGRESS", true, [D("IN_PROGRESS")], [accepted], openTasks: 1));
         Kinds(s).Should().Equal("VIEW_TASKS", "RECORD_DEPOSIT", "COPY_PAYMENT_REMINDER");
         s.Actions.Single(a => a.Kind == "RECORD_DEPOSIT").Label.Should().Be("Đánh dấu đã nhận cọc");
         s.Actions.Single(a => a.Kind == "RECORD_DEPOSIT").Target.QuotationId.Should().Be(accepted.Id);
-        s.Actions.Single(a => a.Kind == "COPY_PAYMENT_REMINDER").Label.Should().Be("Sao chép tin nhắn thanh toán");
+        s.Actions.Single(a => a.Kind == "COPY_PAYMENT_REMINDER").Label.Should().Be("Sao chép tin nhắn nhắc thanh toán");
     }
 
     [Fact]
